@@ -1,0 +1,29 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.test-deps/
+
+# Tooling and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local service data
+data/local/
+infrastructure/volumes/

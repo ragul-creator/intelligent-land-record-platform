@@ -1,0 +1,17 @@
+# Host-installed dependencies and generated output must not replace Linux image files.
+node_modules/
+dist/
+coverage/
+
+# Local configuration and tooling artifacts.
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+pnpm-debug.log*
+*.tsbuildinfo
+.DS_Store
+.idea/
+.vscode/
+.git/

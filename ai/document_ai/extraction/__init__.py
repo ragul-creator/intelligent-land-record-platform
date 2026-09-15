@@ -1,0 +1,1 @@
+"""Future structured extraction boundary."""

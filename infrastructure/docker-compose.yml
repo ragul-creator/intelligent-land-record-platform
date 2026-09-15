@@ -1,0 +1,83 @@
+services:
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - target: 5173
+        published: "${FRONTEND_HOST_PORT}"
+        protocol: tcp
+        mode: ingress
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ../backend
+    ports:
+      - target: 8000
+        published: "${BACKEND_HOST_PORT}"
+        protocol: tcp
+        mode: host
+    environment:
+      APP_ENV: ${APP_ENV}
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    ports:
+      - target: 9000
+        published: "${MINIO_API_HOST_PORT}"
+        protocol: tcp
+        mode: host
+      - target: 9001
+        published: "${MINIO_CONSOLE_HOST_PORT}"
+        protocol: tcp
+        mode: host
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  minio_data:
+  postgres_data:
+  redis_data:
