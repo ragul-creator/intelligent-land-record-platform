@@ -1,1 +1,1 @@
-"""Future polygonization and topology-preparation boundary."""
+"""Phase C.3 preliminary building-mask polygonization boundary."""
