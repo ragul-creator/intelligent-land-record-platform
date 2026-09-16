@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
     bootstrap_admin_full_name: str = "Development Administrator"
+    bootstrap_admin_login_id: str | None = None
 
     @property
     def database_url(self) -> str:

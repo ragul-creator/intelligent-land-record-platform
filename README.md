@@ -126,7 +126,7 @@ AUTH_ACCESS_TOKEN_LIFETIME_SECONDS=900
 AUTH_REFRESH_TOKEN_LIFETIME_SECONDS=604800
 ```
 
-After migrations are applied, temporarily set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, and optionally `BOOTSTRAP_ADMIN_FULL_NAME` in the ignored `.env` file. Then create the initial local administrator once. The command refuses existing users and does not print the password or tokens:
+After migrations are applied, temporarily set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, and optionally `BOOTSTRAP_ADMIN_FULL_NAME` or `BOOTSTRAP_ADMIN_LOGIN_ID` in the ignored `.env` file. Then create the initial local administrator once. When no login ID is supplied, the command creates a unique `ADM-TN-<sequence>` ID and prints that ID only; it never prints the password or tokens:
 
 ```powershell
 docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm backend python -m app.cli.bootstrap_admin
@@ -134,7 +134,7 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm bac
 
 Clear the bootstrap password from `.env` after the command succeeds.
 
-Authentication APIs are `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, and `GET /api/v1/users/me`. Login failures deliberately use a generic response. Audit records retain security-action identifiers and safe metadata only; they never include passwords, raw tokens, signed URLs, or storage credentials.
+Authentication APIs are `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, and `GET /api/v1/users/me`. Login accepts `{ "identifier": "ADM-TN-000001", "password": "..." }` or an email address as `identifier`; the legacy `email` request field remains accepted for compatibility. `/users/me` returns the immutable human-facing `login_id` alongside the canonical UUID `id`. Login failures deliberately use a generic response. Audit records retain security-action identifiers and safe metadata only; they never include passwords, raw tokens, signed URLs, or storage credentials.
 
 ## Repository layout
 

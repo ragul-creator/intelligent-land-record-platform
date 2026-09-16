@@ -6,7 +6,7 @@ import uuid
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.audit.service import record_audit
@@ -40,8 +40,8 @@ def _invalid_credentials() -> HTTPException:
     return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
 
 
-def _identity_hash(email: str) -> str:
-    return hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
+def _identity_hash(identifier: str) -> str:
+    return hashlib.sha256(identifier.strip().lower().encode("utf-8")).hexdigest()
 
 
 def _token_response(user_id: uuid.UUID, session_id: uuid.UUID) -> TokenResponse:
@@ -56,13 +56,21 @@ def _token_response(user_id: uuid.UUID, session_id: uuid.UUID) -> TokenResponse:
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: LoginRequest, session: Session = Depends(get_db_session)) -> TokenResponse:
-    user = session.scalar(select(User).where(User.email == request.email.strip().lower()))
+    identifier = request.identifier.strip()
+    user = session.scalar(
+        select(User).where(
+            or_(
+                User.login_id == identifier.upper(),
+                func.lower(User.email) == identifier.lower(),
+            )
+        )
+    )
     if user is None or not user.is_active or not verify_password(request.password, user.password_hash):
         record_audit(
             session,
             action="auth.login_failure",
             target_type="user",
-            metadata={"identity_hash": _identity_hash(request.email)},
+            metadata={"identity_hash": _identity_hash(identifier)},
         )
         session.commit()
         raise _invalid_credentials()
@@ -152,6 +160,7 @@ def get_current_user_profile(
     )
     return CurrentUserResponse(
         id=user.id,
+        login_id=user.login_id,
         email=user.email,
         full_name=user.full_name,
         roles=sorted(user_roles(session, user.id)),

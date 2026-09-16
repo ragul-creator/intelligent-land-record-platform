@@ -37,8 +37,15 @@ class TimestampedModel:
 
 class User(TimestampedModel, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "login_id ~ '^(ADM|OFF|REV|SUR|VWR)-TN-[0-9]{6,}$'",
+            name="ck_users_login_id_format",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    login_id: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)

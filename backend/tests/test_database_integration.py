@@ -14,6 +14,7 @@ from app.core.storage import get_storage_service
 from app.main import app
 from app.models import Project, ProjectMember, Role, User, UserRole
 from app.services.processing_jobs import create_or_get_job
+from app.services.user_identities import generate_login_id
 
 pytestmark = pytest.mark.skipif(
     os.getenv("RUN_DATABASE_TESTS") != "1",
@@ -30,6 +31,7 @@ def test_database_connectivity_and_postgis_extension() -> None:
 def test_migration_created_foundational_tables_and_seed_data() -> None:
     with engine.connect() as connection:
         assert connection.execute(text("SELECT to_regclass('public.processing_jobs')")).scalar_one() == "processing_jobs"
+        assert connection.execute(text("SELECT to_regclass('public.users_login_id_seq')")).scalar_one() == "users_login_id_seq"
         assert connection.execute(text("SELECT count(*) FROM roles")).scalar_one() == 5
         assert connection.execute(text("SELECT count(*) FROM permissions")).scalar_one() == 28
 
@@ -45,6 +47,7 @@ def test_private_presigned_upload_completion_and_download_flow() -> None:
     unique_suffix = uuid.uuid4().hex
     with SessionLocal() as session:
         user = User(
+            login_id=generate_login_id(session, "OFFICER"),
             email=f"phase-b2-{unique_suffix}@example.invalid",
             password_hash=hash_password("phase-b2-test-password"),
             full_name="Phase B2 Test",
@@ -64,7 +67,7 @@ def test_private_presigned_upload_completion_and_download_flow() -> None:
     client = TestClient(app)
     login = client.post(
         "/api/v1/auth/login",
-        json={"email": user.email, "password": "phase-b2-test-password"},
+        json={"identifier": user.login_id, "password": "phase-b2-test-password"},
     )
     assert login.status_code == 200
     authorization = {"Authorization": f"Bearer {login.json()['access_token']}"}
@@ -109,6 +112,7 @@ def test_processing_job_idempotency_returns_the_existing_job() -> None:
     unique_suffix = uuid.uuid4().hex
     with SessionLocal() as session:
         user = User(
+            login_id=generate_login_id(session, "VIEWER"),
             email=f"phase-b2-idempotency-{unique_suffix}@example.invalid",
             password_hash="not-a-password",
             full_name="Phase B2 Idempotency Test",

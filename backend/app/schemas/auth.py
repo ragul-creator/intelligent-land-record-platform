@@ -2,11 +2,15 @@
 
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=320)
+    identifier: str = Field(
+        min_length=3,
+        max_length=320,
+        validation_alias=AliasChoices("identifier", "email"),
+    )
     password: str = Field(min_length=1, max_length=1024)
 
 
@@ -33,6 +37,7 @@ class ProjectMembershipResponse(BaseModel):
 
 class CurrentUserResponse(BaseModel):
     id: uuid.UUID
+    login_id: str
     email: str
     full_name: str
     roles: list[str]

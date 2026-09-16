@@ -14,7 +14,13 @@ class FakeSession:
     def __init__(self, project: Project | None = None, file: File | None = None, user: User | None = None) -> None:
         self.project = project
         self.file = file
-        self.user = user or User(id=uuid.uuid4(), email="officer@example.invalid", password_hash="hash", full_name="Officer")
+        self.user = user or User(
+            id=uuid.uuid4(),
+            login_id="OFF-TN-000001",
+            email="officer@example.invalid",
+            password_hash="hash",
+            full_name="Officer",
+        )
         self.added: list[object] = []
         self.commit_count = 0
 
