@@ -154,6 +154,10 @@ class File(TimestampedModel, Base):
     __table_args__ = (
         CheckConstraint("size_bytes >= 0", name="ck_files_size_bytes_nonnegative"),
         CheckConstraint("char_length(sha256) = 64", name="ck_files_sha256_length"),
+        CheckConstraint(
+            "category IN ('DOCUMENT', 'IMAGERY', 'GIS', 'SUPPORTING')",
+            name="ck_files_category",
+        ),
         Index("ix_files_project_status", "project_id", "status"),
     )
 
@@ -162,6 +166,7 @@ class File(TimestampedModel, Base):
         Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
     )
     original_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    category: Mapped[str] = mapped_column(String(20), default="DOCUMENT", server_default="DOCUMENT", nullable=False)
     mime_type: Mapped[str] = mapped_column(String(255), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BIGINT, nullable=False)
     sha256: Mapped[str | None] = mapped_column(String(64), index=True)
@@ -175,6 +180,10 @@ class ProcessingJob(TimestampedModel, Base):
         UniqueConstraint("project_id", "idempotency_key", name="uq_processing_jobs_project_key"),
         CheckConstraint("progress >= 0 AND progress <= 100", name="ck_processing_jobs_progress"),
         CheckConstraint("retry_count >= 0", name="ck_processing_jobs_retry_count"),
+        CheckConstraint(
+            "status IN ('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED')",
+            name="ck_processing_jobs_status",
+        ),
         Index("ix_processing_jobs_project_status", "project_id", "status"),
     )
 

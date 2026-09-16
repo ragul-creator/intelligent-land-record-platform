@@ -12,6 +12,11 @@ class FileCategory(StrEnum):
     SUPPORTING = "SUPPORTING"
 
 
+def upload_permission_for_category(category: FileCategory | str) -> str:
+    """Keep the upload permission decision consistent across presign and completion."""
+    return "imagery:upload" if FileCategory(category) == FileCategory.IMAGERY else "document:upload"
+
+
 ALLOWED_CONTENT_TYPES: dict[FileCategory, frozenset[str]] = {
     FileCategory.DOCUMENT: frozenset({"application/pdf", "image/jpeg", "image/png", "image/tiff"}),
     FileCategory.IMAGERY: frozenset({"image/tiff", "image/jpeg", "image/png", "application/geotiff"}),

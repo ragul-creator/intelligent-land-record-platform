@@ -102,6 +102,14 @@ def test_private_presigned_upload_completion_and_download_flow() -> None:
     assert complete.status_code == 200
     assert complete.json()["status"] == "UPLOADED"
 
+    repeated_complete = client.post(
+        "/api/v1/files/complete",
+        json={"file_id": presign_body["file_id"]},
+        headers=authorization,
+    )
+    assert repeated_complete.status_code == 200
+    assert repeated_complete.json()["processing_job_id"] == complete.json()["processing_job_id"]
+
     download = client.get(f"/api/v1/files/{presign_body['file_id']}/download", headers=authorization)
     assert download.status_code == 200
     assert "localhost" not in download.json()["download_url"]

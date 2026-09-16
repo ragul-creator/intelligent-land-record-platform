@@ -48,6 +48,11 @@ class FakeSession:
         return None
 
     def scalar(self, _statement):
+        statement = str(_statement)
+        if "FROM projects JOIN project_members" in statement:
+            return self.project
+        if "FROM files JOIN project_members" in statement:
+            return self.file
         return None
 
     def scalars(self, _statement):
@@ -119,6 +124,7 @@ def test_complete_registers_file_and_creates_processing_job(monkeypatch) -> None
         id=uuid.uuid4(),
         project_id=uuid.uuid4(),
         original_name="record.pdf",
+        category="DOCUMENT",
         mime_type="application/pdf",
         size_bytes=1024,
         sha256="a" * 64,
@@ -153,6 +159,7 @@ def test_download_rejects_invalid_or_incomplete_file_ids() -> None:
         id=uuid.uuid4(),
         project_id=uuid.uuid4(),
         original_name="record.pdf",
+        category="DOCUMENT",
         mime_type="application/pdf",
         size_bytes=1024,
         storage_key="projects/a/originals/b/record.pdf",

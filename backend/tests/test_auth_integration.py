@@ -84,7 +84,8 @@ def test_authentication_refresh_rotation_logout_and_inactive_denial() -> None:
         json={"identifier": inactive_login_id, "password": "phase-b3-test-password"},
     )
     assert {response.status_code for response in (wrong_password, unknown_user, inactive_user)} == {401}
-    assert {response.json()["detail"] for response in (wrong_password, unknown_user, inactive_user)} == {"Invalid credentials."}
+    assert {response.json()["error"]["code"] for response in (wrong_password, unknown_user, inactive_user)} == {"AUTHENTICATION_FAILED"}
+    assert {response.json()["error"]["message"] for response in (wrong_password, unknown_user, inactive_user)} == {"Invalid credentials."}
 
     rotated = client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert rotated.status_code == 200
@@ -159,14 +160,14 @@ def test_role_permissions_project_scope_and_file_idor_protection() -> None:
         "category": "DOCUMENT",
     }
     assert client.post("/api/v1/files/presign", json={**payload, "project_id": str(project_a_id)}, headers=headers).status_code == 201
-    assert client.post("/api/v1/files/presign", json={**payload, "project_id": str(project_b_id)}, headers=headers).status_code == 403
-    assert client.get(f"/api/v1/files/{foreign_file_id}/download", headers=headers).status_code == 403
-    assert client.post("/api/v1/files/complete", json={"file_id": str(pending_foreign_file_id)}, headers=headers).status_code == 403
+    assert client.post("/api/v1/files/presign", json={**payload, "project_id": str(project_b_id)}, headers=headers).status_code == 404
+    assert client.get(f"/api/v1/files/{foreign_file_id}/download", headers=headers).status_code == 404
+    assert client.post("/api/v1/files/complete", json={"file_id": str(pending_foreign_file_id)}, headers=headers).status_code == 404
     assert client.post("/api/v1/files/presign", json={**payload, "project_id": str(project_a_id)}).status_code == 401
 
     admin_tokens = login(client, admin_email)
     admin_headers = {"Authorization": f"Bearer {admin_tokens['access_token']}"}
-    assert client.post("/api/v1/files/presign", json={**payload, "project_id": str(project_a_id)}, headers=admin_headers).status_code == 403
+    assert client.post("/api/v1/files/presign", json={**payload, "project_id": str(project_a_id)}, headers=admin_headers).status_code == 404
 
 
 def test_login_id_sequence_is_concurrent_safe_and_database_unique() -> None:

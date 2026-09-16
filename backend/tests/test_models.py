@@ -30,6 +30,6 @@ def test_foundational_constraints_are_declared() -> None:
     job_constraints = {constraint.name for constraint in foundation.ProcessingJob.__table__.constraints}
     project_constraints = {constraint.name for constraint in foundation.Project.__table__.constraints}
 
-    assert {"ck_files_size_bytes_nonnegative", "ck_files_sha256_length"} <= file_constraints
-    assert {"ck_processing_jobs_progress", "ck_processing_jobs_retry_count"} <= job_constraints
+    assert {"ck_files_size_bytes_nonnegative", "ck_files_sha256_length", "ck_files_category"} <= file_constraints
+    assert {"ck_processing_jobs_progress", "ck_processing_jobs_retry_count", "ck_processing_jobs_status"} <= job_constraints
     assert "ck_projects_state" in project_constraints

@@ -41,7 +41,7 @@ After creating `.env`, start the local service foundation from the repository ro
 docker compose --env-file .env -f infrastructure/docker-compose.yml up --build
 ```
 
-This starts the frontend, FastAPI backend, Celery worker, PostgreSQL/PostGIS, Redis, and private MinIO service. Apply the database schema explicitly with Alembic as described below. Authentication and RBAC enforcement, OCR, GeoAI, GIS, and frontend application features remain outside Phase B.2.
+This starts the frontend, FastAPI backend, Celery worker, PostgreSQL/PostGIS, Redis, and private MinIO service. Apply the database schema explicitly with Alembic as described below. Phase B provides backend authentication, RBAC, project isolation, private storage, and job persistence; OCR, GeoAI, GIS, and frontend application features remain outside this phase.
 
 Stop the stack with:
 
@@ -135,6 +135,23 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm bac
 Clear the bootstrap password from `.env` after the command succeeds.
 
 Authentication APIs are `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, and `GET /api/v1/users/me`. Login accepts `{ "identifier": "ADM-TN-000001", "password": "..." }` or an email address as `identifier`; the legacy `email` request field remains accepted for compatibility. `/users/me` returns the immutable human-facing `login_id` alongside the canonical UUID `id`. Login failures deliberately use a generic response. Audit records retain security-action identifiers and safe metadata only; they never include passwords, raw tokens, signed URLs, or storage credentials.
+
+## Phase B Project APIs
+
+Phase B.4 adds project-scoped backend contracts for later workflow and dashboard work. Every project-owned endpoint requires both the relevant global permission and a `project_members` record; `ADMIN` has no automatic cross-project bypass. Project listings contain only the caller's memberships, and inaccessible project, file, and job IDs intentionally use a not-found response to reduce resource enumeration.
+
+- `POST /api/v1/projects`, `GET /api/v1/projects`, `GET/PATCH /api/v1/projects/{project_id}` use `project:create`, `project:read`, and `project:update` as applicable.
+- `GET/POST /api/v1/projects/{project_id}/members` and `PATCH/DELETE /api/v1/projects/{project_id}/members/{user_id}` require `project:member_manage`. A membership role is only a project-context label: the target must already hold that application role globally, so membership cannot grant or escalate RBAC permissions. Inactive users cannot be added, and the owner membership is protected.
+- `GET /api/v1/projects/{project_id}/summary`, `/workflow`, `/jobs`, and `/audit` provide persisted file/job/member/audit information only. Workflow reports only observed `UPLOADED`, `QUEUED`, `PROCESSING`, or `FAILED` evidence; it does not fabricate OCR or GeoAI stages. Audit reads require `audit:read`.
+- `GET /api/v1/processing-jobs/{job_id}` and project job lists expose safe metadata only. Cancellation and retry APIs are intentionally not exposed until a future workflow implementation can guarantee safe side effects.
+
+List endpoints use bounded `limit` and `offset` query parameters (`limit` defaults to 50 and cannot exceed 100). Application errors use `{ "error": { "code": "...", "message": "..." } }`; request validation remains HTTP 422 with the same envelope but omits rejected values to avoid echoing sensitive inputs.
+
+File completion is idempotent: repeating `POST /api/v1/files/complete` for an uploaded file returns its original registration job. Upload category is persisted so completion rechecks the same required permission used for presigning. Buckets remain private and all client storage access uses short-lived signed URLs. Job transitions are constrained to `QUEUED -> PROCESSING -> COMPLETED|FAILED`; worker failures persist only a generic error signal.
+
+`GET /health` is a liveness endpoint. `GET /ready` verifies PostgreSQL/PostGIS, Redis, and the private MinIO bucket. Celery worker liveness is not part of synchronous readiness because broker-level worker inspection would make readiness brittle; worker status remains observable through Compose and persisted job state.
+
+The next planned phase is **Phase C: GeoAI**. Current Phase B deliberately does not implement OCR/HTR, GeoAI, Web-GIS, document extraction, statutory approval, or frontend login/dashboard UI.
 
 ## Repository layout
 

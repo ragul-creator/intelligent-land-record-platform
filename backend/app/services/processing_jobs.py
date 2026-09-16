@@ -8,6 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.models import ProcessingJob
 
+JOB_STATUSES = frozenset({"QUEUED", "PROCESSING", "COMPLETED", "FAILED"})
+
+
+class InvalidJobTransition(ValueError):
+    """Raised when a worker attempts an unsafe terminal-state transition."""
+
 
 def create_or_get_job(
     session: Session,
@@ -49,17 +55,23 @@ def create_or_get_job(
 
 
 def mark_job_processing(session: Session, job: ProcessingJob) -> None:
-    if job.status == "QUEUED":
-        job.status = "PROCESSING"
-        job.progress = 1
+    if job.status != "QUEUED":
+        raise InvalidJobTransition(f"Cannot process a {job.status} job.")
+    job.status = "PROCESSING"
+    job.progress = 1
 
 
 def mark_job_completed(session: Session, job: ProcessingJob) -> None:
+    if job.status != "PROCESSING":
+        raise InvalidJobTransition(f"Cannot complete a {job.status} job.")
     job.status = "COMPLETED"
     job.progress = 100
     job.error_json = None
 
 
 def mark_job_failed(session: Session, job: ProcessingJob, error: str) -> None:
+    if job.status != "PROCESSING":
+        raise InvalidJobTransition(f"Cannot fail a {job.status} job.")
     job.status = "FAILED"
-    job.error_json = {"message": error}
+    # Worker exceptions can contain implementation or credential details; keep only a safe signal.
+    job.error_json = {"message": "Processing failed."}

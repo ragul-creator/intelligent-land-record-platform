@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from botocore.exceptions import BotoCoreError, ClientError
 from redis import Redis
 from redis.exceptions import RedisError
@@ -10,6 +12,9 @@ from app.core.config import get_settings
 from app.core.storage import get_storage_service
 from app.api.v1.files import router as files_router
 from app.api.v1.auth import router as auth_router, users_router
+from app.api.v1.jobs import project_router as project_jobs_router, router as jobs_router
+from app.api.v1.projects import router as projects_router
+from app.core.errors import ApiError
 
 app = FastAPI(
     title="Intelligent Land Record Platform API",
@@ -19,6 +24,42 @@ app = FastAPI(
 app.include_router(files_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(projects_router, prefix="/api/v1")
+app.include_router(project_jobs_router, prefix="/api/v1")
+app.include_router(jobs_router, prefix="/api/v1")
+
+
+def _error_response(status_code: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"error": {"code": code, "message": message}})
+
+
+@app.exception_handler(ApiError)
+async def api_error_handler(_: Request, error: ApiError) -> JSONResponse:
+    return _error_response(error.status_code, error.code, str(error.detail))
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(_: Request, error: HTTPException) -> JSONResponse:
+    codes = {
+        status.HTTP_401_UNAUTHORIZED: "AUTHENTICATION_FAILED",
+        status.HTTP_403_FORBIDDEN: "FORBIDDEN",
+        status.HTTP_404_NOT_FOUND: "NOT_FOUND",
+        status.HTTP_409_CONFLICT: "CONFLICT",
+        status.HTTP_422_UNPROCESSABLE_CONTENT: "VALIDATION_ERROR",
+    }
+    code = codes.get(error.status_code, "REQUEST_FAILED")
+    return _error_response(error.status_code, code, str(error.detail))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_: Request, __: RequestValidationError) -> JSONResponse:
+    # Preserve FastAPI's 422 semantic without echoing rejected values such as passwords.
+    return _error_response(status.HTTP_422_UNPROCESSABLE_CONTENT, "VALIDATION_ERROR", "Request validation failed.")
+
+
+@app.exception_handler(Exception)
+async def unhandled_error_handler(_: Request, __: Exception) -> JSONResponse:
+    return _error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "An internal error occurred.")
 
 
 @app.get("/health", tags=["operations"])

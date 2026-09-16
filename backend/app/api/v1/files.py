@@ -3,24 +3,24 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audit.service import record_audit
 from app.core.auth import (
     get_current_user,
-    require_project_access,
-    require_project_permission,
     user_permissions,
 )
 from app.core.config import get_settings
 from app.core.database import get_db_session
+from app.core.errors import ApiError, forbidden, not_found
 from app.core.storage import (
     PrivateObjectStorage,
     StorageObjectAlreadyExistsError,
     StorageObjectNotFoundError,
     get_storage_service,
 )
-from app.models import File, Project, User
+from app.models import File, ProjectMember, User
 from app.schemas.files import (
     CompleteFileRequest,
     CompleteFileResponse,
@@ -28,9 +28,23 @@ from app.schemas.files import (
     PresignFileRequest,
     PresignFileResponse,
 )
+from app.services.file_policy import upload_permission_for_category
 from app.services.processing_jobs import create_or_get_job
+from app.services.project_access import get_project_for_user
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+
+def _get_scoped_file(session: Session, user: User, file_id: uuid.UUID) -> File:
+    """Hide files outside the caller's project scope to prevent BOLA enumeration."""
+    file = session.scalar(
+        select(File)
+        .join(ProjectMember, ProjectMember.project_id == File.project_id)
+        .where(File.id == file_id, ProjectMember.user_id == user.id)
+    )
+    if file is None:
+        raise not_found("FILE_NOT_FOUND", "The requested file was not found.")
+    return file
 
 
 @router.post("/presign", response_model=PresignFileResponse, status_code=status.HTTP_201_CREATED)
@@ -40,10 +54,8 @@ def presign_file_upload(
     storage: PrivateObjectStorage = Depends(get_storage_service),
     user: User = Depends(get_current_user),
 ) -> PresignFileResponse:
-    permission = "imagery:upload" if request.category == "IMAGERY" else "document:upload"
-    require_project_permission(session, user, request.project_id, permission)
-    if session.get(Project, request.project_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project was not found.")
+    permission = upload_permission_for_category(request.category)
+    get_project_for_user(session, user, request.project_id, permission)
 
     file_id = uuid.uuid4()
     storage_key = storage.generate_storage_key(request.project_id, file_id, request.filename)
@@ -51,6 +63,7 @@ def presign_file_upload(
         id=file_id,
         project_id=request.project_id,
         original_name=request.filename,
+        category=request.category.value,
         mime_type=request.content_type,
         size_bytes=request.size_bytes,
         sha256=request.sha256.lower() if request.sha256 else None,
@@ -94,14 +107,34 @@ def complete_file_upload(
     storage: PrivateObjectStorage = Depends(get_storage_service),
     user: User = Depends(get_current_user),
 ) -> CompleteFileResponse:
-    file = session.get(File, request.file_id)
-    if file is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File was not found.")
-    require_project_access(session, user, file.project_id)
-    if not user_permissions(session, user.id).intersection({"document:upload", "imagery:upload"}):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+    file = _get_scoped_file(session, user, request.file_id)
+    permission = upload_permission_for_category(file.category)
+    if permission not in user_permissions(session, user.id):
+        raise forbidden("FILE_FORBIDDEN", "You are not allowed to complete this upload.")
+    if file.status == "UPLOADED":
+        job, created = create_or_get_job(
+            session,
+            project_id=file.project_id,
+            job_type="FILE_REGISTERED",
+            idempotency_key=f"file:{file.id}:registration",
+        )
+        if created:
+            record_audit(
+                session,
+                "processing_job.created",
+                "processing_job",
+                job.id,
+                actor_id=user.id,
+                project_id=file.project_id,
+                metadata={"job_type": job.job_type},
+            )
+            session.commit()
+            from app.workers.tasks import process_file_registration
+
+            process_file_registration.delay(str(job.id))
+        return CompleteFileResponse(file_id=file.id, status=file.status, processing_job_id=job.id)
     if file.status != "PENDING_UPLOAD":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="File upload is already completed or unavailable.")
+        raise ApiError(status.HTTP_409_CONFLICT, "FILE_UNAVAILABLE", "The file upload is unavailable.")
 
     try:
         object_info = storage.get_object_info(file.storage_key)
@@ -109,9 +142,9 @@ def complete_file_upload(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Uploaded object was not found.") from error
 
     if object_info.size_bytes != file.size_bytes or object_info.content_type.split(";", 1)[0] != file.mime_type:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Uploaded object metadata does not match the registration.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Uploaded object metadata does not match the registration.")
     if file.sha256 and object_info.metadata.get("sha256", "").lower() != file.sha256:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Uploaded object checksum metadata does not match the registration.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Uploaded object checksum metadata does not match the registration.")
 
     file.status = "UPLOADED"
     job, created = create_or_get_job(
@@ -128,6 +161,16 @@ def complete_file_upload(
         actor_id=user.id,
         project_id=file.project_id,
     )
+    if created:
+        record_audit(
+            session,
+            "processing_job.created",
+            "processing_job",
+            job.id,
+            actor_id=user.id,
+            project_id=file.project_id,
+            metadata={"job_type": job.job_type},
+        )
     session.commit()
     if created:
         from app.workers.tasks import process_file_registration
@@ -143,10 +186,9 @@ def presign_file_download(
     storage: PrivateObjectStorage = Depends(get_storage_service),
     user: User = Depends(get_current_user),
 ) -> DownloadFileResponse:
-    file = session.get(File, file_id)
-    if file is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File was not found.")
-    require_project_permission(session, user, file.project_id, "document:read")
+    file = _get_scoped_file(session, user, file_id)
+    if "document:read" not in user_permissions(session, user.id):
+        raise forbidden("FILE_FORBIDDEN", "You are not allowed to download this file.")
     if file.status != "UPLOADED":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="File is not available for download.")
     download_url = storage.presign_download(file.storage_key)
