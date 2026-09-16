@@ -57,3 +57,20 @@ python -m ai.geoai.cli parcel-create --source-type AI_VISIBLE_BOUNDARY --input '
 ```
 
 World-coordinate output is exported as WGS84 GeoJSON and retains `source_crs`; projected and geographic areas use the same metre-safe and geodesic rules as C.3. `PIXEL`, `LOCAL`, and `UNKNOWN` inputs have null real-world areas. Every result is `DRAFT`/`UNVERIFIED` (or `NOT_DETERMINED` when no boundary can be determined); AI visible evidence also carries `ai_boundary_status: AI_PRELIMINARY` and always requires GIS/survey verification. FMB OCR/georeferencing, imagery boundary inference, legal approval, PostGIS persistence, and Phase D editing remain out of scope.
+
+## Roads and Land Use (Phase C.5)
+
+C.5 creates lightweight, source-backed road/pathway and basic land-use GIS features for later PostGIS and Web-GIS use. It accepts declared `EXISTING_GIS`, `MANUAL_DRAWN`, and `AI_CANDIDATE` sources; it does not train or infer a new road/land-use model. Source geometry and provenance are preserved. All results are `DRAFT`/`UNVERIFIED`; AI candidates additionally carry `AI_PRELIMINARY` and a warning that they are not legal or statutory classifications.
+
+```powershell
+# A projected LineString: its safely calculated length is returned in metres.
+python -m ai.geoai.cli road-create --source-type EXISTING_GIS --road-class ROAD --input "<road.geojson>" --source-crs EPSG:32618 --source-reference "municipal-roads-2026" --output data/processed/geoai/features/road.geojson
+
+# Manual local/pixel coordinates remain local and have null length_m.
+python -m ai.geoai.cli road-create --source-type MANUAL_DRAWN --road-class PATHWAY --input '{"coordinates":[[10,10],[60,10]]}' --output data/processed/geoai/features/pathway.geojson
+
+# UNKNOWN avoids forcing an unsupported class. World-coordinate polygons receive metre-safe areas.
+python -m ai.geoai.cli landuse-create --source-type AI_CANDIDATE --land-use-class UNKNOWN --input "<polygon.geojson>" --source-crs EPSG:32618 --model-version "landuse-candidate-v1" --output data/processed/geoai/features/landuse.geojson
+```
+
+Roads accept `LineString` and, with `road_surface: true` in the JSON input, a polygon road surface. `MultiLineString` and `MultiPolygon` require their explicit CLI opt-in flags. Geographic road length uses PyProj geodesics; projected values use declared CRS units. Geographic land-use area uses a geodesic calculation, never degree-squared. `PIXEL`, `LOCAL`, and `UNKNOWN` coordinate spaces deliberately return null real-world measurements. Road/land-use features are preliminary GIS context, not cadastral boundaries or legal land-use determinations.

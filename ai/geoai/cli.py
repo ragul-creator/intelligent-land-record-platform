@@ -77,6 +77,24 @@ def _parser() -> argparse.ArgumentParser:
     parcel_command.add_argument("--source-reference")
     parcel_command.add_argument("--allow-multipolygon", action="store_true")
     parcel_command.add_argument("--model-version")
+    road_command = commands.add_parser("road-create", help="Create a source-backed draft road or pathway feature.")
+    road_command.add_argument("--source-type", choices=["EXISTING_GIS", "MANUAL_DRAWN", "AI_CANDIDATE"], required=True)
+    road_command.add_argument("--input", required=True, help="JSON/GeoJSON file path or literal JSON object.")
+    road_command.add_argument("--road-class", choices=["ROAD", "PATHWAY", "ACCESS_CORRIDOR"], required=True)
+    road_command.add_argument("--output", type=Path, required=True)
+    road_command.add_argument("--source-crs")
+    road_command.add_argument("--source-reference")
+    road_command.add_argument("--allow-multiline", action="store_true")
+    road_command.add_argument("--model-version")
+    landuse_command = commands.add_parser("landuse-create", help="Create a source-backed draft land-use feature.")
+    landuse_command.add_argument("--source-type", choices=["EXISTING_GIS", "MANUAL_DRAWN", "AI_CANDIDATE"], required=True)
+    landuse_command.add_argument("--input", required=True, help="JSON/GeoJSON file path or literal JSON object.")
+    landuse_command.add_argument("--land-use-class", choices=["RESIDENTIAL", "COMMERCIAL", "INDUSTRIAL", "AGRICULTURAL", "VACANT", "ROAD_TRANSPORT", "WATERBODY", "GREEN_OPEN_SPACE", "UNKNOWN"], required=True)
+    landuse_command.add_argument("--output", type=Path, required=True)
+    landuse_command.add_argument("--source-crs")
+    landuse_command.add_argument("--source-reference")
+    landuse_command.add_argument("--allow-multipolygon", action="store_true")
+    landuse_command.add_argument("--model-version")
     return parser
 
 
@@ -191,6 +209,40 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
+        if arguments.command == "road-create":
+            from ai.geoai.features.export import write_feature_geojson
+            from ai.geoai.features.roads import create_road
+            from ai.geoai.features.validation import load_json_input
+
+            feature = create_road(
+                arguments.source_type,
+                load_json_input(arguments.input),
+                arguments.road_class,
+                source_crs=arguments.source_crs,
+                source_reference=arguments.source_reference,
+                allow_multiline=arguments.allow_multiline,
+                model_version=arguments.model_version,
+            )
+            output = write_feature_geojson(feature, arguments.output)
+            print(json.dumps({"output": str(output), "feature_id": feature.feature_id, "length_m": feature.length_m, "status": feature.status}, indent=2, sort_keys=True))
+            return 0
+        if arguments.command == "landuse-create":
+            from ai.geoai.features.export import write_feature_geojson
+            from ai.geoai.features.land_use import create_land_use
+            from ai.geoai.features.validation import load_json_input
+
+            feature = create_land_use(
+                arguments.source_type,
+                load_json_input(arguments.input),
+                arguments.land_use_class,
+                source_crs=arguments.source_crs,
+                source_reference=arguments.source_reference,
+                allow_multipolygon=arguments.allow_multipolygon,
+                model_version=arguments.model_version,
+            )
+            output = write_feature_geojson(feature, arguments.output)
+            print(json.dumps({"output": str(output), "feature_id": feature.feature_id, "area_m2": feature.area_m2, "status": feature.status}, indent=2, sort_keys=True))
+            return 0
         from ai.geoai.segmentation.pipeline import evaluate
 
         print(
@@ -225,6 +277,8 @@ def main(argv: list[str] | None = None) -> int:
             code = "VISUALIZATION_FAILED"
         elif arguments.command == "parcel-create":
             code = "PARCEL_ACQUISITION_FAILED"
+        elif arguments.command in {"road-create", "landuse-create"}:
+            code = "FEATURE_ACQUISITION_FAILED"
         else:
             code = "SEGMENTATION_FAILED"
         print(json.dumps({"error": {"code": code, "message": str(error)}}), file=sys.stderr)
