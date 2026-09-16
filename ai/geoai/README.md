@@ -40,3 +40,20 @@ python -m ai.geoai.cli building-visualize --image data/raw/imagery/RGB.byte.tif 
 ```
 
 The `WORLD` command fails rather than guessing when `--source-raster`, its CRS/affine transform, or matching raster/image dimensions are unavailable.
+
+## Parcel Acquisition (Phase C.4)
+
+C.4 acquires draft parcel candidates only from declared spatial evidence: cadastral GIS, an already-digitized/georeferenced FMB import, GNSS survey corners, future human-drawn geometry, or a supplied visible-boundary candidate. Building footprints are not parcel boundaries. C.4 does not infer invisible legal/property boundaries from imagery.
+
+```powershell
+# Cadastral or FMB GeoJSON. The source CRS is required when coordinates are world coordinates.
+python -m ai.geoai.cli parcel-create --source-type CADASTRAL_GIS --input "<parcel.geojson>" --source-crs EPSG:32618 --source-reference "cadastral-layer-2026" --output data/processed/geoai/parcels/cadastral-draft.geojson
+
+# Ordered GNSS corners; the input preserves its original point list as provenance.
+python -m ai.geoai.cli parcel-create --source-type GNSS_SURVEY --input "<survey-points.json>" --source-crs EPSG:32618 --source-reference "survey-run-42" --output data/processed/geoai/parcels/gnss-draft.geojson
+
+# No visible imagery evidence deliberately creates a null-geometry, survey-required result.
+python -m ai.geoai.cli parcel-create --source-type AI_VISIBLE_BOUNDARY --input '{"evidence_type":"NO_VISIBLE_EVIDENCE","coordinate_space":"PIXEL"}' --output data/processed/geoai/parcels/not-determined.geojson
+```
+
+World-coordinate output is exported as WGS84 GeoJSON and retains `source_crs`; projected and geographic areas use the same metre-safe and geodesic rules as C.3. `PIXEL`, `LOCAL`, and `UNKNOWN` inputs have null real-world areas. Every result is `DRAFT`/`UNVERIFIED` (or `NOT_DETERMINED` when no boundary can be determined); AI visible evidence also carries `ai_boundary_status: AI_PRELIMINARY` and always requires GIS/survey verification. FMB OCR/georeferencing, imagery boundary inference, legal approval, PostGIS persistence, and Phase D editing remain out of scope.

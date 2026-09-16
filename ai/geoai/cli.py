@@ -69,6 +69,14 @@ def _parser() -> argparse.ArgumentParser:
     visualize_command.add_argument("--output", type=Path, required=True)
     visualize_command.add_argument("--source-raster", type=Path)
     visualize_command.add_argument("--draw-labels", action="store_true")
+    parcel_command = commands.add_parser("parcel-create", help="Create a source-backed preliminary parcel draft.")
+    parcel_command.add_argument("--source-type", choices=["CADASTRAL_GIS", "FMB_IMPORT", "GNSS_SURVEY", "HUMAN_DRAWN", "AI_VISIBLE_BOUNDARY"], required=True)
+    parcel_command.add_argument("--input", required=True, help="JSON/GeoJSON file path or literal JSON object.")
+    parcel_command.add_argument("--output", type=Path, required=True)
+    parcel_command.add_argument("--source-crs")
+    parcel_command.add_argument("--source-reference")
+    parcel_command.add_argument("--allow-multipolygon", action="store_true")
+    parcel_command.add_argument("--model-version")
     return parser
 
 
@@ -156,6 +164,33 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(json.dumps({"output": str(output)}, indent=2, sort_keys=True))
             return 0
+        if arguments.command == "parcel-create":
+            from ai.geoai.parcels.acquisition import create_parcel, load_json_input
+            from ai.geoai.parcels.export import write_parcel_geojson
+
+            parcel = create_parcel(
+                arguments.source_type,
+                load_json_input(arguments.input),
+                source_crs=arguments.source_crs,
+                source_reference=arguments.source_reference,
+                allow_multipolygon=arguments.allow_multipolygon,
+                model_version=arguments.model_version,
+            )
+            output = write_parcel_geojson(parcel, arguments.output)
+            print(
+                json.dumps(
+                    {
+                        "output": str(output),
+                        "parcel_id": parcel.parcel_id,
+                        "status": parcel.status,
+                        "coordinate_space": parcel.coordinate_space,
+                        "requires_survey": parcel.requires_survey,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
         from ai.geoai.segmentation.pipeline import evaluate
 
         print(
@@ -188,6 +223,8 @@ def main(argv: list[str] | None = None) -> int:
             code = "VECTORIZATION_FAILED"
         elif arguments.command == "building-visualize":
             code = "VISUALIZATION_FAILED"
+        elif arguments.command == "parcel-create":
+            code = "PARCEL_ACQUISITION_FAILED"
         else:
             code = "SEGMENTATION_FAILED"
         print(json.dumps({"error": {"code": code, "message": str(error)}}), file=sys.stderr)
