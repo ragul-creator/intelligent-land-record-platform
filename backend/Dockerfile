@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY . .
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --retries 5 --timeout 120 ".[dev]"
 
 EXPOSE 8000
 

@@ -1,0 +1,65 @@
+"""Small persistence service for idempotent asynchronous processing jobs."""
+
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.models import ProcessingJob
+
+
+def create_or_get_job(
+    session: Session,
+    project_id: uuid.UUID,
+    job_type: str,
+    idempotency_key: str,
+) -> tuple[ProcessingJob, bool]:
+    """Return the existing project-scoped job when an idempotency key repeats."""
+    existing = session.scalar(
+        select(ProcessingJob).where(
+            ProcessingJob.project_id == project_id,
+            ProcessingJob.idempotency_key == idempotency_key,
+        )
+    )
+    if existing is not None:
+        return existing, False
+
+    job = ProcessingJob(
+        project_id=project_id,
+        job_type=job_type,
+        idempotency_key=idempotency_key,
+        status="QUEUED",
+    )
+    session.add(job)
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        existing = session.scalar(
+            select(ProcessingJob).where(
+                ProcessingJob.project_id == project_id,
+                ProcessingJob.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is None:
+            raise
+        return existing, False
+    return job, True
+
+
+def mark_job_processing(session: Session, job: ProcessingJob) -> None:
+    if job.status == "QUEUED":
+        job.status = "PROCESSING"
+        job.progress = 1
+
+
+def mark_job_completed(session: Session, job: ProcessingJob) -> None:
+    job.status = "COMPLETED"
+    job.progress = 100
+    job.error_json = None
+
+
+def mark_job_failed(session: Session, job: ProcessingJob, error: str) -> None:
+    job.status = "FAILED"
+    job.error_json = {"message": error}
