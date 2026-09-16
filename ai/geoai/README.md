@@ -74,3 +74,30 @@ python -m ai.geoai.cli landuse-create --source-type AI_CANDIDATE --land-use-clas
 ```
 
 Roads accept `LineString` and, with `road_surface: true` in the JSON input, a polygon road surface. `MultiLineString` and `MultiPolygon` require their explicit CLI opt-in flags. Geographic road length uses PyProj geodesics; projected values use declared CRS units. Geographic land-use area uses a geodesic calculation, never degree-squared. `PIXEL`, `LOCAL`, and `UNKNOWN` coordinate spaces deliberately return null real-world measurements. Road/land-use features are preliminary GIS context, not cadastral boundaries or legal land-use determinations.
+
+## Parcel Topology and Edit Validation (Phase C.6)
+
+C.6 adds reusable library validation under `ai.geoai.topology`. It conservatively repairs polygonal geometry, detects parcel overlaps, checks optional project-boundary coverage gaps/outside areas, compares a draft parcel with an existing GIS reference, and validates future human-edited parcel geometry from Phase D.
+
+Significant area changes, neighbour overlaps, and project-boundary violations return `REVIEW_REQUIRED` rather than silently accepting or auto-rejecting a legal-boundary change. Invalid edits return `INVALID`. The original geometry is never mutated; C.7 will persist geometry versions and audit/provenance.
+
+```python
+from ai.geoai.topology import validate_edited_parcel, validate_parcel_topology
+
+report = validate_parcel_topology(
+    {"P-1": parcel_1, "P-2": parcel_2},
+    source_crs="EPSG:32643",
+    coverage_boundary=project_boundary,
+)
+
+edit = validate_edited_parcel(
+    original_parcel,
+    edited_parcel,
+    parcel_id="P-1",
+    source_crs="EPSG:32643",
+    neighbouring_parcels={"P-2": parcel_2},
+    project_boundary=project_boundary,
+)
+```
+
+Projected areas use declared CRS unit conversions; geographic areas use geodesic calculations. Local/pixel geometry never receives invented real-world measurements. Reference comparison exposes area change, overlap/symmetric-difference area, and projected-CRS Hausdorff distance for review support; these are QA signals, not legal approval decisions.
