@@ -17,6 +17,7 @@ htmlcov/
 .venv/
 venv/
 .test-deps/
+.test-temp/
 
 # Tooling and operating-system files
 .DS_Store

@@ -26,3 +26,17 @@ python -m ai.geoai.cli building-vectorize --mask data/processed/geoai/buildings/
 Every feature records building class, model confidence, source references, model version, processing time, `AI_PRELIMINARY` status, and `UNVERIFIED` verification status. Probability confidence is the mean probability of component pixels after thresholding. Without a probability mask, confidence is `null` unless a caller supplies it through the Python API.
 
 Generated GeoJSON is written under `data/processed/geoai/` and ignored by Git. Geometry is suitable for later PostGIS loading and topology/review work, but must be checked by an authorized GIS or survey reviewer before publication.
+
+## Debug Overlay
+
+Use the read-only debug overlay to visually inspect C.3 boundaries without altering the source image or GeoJSON:
+
+```powershell
+# PIXEL GeoJSON overlays directly on the matching PNG/JPG image.
+python -m ai.geoai.cli building-visualize --image "<source.png>" --geojson data/processed/geoai/buildings/pixel.geojson --output data/processed/geoai/buildings/pixel-overlay.png --draw-labels
+
+# WORLD GeoJSON requires the matching GeoTIFF. Its GeoJSON coordinates are transformed back through the raster CRS and inverse affine transform before drawing.
+python -m ai.geoai.cli building-visualize --image data/raw/imagery/RGB.byte.tif --source-raster data/raw/imagery/RGB.byte.tif --geojson data/processed/geoai/buildings/world.geojson --output data/processed/geoai/buildings/world-overlay.png
+```
+
+The `WORLD` command fails rather than guessing when `--source-raster`, its CRS/affine transform, or matching raster/image dimensions are unavailable.

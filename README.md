@@ -167,6 +167,35 @@ python -m ai.geoai.cli tile data/raw/imagery/RGB.byte.tif --tile-size 512
 
 Tiles are written by default to `data/processed/geoai/tiles/<source_stem>/` with deterministic names such as `RGB.byte_r0000_c0001.tif`. Each tile is written as a GeoTIFF using its actual Rasterio pixel window transform and bounds, preserving CRS, band data, dtype, and NoData. Edge tiles are smaller rather than padded. Generated imagery, tiles, and model artifacts are ignored by Git.
 
+## Building Segmentation MVP (Phase C.2)
+
+Phase C.2 adds pixel-space building-footprint segmentation for the WHU PNG dataset. It uses a swappable torchvision `DeepLabV3-ResNet50` adapter with a binary output head, selected for mature PyTorch support and a practical path to explicitly requested ImageNet backbone weights. By default it creates no network request for pretrained weights; `--pretrained-backbone` is the explicit opt-in and torchvision may download/cache ImageNet weights when they are not already local. Normal inference always uses a supplied local checkpoint.
+
+WHU must be supplied outside this repository with the following layout. Pass its root at the CLI; no machine-specific path is stored in code.
+
+```text
+WHU/
+  train/Image/*.png  train/Mask/*.png
+  val/Image/*.png    val/Mask/*.png
+  test/Image/*.png   test/Mask/*.png
+```
+
+Install the dedicated GeoAI requirements, validate a split, then run a small smoke training job before any full run:
+
+```powershell
+python -m pip install -r ai/geoai/requirements.txt
+python -m ai.geoai.cli dataset-check --dataset-root "<WHU_ROOT>" --split train
+python -m ai.geoai.cli building-train --dataset-root "<WHU_ROOT>" --epochs 1 --batch-size 2 --limit 16 --device auto
+python -m ai.geoai.cli building-infer --checkpoint "data/models/buildings/<run_id>/best.pt" --input "<WHU_ROOT>\val\Image" --output-dir data/processed/geoai/buildings/demo --device auto
+python -m ai.geoai.cli building-evaluate --dataset-root "<WHU_ROOT>" --split val --checkpoint "data/models/buildings/<run_id>/best.pt" --limit 32 --device auto
+```
+
+`--device auto` selects CUDA whenever `torch.cuda.is_available()` succeeds; `--device cuda` fails clearly rather than silently falling back. Startup logs report device, GPU name, CUDA version, VRAM, and CPU logical cores. CUDA training uses AMP, GradScaler, cuDNN benchmarking, pinned-memory DataLoaders, non-blocking transfers, and `zero_grad(set_to_none=True)`. `--num-workers` is auto-sized conservatively from logical CPU cores, while explicit values remain supported. If CUDA runs out of memory, reduce `--batch-size`; C.2 reports the failure and never silently falls back to CPU.
+
+Checkpoints are saved under `data/models/buildings/<run_id>/`; predictions are saved under `data/processed/geoai/buildings/<run_id>/` as deterministic probability arrays, binary PNG masks, and prediction metadata. Reported metrics are IoU/Jaccard, Dice/F1, precision, and recall. Per-prediction confidence is model-only: mean probability over predicted building pixels, predicted-building fraction, and threshold. It is not legal, parcel, or cadastral confidence.
+
+WHU PNG imagery is not georeferenced. C.2 does not invent CRS, affine transforms, areas, parcels, or polygons; C.3 will connect model masks to the C.1 GeoTIFF/world-coordinate pipeline. Native image dimensions are retained unless `--image-size N` is supplied; that option resizes image and mask together (bilinear and nearest-neighbor respectively). For a later full GPU run, start conservatively on the available hardware, for example: `python -m ai.geoai.cli building-train --dataset-root "<WHU_ROOT>" --epochs 30 --batch-size 4 --image-size 256 --device cuda --num-workers 4`. Do not start this full run until smoke validation is reviewed.
+
 ## Repository layout
 
 - `frontend/` - React + TypeScript client; it communicates only with backend APIs.

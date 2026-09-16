@@ -63,6 +63,12 @@ def _parser() -> argparse.ArgumentParser:
     vectorize_command.add_argument("--model-version", default="building-segmentation-c2-v1")
     vectorize_command.add_argument("--source-image")
     vectorize_command.add_argument("--source-mask")
+    visualize_command = commands.add_parser("building-visualize", help="Draw C.3 building polygons over an aerial image for debugging.")
+    visualize_command.add_argument("--image", type=Path, required=True)
+    visualize_command.add_argument("--geojson", type=Path, required=True)
+    visualize_command.add_argument("--output", type=Path, required=True)
+    visualize_command.add_argument("--source-raster", type=Path)
+    visualize_command.add_argument("--draw-labels", action="store_true")
     return parser
 
 
@@ -138,6 +144,18 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
+        if arguments.command == "building-visualize":
+            from ai.geoai.polygonization.visualization import render_building_overlay
+
+            output = render_building_overlay(
+                arguments.image,
+                arguments.geojson,
+                arguments.output,
+                source_raster=arguments.source_raster,
+                draw_labels=arguments.draw_labels,
+            )
+            print(json.dumps({"output": str(output)}, indent=2, sort_keys=True))
+            return 0
         from ai.geoai.segmentation.pipeline import evaluate
 
         print(
@@ -164,7 +182,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     except (FileExistsError, ValueError, RuntimeError) as error:
-        code = "TILING_FAILED" if arguments.command == "tile" else "VECTORIZATION_FAILED" if arguments.command == "building-vectorize" else "SEGMENTATION_FAILED"
+        if arguments.command == "tile":
+            code = "TILING_FAILED"
+        elif arguments.command == "building-vectorize":
+            code = "VECTORIZATION_FAILED"
+        elif arguments.command == "building-visualize":
+            code = "VISUALIZATION_FAILED"
+        else:
+            code = "SEGMENTATION_FAILED"
         print(json.dumps({"error": {"code": code, "message": str(error)}}), file=sys.stderr)
         return 2
 
