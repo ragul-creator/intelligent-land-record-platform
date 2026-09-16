@@ -153,6 +153,22 @@ File completion is idempotent: repeating `POST /api/v1/files/complete` for an up
 
 The next planned phase is **Phase C: GeoAI**. Current Phase B deliberately does not implement OCR/HTR, GeoAI, Web-GIS, document extraction, statutory approval, or frontend login/dashboard UI.
 
+## GeoAI Persistence (Phase C.7)
+
+Phase C.7 connects the existing GeoAI parcel acquisition and topology libraries to PostGIS and Celery. `POST /api/v1/projects/{project_id}/geoai/jobs` creates a project-scoped asynchronous job; `PARCEL_IMPORT` is the complete supported path. The worker invokes the existing C.4 `create_parcel()` code, stores declared world geometry as EPSG:4326, retains `source_crs` and input provenance, creates a parcel plus immutable geometry version 1, and records safe audit events. `GET /api/v1/projects/{project_id}/geoai/jobs/{job_id}` and `/cancel` expose project-scoped job state.
+
+Parcel reads are available at `GET /api/v1/projects/{project_id}/parcels`, `/{parcel_id}`, and `/{parcel_id}/versions`. `POST /api/v1/projects/{project_id}/parcels/{parcel_id}/versions` requires `geo:edit_draft`; it invokes C.6 validation and appends a new human version under a database lock. Earlier versions are never overwritten. Significant changes or topology overlaps return `REVIEW_REQUIRED`; invalid geometry is rejected. These remain preliminary draft geometries, not statutory or legal approval. Phase D will consume this version API.
+
+Run the stack, migrate, and execute database-backed tests:
+
+```powershell
+docker compose --env-file .env -f infrastructure/docker-compose.yml up --build -d
+docker compose --env-file .env -f infrastructure/docker-compose.yml exec backend alembic upgrade head
+docker compose --env-file .env -f infrastructure/docker-compose.yml exec -e RUN_DATABASE_TESTS=1 backend pytest -v
+```
+
+The backend/worker image uses the repository root only to import the existing lightweight C.4/C.6 geometry modules; its root `.dockerignore` excludes local data, generated artifacts, model checkpoints, environments, and Git state. Building/road/land-use job adapters are registered types only in this phase; model execution, frontend editing, approval workflows, and government integration are intentionally not implemented.
+
 ## GeoAI Raster Ingestion (Phase C.1)
 
 Phase C.1 provides a local, reusable GeoTIFF ingestion foundation only. It validates readable GeoTIFF inputs, CRS/EPSG when resolvable, affine transform, bounds, pixel resolution, bands, dtype, and NoData before extracting typed JSON metadata. It performs no segmentation, building detection, inference, polygonization, or area calculation.

@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+from geoalchemy2 import Geometry
 
 from app.core.database import Base
 
@@ -181,7 +182,7 @@ class ProcessingJob(TimestampedModel, Base):
         CheckConstraint("progress >= 0 AND progress <= 100", name="ck_processing_jobs_progress"),
         CheckConstraint("retry_count >= 0", name="ck_processing_jobs_retry_count"),
         CheckConstraint(
-            "status IN ('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED')",
+            "status IN ('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED')",
             name="ck_processing_jobs_status",
         ),
         Index("ix_processing_jobs_project_status", "project_id", "status"),
@@ -197,6 +198,180 @@ class ProcessingJob(TimestampedModel, Base):
     progress: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
     retry_count: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
     error_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+
+class ImageryAsset(TimestampedModel, Base):
+    """Project imagery metadata for later GeoAI input and layer association."""
+
+    __tablename__ = "imagery_assets"
+    __table_args__ = (Index("ix_imagery_assets_project_created", "project_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    file_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("files.id", ondelete="SET NULL"), unique=True)
+    source_reference: Mapped[str | None] = mapped_column(String(1024))
+    source_crs: Mapped[str | None] = mapped_column(String(255))
+    coordinate_space: Mapped[str] = mapped_column(String(16), server_default="WORLD", nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}", nullable=False)
+
+
+class GeoAIJob(TimestampedModel, Base):
+    """GeoAI-specific request/provenance linked to the common job lifecycle."""
+
+    __tablename__ = "geoai_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "job_type IN ('PARCEL_IMPORT', 'BUILDING_VECTORIZE', 'ROAD_IMPORT', 'LAND_USE_IMPORT', 'TOPOLOGY_VALIDATE')",
+            name="ck_geoai_jobs_type",
+        ),
+        Index("ix_geoai_jobs_project_created", "project_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("processing_jobs.id", ondelete="CASCADE"), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    imagery_asset_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("imagery_assets.id", ondelete="SET NULL"))
+    requested_by_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
+    job_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    parameters_json: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}", nullable=False)
+    metrics_json: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}", nullable=False)
+    output_refs_json: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}", nullable=False)
+
+
+class Parcel(TimestampedModel, Base):
+    """Draft parcel identity with its current immutable geometry-version pointer."""
+
+    __tablename__ = "parcels"
+    __table_args__ = (
+        CheckConstraint("current_geometry_version >= 1", name="ck_parcels_current_geometry_version"),
+        Index("ix_parcels_project_status", "project_id", "status"),
+        Index("ix_parcels_project_external_identifier", "project_id", "external_identifier"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    external_identifier: Mapped[str | None] = mapped_column(String(255))
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(1024))
+    status: Mapped[str] = mapped_column(String(32), server_default="DRAFT", nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(32), server_default="UNVERIFIED", nullable=False)
+    current_geometry_version: Mapped[int] = mapped_column(Integer, server_default="1", nullable=False)
+    coordinate_space: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_crs: Mapped[str | None] = mapped_column(String(255))
+    confidence: Mapped[float | None] = mapped_column()
+    model_version: Mapped[str | None] = mapped_column(String(255))
+    ai_boundary_status: Mapped[str | None] = mapped_column(String(32))
+    requires_survey: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+
+
+class ParcelGeometryVersion(Base):
+    """Append-only parcel geometry/provenance record; historical versions are never updated."""
+
+    __tablename__ = "parcel_geometry_versions"
+    __table_args__ = (
+        UniqueConstraint("parcel_id", "version", name="uq_parcel_geometry_versions_parcel_version"),
+        Index("ix_parcel_geometry_versions_parcel_version", "parcel_id", "version"),
+        Index("ix_parcel_geometry_versions_geometry", "geometry", postgresql_using="gist"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    parcel_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("parcels.id", ondelete="RESTRICT"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    geometry: Mapped[Any | None] = mapped_column(Geometry("GEOMETRY", srid=4326, spatial_index=False))
+    source_geometry_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(1024))
+    coordinate_space: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_crs: Mapped[str | None] = mapped_column(String(255))
+    area_m2: Mapped[float | None] = mapped_column()
+    area_sqft: Mapped[float | None] = mapped_column()
+    change_reason: Mapped[str | None] = mapped_column(Text)
+    validation_status: Mapped[str | None] = mapped_column(String(32))
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
+    created_by_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Building(TimestampedModel, Base):
+    __tablename__ = "buildings"
+    __table_args__ = (
+        Index("ix_buildings_project_status", "project_id", "status"),
+        Index("ix_buildings_geometry", "geometry", postgresql_using="gist"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    geometry: Mapped[Any] = mapped_column(Geometry("GEOMETRY", srid=4326, spatial_index=False), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(1024))
+    confidence: Mapped[float | None] = mapped_column()
+    model_version: Mapped[str | None] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    area_m2: Mapped[float | None] = mapped_column()
+    area_sqft: Mapped[float | None] = mapped_column()
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Road(TimestampedModel, Base):
+    __tablename__ = "roads"
+    __table_args__ = (
+        Index("ix_roads_project_class", "project_id", "road_class"),
+        Index("ix_roads_geometry", "geometry", postgresql_using="gist"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    geometry: Mapped[Any] = mapped_column(Geometry("GEOMETRY", srid=4326, spatial_index=False), nullable=False)
+    road_class: Mapped[str] = mapped_column(String(32), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(1024))
+    confidence: Mapped[float | None] = mapped_column()
+    model_version: Mapped[str | None] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    length_m: Mapped[float | None] = mapped_column()
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LandUseFeature(TimestampedModel, Base):
+    __tablename__ = "land_use_features"
+    __table_args__ = (
+        Index("ix_land_use_features_project_class", "project_id", "land_use_class"),
+        Index("ix_land_use_features_geometry", "geometry", postgresql_using="gist"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    geometry: Mapped[Any] = mapped_column(Geometry("GEOMETRY", srid=4326, spatial_index=False), nullable=False)
+    land_use_class: Mapped[str] = mapped_column(String(32), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(1024))
+    confidence: Mapped[float | None] = mapped_column()
+    model_version: Mapped[str | None] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    area_m2: Mapped[float | None] = mapped_column()
+    area_sqft: Mapped[float | None] = mapped_column()
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TopologyError(Base):
+    __tablename__ = "topology_errors"
+    __table_args__ = (Index("ix_topology_errors_project_resolved", "project_id", "resolved"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    parcel_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("parcels.id", ondelete="SET NULL"))
+    related_parcel_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("parcels.id", ondelete="SET NULL"))
+    code: Mapped[str] = mapped_column(String(100), nullable=False)
+    severity: Mapped[str] = mapped_column(String(32), nullable=False)
+    area_m2: Mapped[float | None] = mapped_column()
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    resolved: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class AuditLog(Base):

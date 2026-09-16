@@ -34,6 +34,9 @@ def test_migration_created_foundational_tables_and_seed_data() -> None:
         assert connection.execute(text("SELECT to_regclass('public.users_login_id_seq')")).scalar_one() == "users_login_id_seq"
         assert connection.execute(text("SELECT count(*) FROM roles")).scalar_one() == 5
         assert connection.execute(text("SELECT count(*) FROM permissions")).scalar_one() == 28
+        assert connection.execute(text("SELECT to_regclass('public.parcels')")).scalar_one() == "parcels"
+        assert connection.execute(text("SELECT to_regclass('public.parcel_geometry_versions')")).scalar_one() == "parcel_geometry_versions"
+        assert connection.execute(text("SELECT Find_SRID('public', 'parcel_geometry_versions', 'geometry')")).scalar_one() == 4326
 
 
 def test_redis_and_private_minio_are_available() -> None:

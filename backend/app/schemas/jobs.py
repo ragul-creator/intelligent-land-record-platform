@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from app.schemas.common import PageMetadata
 
-ProcessingJobStatus = Literal["QUEUED", "PROCESSING", "COMPLETED", "FAILED"]
+ProcessingJobStatus = Literal["QUEUED", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"]
 
 
 class ProcessingJobResponse(BaseModel):

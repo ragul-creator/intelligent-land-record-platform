@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ProcessingJob
 
-JOB_STATUSES = frozenset({"QUEUED", "PROCESSING", "COMPLETED", "FAILED"})
+JOB_STATUSES = frozenset({"QUEUED", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"})
 
 
 class InvalidJobTransition(ValueError):
@@ -75,3 +75,11 @@ def mark_job_failed(session: Session, job: ProcessingJob, error: str) -> None:
     job.status = "FAILED"
     # Worker exceptions can contain implementation or credential details; keep only a safe signal.
     job.error_json = {"message": "Processing failed."}
+
+
+def mark_job_cancelled(session: Session, job: ProcessingJob) -> None:
+    """Cancel only work that has not started; active workers must finish safely."""
+    if job.status != "QUEUED":
+        raise InvalidJobTransition(f"Cannot cancel a {job.status} job.")
+    job.status = "CANCELLED"
+    job.progress = 0

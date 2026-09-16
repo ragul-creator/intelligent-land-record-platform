@@ -8,6 +8,7 @@ from app.services.processing_jobs import (
     mark_job_completed,
     mark_job_failed,
     mark_job_processing,
+    mark_job_cancelled,
 )
 
 
@@ -36,3 +37,11 @@ def test_processing_job_state_helpers_preserve_failure_details() -> None:
     mark_job_processing(None, retry)
     mark_job_completed(None, retry)
     assert (retry.status, retry.progress, retry.error_json) == ("COMPLETED", 100, None)
+
+
+def test_queued_jobs_can_be_cancelled_without_touching_started_work() -> None:
+    job = ProcessingJob(project_id=uuid.uuid4(), job_type="PARCEL_IMPORT", idempotency_key="geoai:cancel", status="QUEUED")
+    mark_job_cancelled(None, job)
+    assert (job.status, job.progress) == ("CANCELLED", 0)
+    with pytest.raises(InvalidJobTransition):
+        mark_job_cancelled(None, job)
