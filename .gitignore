@@ -27,3 +27,15 @@ Thumbs.db
 # Local service data
 data/local/
 infrastructure/volumes/
+
+# GeoAI raster inputs and generated processing artifacts
+data/raw/imagery/*
+!data/raw/imagery/.gitkeep
+data/processed/geoai/
+ai/geoai/artifacts/
+ai/geoai/checkpoints/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.onnx

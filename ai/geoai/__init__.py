@@ -1,1 +1,1 @@
-"""Internal GeoAI package boundary; models are not implemented in Phase A."""
+"""GeoAI raster ingestion and tiling foundation; inference is intentionally out of scope."""

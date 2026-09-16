@@ -153,6 +153,20 @@ File completion is idempotent: repeating `POST /api/v1/files/complete` for an up
 
 The next planned phase is **Phase C: GeoAI**. Current Phase B deliberately does not implement OCR/HTR, GeoAI, Web-GIS, document extraction, statutory approval, or frontend login/dashboard UI.
 
+## GeoAI Raster Ingestion (Phase C.1)
+
+Phase C.1 provides a local, reusable GeoTIFF ingestion foundation only. It validates readable GeoTIFF inputs, CRS/EPSG when resolvable, affine transform, bounds, pixel resolution, bands, dtype, and NoData before extracting typed JSON metadata. It performs no segmentation, building detection, inference, polygonization, or area calculation.
+
+Install the dedicated GeoAI development dependencies from the repository root. Rasterio publishes GDAL-compatible Linux wheels, and the isolated [GeoAI Dockerfile](ai/geoai/Dockerfile) can be built with `docker build -f ai/geoai/Dockerfile .` without increasing the existing backend image.
+
+```powershell
+python -m pip install -r ai/geoai/requirements.txt
+python -m ai.geoai.cli inspect data/raw/imagery/RGB.byte.tif
+python -m ai.geoai.cli tile data/raw/imagery/RGB.byte.tif --tile-size 512
+```
+
+Tiles are written by default to `data/processed/geoai/tiles/<source_stem>/` with deterministic names such as `RGB.byte_r0000_c0001.tif`. Each tile is written as a GeoTIFF using its actual Rasterio pixel window transform and bounds, preserving CRS, band data, dtype, and NoData. Edge tiles are smaller rather than padded. Generated imagery, tiles, and model artifacts are ignored by Git.
+
 ## Repository layout
 
 - `frontend/` - React + TypeScript client; it communicates only with backend APIs.
