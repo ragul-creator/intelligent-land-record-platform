@@ -20,28 +20,34 @@ const parcel = {
   current_version: { id: "version-1", version: 1, geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, source: "EXISTING_GIS", source_reference: "survey-2026", coordinate_space: "WORLD", source_crs: "EPSG:32643", area_m2: 120, area_sqft: 1291.67, change_reason: null, validation_status: "VALID", created_by_user_id: null, created_by_type: "IMPORT", processed_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z" },
 };
 const notDeterminedParcel = { ...parcel, id: "parcel-no-geometry", external_identifier: "Not determined", ai_boundary_status: "NOT_DETERMINED", current_version: { ...parcel.current_version, id: "version-no-geometry", geometry: null } };
+const currentUser = { id: "user-1", login_id: "SUR-TN-1", email: "surveyor@example.invalid", full_name: "Surveyor", roles: ["SURVEYOR"], permissions: ["geo:read", "geo:edit_draft"], project_memberships: [{ project_id: "project-1", role: "SURVEYOR" }] };
+const topologyIssue = { id: "topology-1", project_id: "project-1", parcel_id: "parcel-1", related_parcel_id: null, code: "NEIGHBOUR_OVERLAP", severity: "REVIEW", area_m2: 4.25, message: "Edited parcel overlaps a neighbour.", resolved: false, created_at: "2026-01-01T00:00:00Z" };
+
+function installProjectFetch() {
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/users/me")) return new Response(JSON.stringify(currentUser), { status: 200 });
+    if (url.includes("/versions")) return new Response(JSON.stringify(page([parcel.current_version])), { status: 200 });
+    if (url.includes("/parcels?")) return new Response(JSON.stringify(page([parcel, notDeterminedParcel])), { status: 200 });
+    if (url.includes("/buildings")) return new Response(JSON.stringify(page([{ id: "building-1" }])), { status: 200 });
+    if (url.includes("/roads")) return new Response(JSON.stringify(page([{ id: "road-1", source: "EXISTING_GIS", source_reference: "road-survey", confidence: 0.9, model_version: null, status: "DRAFT", verification_status: "UNVERIFIED", processed_at: null, geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] }, properties: { road_class: "ROAD", length_m: 155.5 } }])), { status: 200 });
+    if (url.includes("/land-use")) return new Response(JSON.stringify(page([{ id: "land-use-1" }])), { status: 200 });
+    if (url.includes("/topology-errors")) return new Response(JSON.stringify(page([topologyIssue])), { status: 200 });
+    return new Response(JSON.stringify(page([])), { status: 200 });
+  }));
+}
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={["/projects/project-1/gis"]}><Routes><Route path="/projects/:projectId/gis" element={<GisPage />} /></Routes></MemoryRouter></QueryClientProvider>);
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe("GisPage", () => {
-  it("loads separate layer collections and renders selected parcel provenance", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/users/me")) return new Response(JSON.stringify({ id: "user-1", login_id: "SUR-TN-1", email: "surveyor@example.invalid", full_name: "Surveyor", roles: ["SURVEYOR"], permissions: ["geo:read", "geo:edit_draft"], project_memberships: [{ project_id: "project-1", role: "SURVEYOR" }] }), { status: 200 });
-      if (url.includes("/versions")) return new Response(JSON.stringify(page([parcel.current_version])), { status: 200 });
-      if (url.includes("/parcels?")) return new Response(JSON.stringify(page([parcel, notDeterminedParcel])), { status: 200 });
-      if (url.includes("/buildings")) return new Response(JSON.stringify(page([{ id: "building-1" }])), { status: 200 });
-      if (url.includes("/roads")) return new Response(JSON.stringify(page([{ id: "road-1", source: "EXISTING_GIS", source_reference: "road-survey", confidence: 0.9, model_version: null, status: "DRAFT", verification_status: "UNVERIFIED", processed_at: null, geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] }, properties: { road_class: "ROAD", length_m: 155.5 } }])), { status: 200 });
-      if (url.includes("/land-use")) return new Response(JSON.stringify(page([{ id: "land-use-1" }])), { status: 200 });
-      return new Response(JSON.stringify(page([{ id: "topology-1", parcel_id: "parcel-1", related_parcel_id: null }])), { status: 200 });
-    }));
+  it("loads separate layer collections and renders selected parcel provenance and topology details", async () => {
+    installProjectFetch();
     renderPage();
-
     await screen.findByRole("heading", { name: /project cadastral viewer/i });
     const map = screen.getByTestId("gis-map");
     expect(map).toHaveAttribute("data-parcel-count", "2");
@@ -57,13 +63,37 @@ describe("GisPage", () => {
     expect(screen.getByText("1,291.67 sq ft")).toBeInTheDocument();
     expect(screen.getByText(/saving appends a new immutable version/i)).toBeInTheDocument();
     expect(await screen.findByText(/IMPORT.*system/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: "roads" }));
-    expect(screen.getByRole("checkbox", { name: "roads" })).not.toBeChecked();
+    expect(screen.getByText(/NEIGHBOUR_OVERLAP/)).toBeInTheDocument();
+    expect(screen.getByText(/overlaps a neighbour/i)).toBeInTheDocument();
+    expect(screen.getByText(/4.25 m² affected/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /select road/i }));
     expect(await screen.findByRole("heading", { name: "ROAD" })).toBeInTheDocument();
     expect(screen.getByText("155.5 m")).toBeInTheDocument();
+  });
+
+  it("persists layer visibility per project", async () => {
+    installProjectFetch();
+    const first = renderPage();
+    await screen.findByRole("heading", { name: /project cadastral viewer/i });
+    fireEvent.click(screen.getByRole("checkbox", { name: "roads" }));
+    expect(screen.getByRole("checkbox", { name: "roads" })).not.toBeChecked();
+    await waitFor(() => expect(localStorage.getItem("gis-layer-visibility:project-1")).toContain('"roads":false'));
+    first.unmount();
+    renderPage();
+    await screen.findByRole("heading", { name: /project cadastral viewer/i });
+    expect(screen.getByRole("checkbox", { name: "roads" })).not.toBeChecked();
+  });
+
+  it("supports a manual GIS refresh", async () => {
+    installProjectFetch();
+    renderPage();
+    await screen.findByRole("heading", { name: /project cadastral viewer/i });
+    const fetchMock = vi.mocked(fetch);
+    const before = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: /refresh gis data/i }));
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(before));
+    expect(await screen.findByText(/last synced/i)).toBeInTheDocument();
   });
 
   it("shows a clear unauthorized state", async () => {
@@ -73,7 +103,7 @@ describe("GisPage", () => {
   });
 
   it("handles an empty project safely", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(page([])), { status: 200 })));
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => String(input).includes("/users/me") ? new Response(JSON.stringify(currentUser), { status: 200 }) : new Response(JSON.stringify(page([])), { status: 200 })));
     renderPage();
     await waitFor(() => expect(screen.getByText(/no gis features are available/i)).toBeInTheDocument());
     expect(screen.getByText(/building footprints remain separate/i)).toBeInTheDocument();
