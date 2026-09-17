@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, loadCurrentUser, loadGisProject, loadParcelVersions, type GeoFeature, type Parcel, type ParcelVersionSaveResult, type TopologyError } from "../api/gis";
@@ -40,7 +40,6 @@ export function GisPage() {
   const [layers, setLayers] = useState<LayerVisibility>(() => projectId ? readLayerVisibility(projectId) : initialLayers);
   const [selected, setSelected] = useState<{ kind: "PARCEL" | MapFeatureKind; id: string } | null>(null);
   const [saveResult, setSaveResult] = useState<ParcelVersionSaveResult | null>(null);
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (projectId) setLayers(readLayerVisibility(projectId));
@@ -52,11 +51,7 @@ export function GisPage() {
 
   const query = useQuery({
     queryKey: ["gis-project", projectId],
-    queryFn: async () => {
-      const result = await loadGisProject(projectId!);
-      setLastSyncedAt(new Date());
-      return result;
-    },
+    queryFn: () => loadGisProject(projectId!),
     enabled: Boolean(projectId),
     refetchOnWindowFocus: !editor.session,
     refetchInterval: editor.session ? false : 30_000,
@@ -72,10 +67,11 @@ export function GisPage() {
   const selectedFeature = selected?.kind === "BUILDING" ? data.buildings.find((item) => item.id === selected.id) ?? null : selected?.kind === "ROAD" ? data.roads.find((item) => item.id === selected.id) ?? null : selected?.kind === "LAND_USE" ? data.landUse.find((item) => item.id === selected.id) ?? null : null;
   const selectedIssues = selectedParcel ? data.topology.filter((issue) => issue.parcel_id === selectedParcel.id || issue.related_parcel_id === selectedParcel.id) : [];
   const empty = !data.parcels.length && !data.buildings.length && !data.roads.length && !data.landUse.length;
-  const topologyParcelIds = useMemo(() => [...new Set(data.topology.flatMap((issue) => [issue.parcel_id, issue.related_parcel_id]).filter((id): id is string => Boolean(id)))], [data.topology]);
+  const topologyParcelIds = [...new Set(data.topology.flatMap((issue) => [issue.parcel_id, issue.related_parcel_id]).filter((id): id is string => Boolean(id)))];
   const membership = currentUser.data?.project_memberships?.some((item) => item.project_id === projectId) ?? false;
   const canEdit = Boolean(currentUser.data?.permissions?.includes("geo:edit_draft") && membership);
   const editOverlay = editor.session ? { original: editor.session.original, working: editor.session.working, showOriginal: editor.session.showOriginal, selectedVertex: editor.session.selectedVertex, onSelectVertex: editor.selectVertex, onMoveVertex: editor.moveVertex, onCommitDrag: editor.commitDraggedVertex, onAddVertex: editor.addVertexAt } : null;
+  const lastSyncedAt = query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null;
 
   const saved = async (result: ParcelVersionSaveResult) => {
     setSaveResult(result);
