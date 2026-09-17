@@ -169,6 +169,22 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml exec -e RUN_
 
 The backend/worker image uses the repository root only to import the existing lightweight C.4/C.6 geometry modules; its root `.dockerignore` excludes local data, generated artifacts, model checkpoints, environments, and Git state. Building/road/land-use job adapters are registered types only in this phase; model execution, frontend editing, approval workflows, and government integration are intentionally not implemented.
 
+## Read-only Web-GIS (Phase D.1)
+
+The React viewer is available at `/projects/{project_id}/gis` to an authenticated project member with `geo:read`. It reads the existing parcel-version API and the project-scoped `buildings`, `roads`, `land-use`, and unresolved `topology-errors` endpoints. The viewer deliberately keeps building footprints distinct from parcel boundaries, represents missing geometry as absent rather than invented, and labels every displayed cadastral feature as draft/preliminary and unverified where applicable.
+
+MapLibre GL JS renders the layer stack locally in the browser. The optional OpenStreetMap raster basemap is a visual reference only; no external imagery is required for the project data layers. Parcel selection is read-only and shows current version/provenance/area metadata plus a version-history list. Red dashed parcel outlines indicate an unresolved topology record associated with that parcel; they do not imply a geometry for the topology error itself. D.1 does not include vertex editing, version creation, review actions, approval, or legal/statutory determinations.
+
+Start the frontend and open a project route after obtaining an existing application session token through the backend authentication API:
+
+```powershell
+cd frontend
+npm run dev
+# http://localhost:5173/projects/<project-uuid>/gis
+```
+
+Run the frontend checks with `npm test` and `npm run build`. Backend project-scope integration checks run after the Compose stack is migrated with `RUN_DATABASE_TESTS=1` as shown above.
+
 ## GeoAI Raster Ingestion (Phase C.1)
 
 Phase C.1 provides a local, reusable GeoTIFF ingestion foundation only. It validates readable GeoTIFF inputs, CRS/EPSG when resolvable, affine transform, bounds, pixel resolution, bands, dtype, and NoData before extracting typed JSON metadata. It performs no segmentation, building detection, inference, polygonization, or area calculation.

@@ -1,12 +1,6 @@
+import { Route, Routes } from "react-router-dom";
+import { GisPage } from "./pages/GisPage";
+
 export function App() {
-  return (
-    <main className="app-shell">
-      <p className="eyebrow">Phase A</p>
-      <h1>Intelligent Land Record Platform</h1>
-      <p>
-        The frontend foundation is ready for the approved backend API contracts and
-        later Web-GIS, document review, and workflow features.
-      </p>
-    </main>
-  );
+  return <Routes><Route path="/projects/:projectId/gis" element={<GisPage />} /><Route path="*" element={<main className="app-shell"><p className="eyebrow">Platform</p><h1>Intelligent Land Record Platform</h1><p>Open a project GIS route to view authorized preliminary cadastral layers.</p></main>} /></Routes>;
 }

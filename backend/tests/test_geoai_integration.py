@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.core.auth import hash_password
 from app.core.database import SessionLocal
-from app.models import GeoAIJob, Parcel, ParcelGeometryVersion, ProcessingJob, Project, ProjectMember, Role, TopologyError, User, UserRole
+from app.models import Building, GeoAIJob, LandUseFeature, Parcel, ParcelGeometryVersion, ProcessingJob, Project, ProjectMember, Road, Role, TopologyError, User, UserRole
 from app.services.user_identities import generate_login_id
 from app.workers.tasks import process_geoai_parcel_import
 
@@ -99,3 +99,35 @@ def test_api_scope_and_human_edit_create_version_two() -> None:
     assert edited.json()["status"] == "REVIEW_REQUIRED"
     versions = client.get(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", headers=surveyor_headers)
     assert [item["version"] for item in versions.json()["items"]] == [1, 2]
+
+
+def test_gis_layer_reads_are_project_scoped() -> None:
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import LineString, Polygon
+
+    from app.main import app
+
+    with SessionLocal() as session:
+        surveyor = _user(session, "SURVEYOR")
+        outsider = _user(session, "SURVEYOR")
+        project = _project(session, surveyor)
+        footprint = from_shape(Polygon([(77.0, 28.0), (77.001, 28.0), (77.001, 28.001), (77.0, 28.001), (77.0, 28.0)]), srid=4326)
+        session.add(Building(project_id=project.id, geometry=footprint, source="AI_CANDIDATE", status="AI_PRELIMINARY", verification_status="UNVERIFIED", area_m2=100.0))
+        session.add(Road(project_id=project.id, geometry=from_shape(LineString([(77.0, 28.0), (77.001, 28.001)]), srid=4326), road_class="ROAD", source="EXISTING_GIS", status="DRAFT", verification_status="UNVERIFIED", length_m=150.0))
+        session.add(LandUseFeature(project_id=project.id, geometry=footprint, land_use_class="RESIDENTIAL", source="MANUAL_DRAWN", status="DRAFT", verification_status="UNVERIFIED", area_m2=100.0, area_sqft=1076.39))
+        session.add(TopologyError(project_id=project.id, code="OVERLAP", severity="WARNING", message="Fixture topology finding"))
+        session.commit()
+        surveyor_id, outsider_id, project_id = surveyor.login_id, outsider.login_id, project.id
+    client = TestClient(app)
+
+    def headers(login_id: str) -> dict[str, str]:
+        response = client.post("/api/v1/auth/login", json={"identifier": login_id, "password": "c7-test-password"})
+        assert response.status_code == 200
+        return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    surveyor_headers = headers(surveyor_id)
+    for endpoint in ("buildings", "roads", "land-use", "topology-errors"):
+        response = client.get(f"/api/v1/projects/{project_id}/{endpoint}", headers=surveyor_headers)
+        assert response.status_code == 200
+        assert len(response.json()["items"]) == 1
+    assert client.get(f"/api/v1/projects/{project_id}/buildings", headers=headers(outsider_id)).status_code == 404

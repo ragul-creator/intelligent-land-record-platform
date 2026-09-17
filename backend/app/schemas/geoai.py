@@ -96,3 +96,40 @@ class ParcelVersionCreateResponse(BaseModel):
     area_before_m2: float | None
     area_after_m2: float | None
     issues: list[dict[str, Any]]
+
+
+class GeoFeatureResponse(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    geometry: dict[str, Any]
+    source: str
+    source_reference: str | None
+    confidence: float | None
+    model_version: str | None
+    status: str
+    verification_status: str
+    processed_at: datetime | None
+    properties: dict[str, Any]
+
+
+class GeoFeatureListResponse(BaseModel):
+    items: list[GeoFeatureResponse]
+    page: PageMetadata
+
+
+class TopologyErrorResponse(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    parcel_id: uuid.UUID | None
+    related_parcel_id: uuid.UUID | None
+    code: str
+    severity: str
+    area_m2: float | None
+    message: str
+    resolved: bool
+    created_at: datetime
+
+
+class TopologyErrorListResponse(BaseModel):
+    items: list[TopologyErrorResponse]
+    page: PageMetadata

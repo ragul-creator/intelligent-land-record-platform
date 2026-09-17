@@ -13,7 +13,7 @@ from app.audit.service import record_audit
 from app.core.auth import get_current_user
 from app.core.database import get_db_session
 from app.core.errors import ApiError, not_found
-from app.models import GeoAIJob, Parcel, ParcelGeometryVersion, ProcessingJob, User
+from app.models import Building, GeoAIJob, LandUseFeature, Parcel, ParcelGeometryVersion, ProcessingJob, Road, TopologyError, User
 from app.schemas.common import PageMetadata
 from app.schemas.geoai import (
     GeoAIJobCreateRequest,
@@ -24,6 +24,10 @@ from app.schemas.geoai import (
     ParcelVersionCreateResponse,
     ParcelVersionListResponse,
     ParcelVersionResponse,
+    GeoFeatureListResponse,
+    GeoFeatureResponse,
+    TopologyErrorListResponse,
+    TopologyErrorResponse,
 )
 from app.services.geoai import GeoAIServiceError, create_human_parcel_version, current_version, geometry_geojson
 from app.services.processing_jobs import InvalidJobTransition, create_or_get_job, mark_job_cancelled
@@ -97,6 +101,51 @@ def list_parcels(project_id: uuid.UUID, limit: int = Query(50, ge=1, le=100), of
     total = session.scalar(select(func.count(Parcel.id)).where(Parcel.project_id == project_id)) or 0
     parcels = list(session.scalars(select(Parcel).where(Parcel.project_id == project_id).order_by(Parcel.created_at.desc(), Parcel.id).limit(limit).offset(offset)))
     return ParcelListResponse(items=[_parcel_response(session, parcel) for parcel in parcels], page=PageMetadata(limit=limit, offset=offset, total=total))
+
+
+def _page_features(session: Session, model: Any, project_id: uuid.UUID, limit: int, offset: int, response) -> GeoFeatureListResponse:
+    total = session.scalar(select(func.count(model.id)).where(model.project_id == project_id)) or 0
+    records = list(session.scalars(select(model).where(model.project_id == project_id).order_by(model.created_at.desc(), model.id).limit(limit).offset(offset)))
+    return GeoFeatureListResponse(items=[response(record) for record in records], page=PageMetadata(limit=limit, offset=offset, total=total))
+
+
+def _building_response(feature: Building) -> GeoFeatureResponse:
+    return GeoFeatureResponse(id=feature.id, project_id=feature.project_id, geometry=geometry_geojson(feature.geometry), source=feature.source, source_reference=feature.source_reference, confidence=feature.confidence, model_version=feature.model_version, status=feature.status, verification_status=feature.verification_status, processed_at=feature.processed_at, properties={"area_m2": feature.area_m2, "area_sqft": feature.area_sqft})
+
+
+def _road_response(feature: Road) -> GeoFeatureResponse:
+    return GeoFeatureResponse(id=feature.id, project_id=feature.project_id, geometry=geometry_geojson(feature.geometry), source=feature.source, source_reference=feature.source_reference, confidence=feature.confidence, model_version=feature.model_version, status=feature.status, verification_status=feature.verification_status, processed_at=feature.processed_at, properties={"road_class": feature.road_class, "length_m": feature.length_m})
+
+
+def _land_use_response(feature: LandUseFeature) -> GeoFeatureResponse:
+    return GeoFeatureResponse(id=feature.id, project_id=feature.project_id, geometry=geometry_geojson(feature.geometry), source=feature.source, source_reference=feature.source_reference, confidence=feature.confidence, model_version=feature.model_version, status=feature.status, verification_status=feature.verification_status, processed_at=feature.processed_at, properties={"land_use_class": feature.land_use_class, "area_m2": feature.area_m2, "area_sqft": feature.area_sqft})
+
+
+@router.get("/buildings", response_model=GeoFeatureListResponse)
+def list_buildings(project_id: uuid.UUID, limit: int = Query(500, ge=1, le=1000), offset: int = Query(0, ge=0), session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> GeoFeatureListResponse:
+    get_project_for_user(session, user, project_id, "geo:read")
+    return _page_features(session, Building, project_id, limit, offset, _building_response)
+
+
+@router.get("/roads", response_model=GeoFeatureListResponse)
+def list_roads(project_id: uuid.UUID, limit: int = Query(500, ge=1, le=1000), offset: int = Query(0, ge=0), session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> GeoFeatureListResponse:
+    get_project_for_user(session, user, project_id, "geo:read")
+    return _page_features(session, Road, project_id, limit, offset, _road_response)
+
+
+@router.get("/land-use", response_model=GeoFeatureListResponse)
+def list_land_use(project_id: uuid.UUID, limit: int = Query(500, ge=1, le=1000), offset: int = Query(0, ge=0), session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> GeoFeatureListResponse:
+    get_project_for_user(session, user, project_id, "geo:read")
+    return _page_features(session, LandUseFeature, project_id, limit, offset, _land_use_response)
+
+
+@router.get("/topology-errors", response_model=TopologyErrorListResponse)
+def list_topology_errors(project_id: uuid.UUID, resolved: bool = False, limit: int = Query(500, ge=1, le=1000), offset: int = Query(0, ge=0), session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> TopologyErrorListResponse:
+    get_project_for_user(session, user, project_id, "geo:read")
+    filters = [TopologyError.project_id == project_id, TopologyError.resolved == resolved]
+    total = session.scalar(select(func.count(TopologyError.id)).where(*filters)) or 0
+    records = list(session.scalars(select(TopologyError).where(*filters).order_by(TopologyError.created_at.desc(), TopologyError.id).limit(limit).offset(offset)))
+    return TopologyErrorListResponse(items=[TopologyErrorResponse(id=item.id, project_id=item.project_id, parcel_id=item.parcel_id, related_parcel_id=item.related_parcel_id, code=item.code, severity=item.severity, area_m2=item.area_m2, message=item.message, resolved=item.resolved, created_at=item.created_at) for item in records], page=PageMetadata(limit=limit, offset=offset, total=total))
 
 
 def _project_parcel(session: Session, user: User, project_id: uuid.UUID, parcel_id: uuid.UUID, permission: str) -> Parcel:
