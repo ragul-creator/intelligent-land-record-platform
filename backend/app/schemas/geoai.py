@@ -87,6 +87,7 @@ class ParcelVersionCreateRequest(BaseModel):
     geometry: dict[str, Any]
     source_crs: str = Field(min_length=1, max_length=255)
     coordinate_space: Literal["WORLD"] = "WORLD"
+    expected_current_version: int = Field(ge=1)
     change_reason: str | None = Field(default=None, max_length=2000)
 
 

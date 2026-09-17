@@ -32,6 +32,7 @@ describe("GisPage", () => {
   it("loads separate layer collections and renders selected parcel provenance", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes("/users/me")) return new Response(JSON.stringify({ id: "user-1", login_id: "SUR-TN-1", email: "surveyor@example.invalid", full_name: "Surveyor", roles: ["SURVEYOR"], permissions: ["geo:read", "geo:edit_draft"], project_memberships: [{ project_id: "project-1", role: "SURVEYOR" }] }), { status: 200 });
       if (url.includes("/versions")) return new Response(JSON.stringify(page([parcel.current_version])), { status: 200 });
       if (url.includes("/parcels?")) return new Response(JSON.stringify(page([parcel, notDeterminedParcel])), { status: 200 });
       if (url.includes("/buildings")) return new Response(JSON.stringify(page([{ id: "building-1" }])), { status: 200 });
@@ -54,7 +55,7 @@ describe("GisPage", () => {
     expect(screen.getByText("survey-2026")).toBeInTheDocument();
     expect(screen.getByText("120 m²")).toBeInTheDocument();
     expect(screen.getByText("1,291.67 sq ft")).toBeInTheDocument();
-    expect(screen.getByText("Read-only in D.1.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/saving appends a new immutable version/i)).toBeInTheDocument();
     expect(await screen.findByText(/IMPORT.*system/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "roads" }));

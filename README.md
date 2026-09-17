@@ -185,6 +185,14 @@ npm run dev
 
 Run the frontend checks with `npm test` and `npm run build`. Backend project-scope integration checks run after the Compose stack is migrated with `RUN_DATABASE_TESTS=1` as shown above.
 
+## Draft Parcel Editing (Phase D.2)
+
+The same `/projects/{project_id}/gis` route now supports a Polygon-only draft edit session for a project member whose backend profile includes `geo:edit_draft`. It uses `/api/v1/users/me` only to decide whether to expose the editor; the backend remains authoritative for permission and project-membership enforcement. View-only users do not receive edit controls.
+
+An edit session clones the current GeoJSON geometry in memory, renders the original dashed outline plus the edited boundary and vertex handles, and supports vertex drag, edge-click insertion, selected-vertex deletion, undo, redo, reset, and cancel. MultiPolygon and `NOT_DETERMINED`/missing geometries remain read-only with an explicit message. The browser preview uses a spherical geodesic calculation for the WGS84 API geometry; it is only a responsive indication. C.6/PostGIS calculates and validates the authoritative result when saving.
+
+`Save Draft` requires a change reason and sends the existing immutable-version endpoint with `expected_current_version`. A stale draft gets `409 PARCEL_VERSION_CONFLICT` and remains open for correction/refresh. A successful save appends a new human geometry version, refreshes parcel/history/topology reads, and displays either the new version or `Saved — Review Required` with C.6 issue reasons. D.2 does not approve, publish, certify, or make a parcel legally authoritative.
+
 ## GeoAI Raster Ingestion (Phase C.1)
 
 Phase C.1 provides a local, reusable GeoTIFF ingestion foundation only. It validates readable GeoTIFF inputs, CRS/EPSG when resolvable, affine transform, bounds, pixel resolution, bands, dtype, and NoData before extracting typed JSON metadata. It performs no segmentation, building detection, inference, polygonization, or area calculation.

@@ -23,6 +23,10 @@ class GeoAIServiceError(ValueError):
     """Safe domain error for rejected GeoAI persistence requests."""
 
 
+class ParcelVersionConflict(GeoAIServiceError):
+    """The draft was based on a geometry version that is no longer current."""
+
+
 def _as_utc(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
 
@@ -125,12 +129,20 @@ def _persist_topology_issues(session: Session, project_id: uuid.UUID, parcel_id:
 
 
 def create_human_parcel_version(
-    session: Session, parcel: Parcel, user_id: uuid.UUID, geometry_data: dict[str, Any], source_crs: str, change_reason: str | None
+    session: Session,
+    parcel: Parcel,
+    user_id: uuid.UUID,
+    geometry_data: dict[str, Any],
+    source_crs: str,
+    expected_current_version: int,
+    change_reason: str | None,
 ) -> tuple[ParcelGeometryVersion, Any]:
     """Append a validated human version atomically; no prior version is modified."""
     locked = session.scalar(select(Parcel).where(Parcel.id == parcel.id).with_for_update())
     if locked is None:
         raise GeoAIServiceError("Parcel was not found.")
+    if locked.current_geometry_version != expected_current_version:
+        raise ParcelVersionConflict("This parcel has a newer geometry version. Refresh it before saving your draft.")
     previous = current_version(session, locked)
     if previous.geometry is None:
         raise GeoAIServiceError("A parcel without world geometry cannot be edited until it is georeferenced.")

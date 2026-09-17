@@ -92,13 +92,18 @@ def test_api_scope_and_human_edit_create_version_two() -> None:
         return {"Authorization": f"Bearer {response.json()['access_token']}"}
     surveyor_headers, viewer_headers, outsider_headers = headers(surveyor_id), headers(viewer_id), headers(outsider_id)
     assert client.get(f"/api/v1/projects/{project_id}/parcels/{parcel_id}", headers=outsider_headers).status_code == 404
-    assert client.post(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", json={"geometry": {"type": "Polygon", "coordinates": [[[77.0, 28.0], [77.0012, 28.0], [77.0012, 28.0012], [77.0, 28.0012], [77.0, 28.0]]]}, "source_crs": "EPSG:4326", "change_reason": "Survey adjustment"}, headers=viewer_headers).status_code == 403
-    edited = client.post(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", json={"geometry": {"type": "Polygon", "coordinates": [[[77.0, 28.0], [77.0012, 28.0], [77.0012, 28.0012], [77.0, 28.0012], [77.0, 28.0]]]}, "source_crs": "EPSG:4326", "change_reason": "Survey adjustment"}, headers=surveyor_headers)
+    assert client.post(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", json={"geometry": {"type": "Polygon", "coordinates": [[[77.0, 28.0], [77.0012, 28.0], [77.0012, 28.0012], [77.0, 28.0012], [77.0, 28.0]]]}, "source_crs": "EPSG:4326", "expected_current_version": 1, "change_reason": "Survey adjustment"}, headers=viewer_headers).status_code == 403
+    edited = client.post(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", json={"geometry": {"type": "Polygon", "coordinates": [[[77.0, 28.0], [77.0012, 28.0], [77.0012, 28.0012], [77.0, 28.0012], [77.0, 28.0]]]}, "source_crs": "EPSG:4326", "expected_current_version": 1, "change_reason": "Survey adjustment"}, headers=surveyor_headers)
     assert edited.status_code == 201
     assert edited.json()["version"]["version"] == 2
     assert edited.json()["status"] == "REVIEW_REQUIRED"
     versions = client.get(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", headers=surveyor_headers)
     assert [item["version"] for item in versions.json()["items"]] == [1, 2]
+    stale = client.post(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", json={"geometry": {"type": "Polygon", "coordinates": [[[77.0, 28.0], [77.0013, 28.0], [77.0013, 28.0013], [77.0, 28.0013], [77.0, 28.0]]]}, "source_crs": "EPSG:4326", "expected_current_version": 1, "change_reason": "Stale adjustment"}, headers=surveyor_headers)
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "PARCEL_VERSION_CONFLICT"
+    versions_after_conflict = client.get(f"/api/v1/projects/{project_id}/parcels/{parcel_id}/versions", headers=surveyor_headers)
+    assert [item["version"] for item in versions_after_conflict.json()["items"]] == [1, 2]
 
 
 def test_gis_layer_reads_are_project_scoped() -> None:

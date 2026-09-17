@@ -29,7 +29,7 @@ from app.schemas.geoai import (
     TopologyErrorListResponse,
     TopologyErrorResponse,
 )
-from app.services.geoai import GeoAIServiceError, create_human_parcel_version, current_version, geometry_geojson
+from app.services.geoai import ParcelVersionConflict, GeoAIServiceError, create_human_parcel_version, current_version, geometry_geojson
 from app.services.processing_jobs import InvalidJobTransition, create_or_get_job, mark_job_cancelled
 from app.services.project_access import get_project_for_user
 from app.workers.tasks import process_geoai_parcel_import
@@ -173,7 +173,9 @@ def list_parcel_versions(project_id: uuid.UUID, parcel_id: uuid.UUID, limit: int
 def create_parcel_version(project_id: uuid.UUID, parcel_id: uuid.UUID, request: ParcelVersionCreateRequest, session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> ParcelVersionCreateResponse:
     parcel = _project_parcel(session, user, project_id, parcel_id, "geo:edit_draft")
     try:
-        version, result = create_human_parcel_version(session, parcel, user.id, request.geometry, request.source_crs, request.change_reason)
+        version, result = create_human_parcel_version(session, parcel, user.id, request.geometry, request.source_crs, request.expected_current_version, request.change_reason)
+    except ParcelVersionConflict as error:
+        raise ApiError(status.HTTP_409_CONFLICT, "PARCEL_VERSION_CONFLICT", str(error)) from error
     except GeoAIServiceError as error:
         raise ApiError(status.HTTP_422_UNPROCESSABLE_CONTENT, "PARCEL_EDIT_INVALID", str(error)) from error
     record_audit(session, "parcel.geometry_version_created", "parcel_geometry_version", version.id, actor_id=user.id, project_id=project_id, metadata={"parcel_id": str(parcel.id), "version": version.version, "status": result.status})
