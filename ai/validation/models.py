@@ -1,8 +1,4 @@
-"""Unified Phase E.1 validation contracts.
-
-These types are intentionally domain-neutral so document, GIS, duplicate, and
-master-data checks can emit the same auditable issue/report shape.
-"""
+"""Unified validation contracts shared by SIH12 and SIH18."""
 
 from __future__ import annotations
 
@@ -13,10 +9,12 @@ from typing import Iterable
 
 
 class Severity(StrEnum):
+    """Canonical validation severity from the validation/data-quality blueprint."""
+
     INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 
 class ValidationStatus(StrEnum):
@@ -79,8 +77,8 @@ class ValidationReport:
         return self.status is ValidationStatus.REVIEW_REQUIRED
 
     @property
-    def has_errors(self) -> bool:
-        return any(issue.severity in {Severity.ERROR, Severity.CRITICAL} for issue in self.issues)
+    def has_high_severity_issues(self) -> bool:
+        return any(issue.severity is Severity.HIGH for issue in self.issues)
 
 
 def aggregate_validation(
@@ -88,19 +86,18 @@ def aggregate_validation(
     *,
     unsafe: bool = False,
 ) -> ValidationReport:
-    """Aggregate issues deterministically.
+    """Aggregate issues using canonical routing.
 
-    ``INVALID`` is reserved for data that is unsafe to continue processing
-    (for example unrecoverable geometry). Normal business-rule failures and
-    low-confidence outputs are reviewable and therefore become
-    ``REVIEW_REQUIRED``.
+    MEDIUM/HIGH issues require review by default. LOW/INFO may continue unless a
+    rule explicitly sets ``review_required``. ``INVALID`` remains reserved for
+    data unsafe to continue processing.
     """
 
     normalized = tuple(issues)
     if unsafe:
         status = ValidationStatus.INVALID
     elif any(
-        issue.review_required or issue.severity in {Severity.ERROR, Severity.CRITICAL}
+        issue.review_required or issue.severity in {Severity.MEDIUM, Severity.HIGH}
         for issue in normalized
     ):
         status = ValidationStatus.REVIEW_REQUIRED

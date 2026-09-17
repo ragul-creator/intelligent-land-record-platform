@@ -15,6 +15,7 @@ from app.api.v1.auth import router as auth_router, users_router
 from app.api.v1.jobs import project_router as project_jobs_router, router as jobs_router
 from app.api.v1.projects import router as projects_router
 from app.api.v1.geoai import router as geoai_router
+from app.api.v1.review import router as review_router
 from app.core.errors import ApiError
 
 app = FastAPI(
@@ -27,6 +28,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(geoai_router, prefix="/api/v1")
+app.include_router(review_router, prefix="/api/v1")
 app.include_router(project_jobs_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 

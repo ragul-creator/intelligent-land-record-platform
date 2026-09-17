@@ -1,4 +1,4 @@
-"""Configurable confidence policy for Phase E.1.
+"""Configurable confidence policy for unified validation.
 
 The default 0.90/0.75 thresholds are hackathon/MVP defaults, not statutory
 confidence thresholds. Callers may provide a different policy later.
@@ -48,13 +48,13 @@ def low_confidence_issue(
     model_version: str | None = None,
     policy: ConfidencePolicy = DEFAULT_CONFIDENCE_POLICY,
 ) -> ValidationIssue | None:
-    """Return a review issue when confidence is below the configured medium band."""
+    """Return a review issue when confidence is below the configured threshold."""
 
     if not policy.requires_review(confidence):
         return None
     return ValidationIssue(
         code="LOW_CONFIDENCE",
-        severity=Severity.ERROR,
+        severity=Severity.MEDIUM,
         message=f"Confidence {confidence:.3f} is below the review threshold {policy.medium_threshold:.3f}.",
         entity_type=entity_type,
         entity_id=entity_id,

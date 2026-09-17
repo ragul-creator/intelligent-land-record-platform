@@ -21,6 +21,7 @@ from app.models.foundation import (
     User,
     UserRole,
 )
+from app.models.review import ReviewTask
 
 __all__ = [
     "AuditLog",
@@ -36,6 +37,7 @@ __all__ = [
     "ProcessingJob",
     "Project",
     "ProjectMember",
+    "ReviewTask",
     "Role",
     "RolePermission",
     "Road",

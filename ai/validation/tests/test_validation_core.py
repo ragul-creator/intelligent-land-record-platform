@@ -21,7 +21,7 @@ def test_default_confidence_bands() -> None:
     assert policy.band(None) is ConfidenceBand.UNKNOWN
 
 
-def test_low_confidence_forces_review() -> None:
+def test_low_confidence_forces_review_with_canonical_medium_severity() -> None:
     issue = low_confidence_issue(
         entity_type="DOCUMENT_FIELD",
         entity_id="field-1",
@@ -29,21 +29,34 @@ def test_low_confidence_forces_review() -> None:
         confidence=0.62,
     )
     assert issue is not None
+    assert issue.severity is Severity.MEDIUM
     report = aggregate_validation((issue,))
     assert report.status is ValidationStatus.REVIEW_REQUIRED
     assert report.review_required is True
 
 
-def test_warning_alone_does_not_force_review() -> None:
+def test_low_severity_alone_does_not_force_review() -> None:
     issue = ValidationIssue(
         code="NORMALIZATION_NOTE",
-        severity=Severity.WARNING,
+        severity=Severity.LOW,
         message="Value was normalized.",
         entity_type="DOCUMENT_FIELD",
         entity_id="field-1",
     )
     report = aggregate_validation((issue,))
     assert report.status is ValidationStatus.VALID
+
+
+def test_medium_and_high_severity_route_to_review() -> None:
+    for severity in (Severity.MEDIUM, Severity.HIGH):
+        issue = ValidationIssue(
+            code="MATERIAL_ISSUE",
+            severity=severity,
+            message="Requires review.",
+            entity_type="LAND_RECORD",
+            entity_id="record-1",
+        )
+        assert aggregate_validation((issue,)).status is ValidationStatus.REVIEW_REQUIRED
 
 
 def test_unsafe_processing_is_invalid() -> None:
@@ -60,6 +73,7 @@ def test_required_field_rule() -> None:
     )
     assert issue is not None
     assert issue.code == "REQUIRED_FIELD_MISSING"
+    assert issue.severity is Severity.MEDIUM
     assert issue.review_required is True
 
 
