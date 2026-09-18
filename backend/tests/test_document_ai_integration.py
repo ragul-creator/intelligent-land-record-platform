@@ -272,7 +272,7 @@ def test_review_failure_and_correction_preserve_prior_evidence(monkeypatch) -> N
         apply_review_action(session, review, actor=officer, action="CORRECT", reason="Checked source evidence", correction_reference=str(correction_id))
         session.commit()
 
-    # A failed reprocess must not remove the successful OCR/extraction history.
+    # A retryable reprocess failure must preserve successful OCR/extraction history and requeue safely.
     class BrokenPipeline:
         def process(self, *_args, **_kwargs):
             raise RuntimeError("mock OCR failure")
@@ -284,6 +284,8 @@ def test_review_failure_and_correction_preserve_prior_evidence(monkeypatch) -> N
     with SessionLocal() as session:
         document = session.get(Document, document_id)
         job = session.get(ProcessingJob, uuid.UUID(reprocess.json()["id"]))
-        assert document is not None and document.status == "FAILED"
-        assert job is not None and job.status == "FAILED"
+        assert document is not None and document.status == "QUEUED"
+        assert job is not None and job.status == "QUEUED"
+        assert job.retry_count == 1
+        assert job.error_json is None
         assert session.scalar(select(func.count(DocumentOcrResultRecord.id)).where(DocumentOcrResultRecord.document_id == document_id)) == 1
