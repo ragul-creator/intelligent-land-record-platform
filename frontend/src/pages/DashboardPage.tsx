@@ -39,6 +39,7 @@ export function DashboardPage() {
     <header className="dashboard-header">
       <div><p className="eyebrow">Combined SIH12 + SIH18 workflow</p><h1>{data.project.name}</h1><p>{data.project.description || "Project operational dashboard"}</p><div className="dashboard-badges"><span>{data.project.state}</span><span>{data.project_role}</span></div></div>
       <nav className="dashboard-nav" aria-label="Project workspace navigation">
+        <Link to="/">Platform home</Link>
         {canDocuments && <Link to={`/projects/${projectId}/documents`}>Documents</Link>}
         {canGis && <Link to={`/projects/${projectId}/gis`}>Web-GIS</Link>}
         {canReview && <Link to={`/projects/${projectId}/review`}>Review workspace</Link>}
@@ -68,7 +69,7 @@ export function DashboardPage() {
       <section><h2>Jobs</h2><StatusList items={data.jobs.by_status} /></section>
     </div>
 
-    <section className="demo-flow" aria-label="End to end demo flow"><div><p className="eyebrow">G.3 integrated demo path</p><h2>From source evidence to verified workflow association</h2><p>Follow the persisted vertical slice without bypassing human review or legal safeguards.</p></div><ol>{canDocuments && <li><Link to={`/projects/${projectId}/documents`}>1. Upload/process a land-record document</Link><span>OCR → extraction → validation with provenance and confidence.</span></li>}{canGis && <li><Link to={`/projects/${projectId}/gis`}>2. Inspect cadastral and GeoAI evidence</Link><span>Parcels remain draft/preliminary; buildings stay separate from parcel boundaries.</span></li>}{canReview && <li><Link to={`/projects/${projectId}/review`}>3. Resolve human-review work</Link><span>Use the canonical reviewer actions for document/GIS/link cases.</span></li>}<li><strong>4. Confirm the Record ↔ Parcel workflow association</strong><span>Confirmation is auditable workflow evidence, not statutory ownership proof.</span></li></ol></section>
+    <section className="demo-flow" aria-label="End to end demo flow"><div><p className="eyebrow">H.2 guided demo path</p><h2>From source evidence to auditable workflow association</h2><p>Follow the persisted vertical slice without bypassing human review or legal safeguards.</p></div><ol>{canDocuments && <li><Link to={`/projects/${projectId}/documents`}>1. Upload/process a land-record document</Link><span>OCR → extraction → validation with provenance and confidence.</span></li>}{canGis && <li><Link to={`/projects/${projectId}/gis`}>2. Inspect cadastral and GeoAI evidence</Link><span>Parcels remain draft/preliminary; buildings stay separate from parcel boundaries.</span></li>}{canReview && <li><Link to={`/projects/${projectId}/review`}>3. Resolve human-review work</Link><span>Use the canonical reviewer actions for document/GIS/link cases.</span></li>}<li><strong>4. Confirm the Record ↔ Parcel workflow association</strong><span>Confirmation is auditable workflow evidence, not statutory ownership proof.</span></li></ol></section>
 
     <p className="dashboard-disclaimer">AI cadastral outputs remain preliminary until authorized verification. Dashboard counts are derived from persisted project data; no synthetic progress score is used.</p>
   </main>;
