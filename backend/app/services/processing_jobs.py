@@ -73,7 +73,8 @@ def mark_job_retry_queued(session: Session, job: ProcessingJob, retry_count: int
     """Return a started job to QUEUED so Celery autoretry can actually execute it again."""
     if job.status != "PROCESSING":
         raise InvalidJobTransition(f"Cannot retry a {job.status} job.")
-    if retry_count <= job.retry_count:
+    current_retry_count = job.retry_count or 0
+    if retry_count <= current_retry_count:
         raise InvalidJobTransition("Retry count must increase monotonically.")
     job.status = "QUEUED"
     job.progress = 0
