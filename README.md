@@ -257,3 +257,15 @@ WHU PNG imagery is not georeferenced. C.2 does not invent CRS, affine transforms
 - `infrastructure/` - local container configuration.
 - `data/` - local-only samples and annotations (not source-of-truth production storage).
 - `docs/` - approved architecture and future API/deployment documentation.
+
+## Phase G.3 End-to-End Integrated Demo Flow
+
+Phase G.3 connects the completed document, GIS, review, dashboard, and G.1 record-to-parcel workflows into one navigable demo path without adding new statutory claims or bypassing existing RBAC.
+
+The project dashboard at `/projects/{project_id}` now presents the guided vertical slice: open the SIH18 Documents workspace, process and validate a land-record document, inspect SIH12 cadastral evidence in Web-GIS, resolve any human-review task, and then inspect or confirm the persisted Record ↔ Parcel workflow association. Document-to-parcel candidate generation still uses the G.1 deterministic matcher and persisted evidence only; imagery alone never establishes an official identifier.
+
+The Documents workspace displays persisted Record ↔ Parcel candidates for the selected validated record, including method, confidence, review state, and direct navigation to the associated parcel in Web-GIS. Authorized users with `validation:run` may generate candidates, while `validation:resolve` controls confirmation/rejection. Rejecting an association requires a reason. The GIS parcel panel performs the reverse lookup and links back to the source document, preserving a complete demo trail in both directions.
+
+Deep links are supported with `?documentId=<uuid>` on the Documents route and `?parcelId=<uuid>` on the Web-GIS route. These are navigation aids only; backend project membership and permission checks remain authoritative.
+
+The integrated demo does not auto-publish land records, certify ownership, or treat an AI-derived parcel as a legal boundary. Confirmed Record ↔ Parcel links remain auditable workflow associations. Final statutory verification and live government-system integration require external departmental processes/adapters.
