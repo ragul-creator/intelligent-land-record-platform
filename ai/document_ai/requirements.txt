@@ -1,0 +1,6 @@
+# Runtime libraries for Phase F.1 only. Tesseract itself is a documented system dependency.
+numpy>=1.26,<3
+Pillow>=10,<12
+PyMuPDF>=1.24,<2
+pytesseract>=0.3.10,<1
+pytest>=8,<9

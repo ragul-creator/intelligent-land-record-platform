@@ -240,7 +240,8 @@ WHU PNG imagery is not georeferenced. C.2 does not invent CRS, affine transforms
 
 - `frontend/` - React + TypeScript client; it communicates only with backend APIs.
 - `backend/` - FastAPI public integration boundary.
-- `ai/document_ai/`, `ai/geoai/`, `ai/validation/` - internal package boundaries for later asynchronous services.
+- `ai/document_ai/` - preliminary PDF/image preprocessing and Tamil/English OCR; see [`ai/document_ai/README.md`](ai/document_ai/README.md).
+- `ai/geoai/`, `ai/validation/` - internal package boundaries for later asynchronous services.
 - `infrastructure/` - local container configuration.
 - `data/` - local-only samples and annotations (not source-of-truth production storage).
 - `docs/` - approved architecture and future API/deployment documentation.
