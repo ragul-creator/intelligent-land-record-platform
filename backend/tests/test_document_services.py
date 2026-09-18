@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
+
 from ai.document_ai.extraction import DocumentExtractionResult, ExtractedFieldCandidate, FieldEvidence
 from ai.document_ai.models import BoundingBox
 from app.models.documents import Document, DocumentExtractedField
@@ -58,7 +60,7 @@ def test_reprocess_requires_prior_persisted_ocr(monkeypatch) -> None:
             return None
 
     monkeypatch.setattr("app.services.documents.active_document_job", lambda _session, _document_id: None)
-    with __import__("pytest").raises(DocumentWorkflowError, match="persisted OCR result"):
+    with pytest.raises(DocumentWorkflowError, match="persisted OCR result"):
         queue_document_job(
             SessionWithoutOcr(),
             document=document,
