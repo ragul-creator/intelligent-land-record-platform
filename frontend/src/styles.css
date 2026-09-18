@@ -125,3 +125,5 @@ dl { display: grid; grid-template-columns: 9rem 1fr; gap: .4rem .7rem; margin: 1
 .home-demo-path strong, .home-demo-path span { display: block; }
 .home-demo-path span { margin-top: .18rem; color: #637477; font-size: .84rem; }
 @media (max-width: 760px) { .home-hero, .login-card, .home-demo-path { grid-template-columns: 1fr; }.signed-in-bar, .project-launcher-heading { align-items: stretch; flex-direction: column; }.home-hero h1 { max-width: none; } }
+
+.demo-fixture-note { margin: .65rem 0; padding: .65rem .75rem; border-left: 4px solid #bf7a2f; background: #fff8e8; color: #6f522b; font-size: .84rem; line-height: 1.45; }
