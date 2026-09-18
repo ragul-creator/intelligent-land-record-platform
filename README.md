@@ -275,3 +275,19 @@ The integrated demo does not auto-publish land records, certify ownership, or tr
 Phase H.1 adds regression coverage and targeted hardening across authentication, project isolation, RBAC, human review, Document AI workflow states, async retry/failure semantics, audit redaction, and the browser API boundary. The backend now accepts browser requests only from explicitly configured `CORS_ALLOWED_ORIGINS` (default local demo origin `http://localhost:5173`); wildcard CORS is rejected.
 
 Retryable Celery failures are persisted back to `QUEUED` so the configured retry can actually run, while final failures retain only a generic error signal. Inactive reviewers cannot receive new assignments, and Document AI reprocessing requires prior persisted OCR evidence. See [`docs/H1_REGRESSION_SECURITY.md`](docs/H1_REGRESSION_SECURITY.md) for the verification scope and known MVP limits.
+
+## Phase H.2 Tamil Nadu Demo
+
+Phase H.2 adds a browser sign-in/project launcher and an idempotent **synthetic** Tamil Nadu demo dataset. The seed includes Tamil + English OCR evidence, structured fields, a human-review case, draft cadastral parcels, building/pathway/land-use GIS layers, and a confirmed workflow association between one validated record and one parcel. It does not contain official survey or ownership data.
+
+After migrations are applied, seed the demo with a local password:
+
+```powershell
+$env:DEMO_SEED_PASSWORD = "replace-with-a-local-demo-password"
+docker compose -f infrastructure\docker-compose.yml --env-file .env run --rm --build `
+  -e DEMO_SEED_PASSWORD=$env:DEMO_SEED_PASSWORD `
+  backend `
+  python -m app.cli.seed_demo
+```
+
+The command prints the generated role login IDs and project UUID. Open `http://localhost:5173/`, sign in, and launch **Tamil Nadu Integrated Land Records Demo** from the project chooser. See [`docs/H2_DEMO_GUIDE.md`](docs/H2_DEMO_GUIDE.md) for the presentation sequence and synthetic-data boundaries.
