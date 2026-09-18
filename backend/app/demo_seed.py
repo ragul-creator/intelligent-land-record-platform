@@ -58,6 +58,11 @@ def _user(session: Session, role_name: str, password: str) -> User:
     email, full_name = DEMO_USERS[role_name]
     existing = session.scalar(select(User).where(User.email == email))
     if existing is not None:
+        # These are synthetic demo-only accounts. Re-running the seed command is
+        # an explicit request to make them usable with the caller-supplied local
+        # demo password, including after DB-backed tests created them first.
+        existing.password_hash = hash_password(password)
+        existing.is_active = True
         return existing
 
     role = session.scalar(select(Role).where(Role.name == role_name))
