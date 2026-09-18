@@ -203,3 +203,29 @@ def test_escalation_assignment_and_correction_contract() -> None:
     )
     assert corrected.status_code == 200
     assert corrected.json()["status"] == "OPEN"
+
+
+def test_inactive_reviewer_cannot_be_assigned_or_escalated() -> None:
+    from app.main import app
+
+    data = _fixture_data()
+    with SessionLocal() as session:
+        second = session.scalar(select(User).where(User.login_id == data["second_reviewer"]))
+        assert second is not None
+        second.is_active = False
+        session.commit()
+
+    client = TestClient(app)
+    reviewer_headers = _login(client, data["reviewer"])
+    response = client.patch(
+        f"/api/v1/review/tasks/{data['blocking_id']}",
+        json={
+            "action": "ESCALATE",
+            "reason": "Inactive reviewers must not receive active work.",
+            "assignee_user_id": str(data["second_reviewer_id"]),
+        },
+        headers=reviewer_headers,
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "REVIEW_ACTION_INVALID"
+    assert "project member with review:act permission" in response.json()["error"]["message"]

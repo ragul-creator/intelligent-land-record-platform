@@ -67,6 +67,32 @@ def test_parcel_import_task_persists_immutable_version_and_safe_failure() -> Non
         assert session.scalar(select(TopologyError).where(TopologyError.parcel_id == parcel.id)) is None
 
 
+def test_invalid_geoai_input_is_terminal_and_does_not_persist_partial_parcel() -> None:
+    with SessionLocal() as session:
+        surveyor = _user(session, "SURVEYOR")
+        project = _project(session, surveyor)
+        geoai = _geoai_job(
+            session,
+            project,
+            {
+                "source_type": "UNSUPPORTED_SOURCE",
+                "source_payload": None,
+                "source_crs": "EPSG:4326",
+            },
+        )
+        session.commit()
+        job_id, project_id = geoai.id, project.id
+
+    process_geoai_parcel_import.run(str(job_id))
+
+    with SessionLocal() as session:
+        processing = session.get(ProcessingJob, job_id)
+        assert processing is not None
+        assert processing.status == "FAILED"
+        assert processing.error_json == {"message": "Processing failed."}
+        assert session.scalar(select(Parcel).where(Parcel.project_id == project_id)) is None
+
+
 def test_api_scope_and_human_edit_create_version_two() -> None:
     from app.main import app
 

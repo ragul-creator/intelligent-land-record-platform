@@ -52,7 +52,12 @@ def queue_document_job(
         return active[0], active[1], False
     if not reprocess and document.status not in {"UPLOADED", "FAILED"}:
         raise DocumentWorkflowError("The document must be uploaded or failed before processing.")
-    version = (session.scalar(select(func.max(DocumentOcrResultRecord.version)).where(DocumentOcrResultRecord.document_id == document.id)) or 0) + 1
+    previous_ocr_version = session.scalar(
+        select(func.max(DocumentOcrResultRecord.version)).where(DocumentOcrResultRecord.document_id == document.id)
+    )
+    if reprocess and previous_ocr_version is None:
+        raise DocumentWorkflowError("Reprocessing requires a persisted OCR result from an earlier processing run.")
+    version = (previous_ocr_version or 0) + 1
     key = f"document:{document.id}:ocr:{version}"
     job, created = create_or_get_job(session, document.project_id, "DOCUMENT_AI_PROCESS", key)
     detail = session.get(DocumentProcessingJob, job.id)

@@ -6,10 +6,12 @@ import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
+
 from ai.document_ai.extraction import DocumentExtractionResult, ExtractedFieldCandidate, FieldEvidence
 from ai.document_ai.models import BoundingBox
 from app.models.documents import Document, DocumentExtractedField
-from app.services.documents import extraction_from_records
+from app.services.documents import DocumentWorkflowError, extraction_from_records, queue_document_job
 
 
 class FakeSession:
@@ -42,3 +44,27 @@ def test_extraction_contract_keeps_preliminary_candidates_evidence_grounded() ->
     )
     result = DocumentExtractionResult(source_id="document-1", fields={"owner_details": (candidate,)}, extraction_version="f2", processed_at=datetime.now(UTC))
     assert result.fields["owner_details"][0].original_value == "சோதனை நபர்"
+
+
+def test_reprocess_requires_prior_persisted_ocr(monkeypatch) -> None:
+    document = Document(
+        id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        file_id=uuid.uuid4(),
+        uploaded_by_user_id=uuid.uuid4(),
+        status="UPLOADED",
+    )
+
+    class SessionWithoutOcr:
+        def scalar(self, _query):
+            return None
+
+    monkeypatch.setattr("app.services.documents.active_document_job", lambda _session, _document_id: None)
+    with pytest.raises(DocumentWorkflowError, match="persisted OCR result"):
+        queue_document_job(
+            SessionWithoutOcr(),
+            document=document,
+            actor_id=uuid.uuid4(),
+            languages=["tam", "eng"],
+            reprocess=True,
+        )

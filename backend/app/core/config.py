@@ -29,10 +29,19 @@ class Settings(BaseSettings):
     auth_jwt_algorithm: str = "HS256"
     auth_access_token_lifetime_seconds: int = Field(default=900, ge=60, le=3600)
     auth_refresh_token_lifetime_seconds: int = Field(default=604800, ge=300, le=2592000)
+    cors_allowed_origins: str = "http://localhost:5173"
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
     bootstrap_admin_full_name: str = "Development Administrator"
     bootstrap_admin_login_id: str | None = None
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Return explicit browser origins; wildcard origins are never accepted."""
+        origins = [value.strip().rstrip("/") for value in self.cors_allowed_origins.split(",") if value.strip()]
+        if any(origin == "*" for origin in origins):
+            raise ValueError("CORS_ALLOWED_ORIGINS must list explicit origins; wildcard is not allowed.")
+        return origins
 
     @property
     def database_url(self) -> str:
