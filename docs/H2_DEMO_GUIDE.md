@@ -17,7 +17,7 @@ docker compose -f infrastructure\docker-compose.yml --env-file .env run --rm --b
 
 The command prints the generated login IDs for ADMIN, OFFICER, REVIEWER, SURVEYOR, and VIEWER plus the demo project UUID. Open `http://localhost:5173/`, sign in with one of those login IDs and the password you supplied, and choose **Tamil Nadu Integrated Land Records Demo**.
 
-The seed command is idempotent. Re-running it does not duplicate the project or the demo evidence. Existing demo-user passwords are not silently reset by a later run.
+The seed command is idempotent. Re-running it does not duplicate the project or demo evidence, and it intentionally refreshes the synthetic demo-account passwords to the caller-supplied `DEMO_SEED_PASSWORD`. This makes the accounts recoverable after DB-backed tests or an earlier demo run.
 
 ## What the dataset contains
 
