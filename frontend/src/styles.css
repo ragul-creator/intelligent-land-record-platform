@@ -88,3 +88,40 @@ dl { display: grid; grid-template-columns: 9rem 1fr; gap: .4rem .7rem; margin: 1
 .demo-flow li a, .demo-flow li strong { display: block; color: #173b47; font-weight: 700; }
 .demo-flow li span { display: block; margin-top: .2rem; color: #60767a; font-size: .82rem; }
 @media (max-width: 760px) { .documents-header, .record-link-heading, .demo-flow { display: grid; grid-template-columns: 1fr; }.documents-nav { justify-content: start; } }
+
+/* Phase H.2 demo landing page and judging flow. */
+.home-shell { min-height: 100vh; padding: 2rem clamp(1rem, 3vw, 3rem) 3rem; background: linear-gradient(180deg, #f7f4ea 0%, #eef3ef 100%); color: #173b47; }
+.home-hero { max-width: 1180px; margin: 0 auto 1.25rem; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(16rem, .7fr); gap: 1.25rem; align-items: end; }
+.home-hero h1 { margin: .15rem 0 .65rem; font-size: clamp(2.1rem, 5vw, 4.2rem); line-height: .98; letter-spacing: -.045em; max-width: 12ch; }
+.home-hero p { max-width: 62ch; font-size: 1.02rem; line-height: 1.6; }
+.home-safety-note { display: grid; gap: .35rem; padding: 1rem; border-left: 4px solid #bf7a2f; background: #fff9ec; box-shadow: 0 8px 24px rgb(38 59 52 / 8%); }
+.home-safety-note strong { font-family: "Trebuchet MS", sans-serif; text-transform: uppercase; letter-spacing: .06em; font-size: .75rem; }
+.home-safety-note span { line-height: 1.45; }
+.login-card, .signed-in-bar, .project-launcher, .home-demo-path { max-width: 1180px; margin: 0 auto 1rem; border: 1px solid #c9d5cc; background: rgba(255, 254, 249, .94); box-shadow: 0 12px 32px rgb(38 59 52 / 7%); }
+.login-card { display: grid; grid-template-columns: minmax(0, .8fr) minmax(18rem, 1.2fr); gap: 1.5rem; padding: 1.25rem; }
+.login-card h2, .project-launcher h2, .home-demo-path h2 { margin: .15rem 0 .5rem; }
+.login-card form { display: grid; gap: .8rem; }
+.login-card label { display: grid; gap: .35rem; font-weight: 700; font-size: .82rem; }
+.login-card input { width: 100%; padding: .72rem .8rem; border: 1px solid #9fafaa; border-radius: .35rem; background: #fff; font: inherit; }
+.login-card button, .signed-in-bar button { width: fit-content; padding: .65rem .9rem; border: 1px solid #244f59; border-radius: .35rem; background: #244f59; color: white; font-weight: 700; cursor: pointer; }
+.login-card button:disabled, .signed-in-bar button:disabled { opacity: .55; cursor: default; }
+.text-action { background: transparent !important; color: #244f59 !important; border-color: transparent !important; padding-left: 0 !important; }
+.signed-in-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .9rem 1rem; }
+.signed-in-bar div { display: grid; gap: .12rem; }
+.signed-in-bar span, .signed-in-bar small { color: #64777a; }
+.project-launcher { padding: 1.2rem; }
+.project-launcher-heading { display: flex; justify-content: space-between; align-items: end; gap: 1rem; margin-bottom: .8rem; }
+.project-launcher-heading > span { padding: .25rem .5rem; border-radius: 999px; background: #e5eee7; font-size: .76rem; font-weight: 700; }
+.project-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .8rem; }
+.project-launch-card { min-height: 12rem; display: grid; align-content: start; gap: .65rem; padding: 1rem; border: 1px solid #d3ddd5; background: #fffdf8; }
+.project-launch-card > div { display: flex; gap: .4rem; flex-wrap: wrap; }
+.project-launch-card > div span { padding: .2rem .4rem; border: 1px solid #c5d3c8; border-radius: 999px; font-size: .68rem; font-weight: 700; }
+.project-launch-card h3 { margin: 0; font-size: 1.15rem; }
+.project-launch-card p { margin: 0; color: #617275; line-height: 1.45; }
+.project-launch-card a { margin-top: auto; width: fit-content; padding: .55rem .7rem; background: #173b47; color: white; text-decoration: none; font-weight: 700; border-radius: .3rem; }
+.home-demo-path { display: grid; grid-template-columns: minmax(15rem, .7fr) minmax(0, 1.3fr); gap: 1rem; padding: 1.2rem; }
+.home-demo-path ol { margin: 0; padding-left: 1.3rem; display: grid; gap: .55rem; }
+.home-demo-path li { padding: .55rem .65rem; background: #f4f1e7; }
+.home-demo-path strong, .home-demo-path span { display: block; }
+.home-demo-path span { margin-top: .18rem; color: #637477; font-size: .84rem; }
+@media (max-width: 760px) { .home-hero, .login-card, .home-demo-path { grid-template-columns: 1fr; }.signed-in-bar, .project-launcher-heading { align-items: stretch; flex-direction: column; }.home-hero h1 { max-width: none; } }
