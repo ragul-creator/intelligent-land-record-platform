@@ -286,7 +286,7 @@ export function ReviewPage() {
                     </select>
                   </label>
 
-                  {action === "APPROVE" && selected.blocking_issue_count > 0 && <p className="review-warning">Approval is blocked until all blocking issues are resolved.</p>}
+                  {selected.blocking_issue_count > 0 && <p className="review-warning">Approval is blocked until all blocking issues are resolved.</p>}
 
                   {actionNeedsReason && <label>Reason / comment
                     <textarea value={reason} maxLength={2000} onChange={(event) => setReason(event.target.value)} placeholder={action === "COMMENT" ? "Add reviewer comment" : "Explain this decision"} />
