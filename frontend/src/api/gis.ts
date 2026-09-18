@@ -28,7 +28,7 @@ const get = <T>(path: string) => request<T>(path);
 
 export async function loadGisProject(projectId: string) {
   const [parcels, buildings, roads, landUse, topology] = await Promise.all([
-    get<Page<Parcel>>(`/projects/${projectId}/parcels?limit=500`), get<Page<Building>>(`/projects/${projectId}/buildings?limit=500`), get<Page<Road>>(`/projects/${projectId}/roads?limit=500`), get<Page<LandUseFeature>>(`/projects/${projectId}/land-use?limit=500`), get<Page<TopologyError>>(`/projects/${projectId}/topology-errors?limit=500`),
+    get<Page<Parcel>>(`/projects/${projectId}/parcels?limit=100`), get<Page<Building>>(`/projects/${projectId}/buildings?limit=500`), get<Page<Road>>(`/projects/${projectId}/roads?limit=500`), get<Page<LandUseFeature>>(`/projects/${projectId}/land-use?limit=500`), get<Page<TopologyError>>(`/projects/${projectId}/topology-errors?limit=500`),
   ]);
   return { parcels: parcels.items, buildings: buildings.items, roads: roads.items, landUse: landUse.items, topology: topology.items };
 }
