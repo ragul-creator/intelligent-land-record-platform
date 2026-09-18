@@ -9,7 +9,7 @@ Apply migrations first, then set a local demo password of at least 12 characters
 ```powershell
 $env:DEMO_SEED_PASSWORD = "replace-with-a-local-demo-password"
 
-docker compose -f infrastructure\docker-compose.yml --env-file .env run --rm `
+docker compose -f infrastructure\docker-compose.yml --env-file .env run --rm --build `
   -e DEMO_SEED_PASSWORD=$env:DEMO_SEED_PASSWORD `
   backend `
   python -m app.cli.seed_demo
