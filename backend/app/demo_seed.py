@@ -143,7 +143,6 @@ def _document(
     status: str,
     survey_number: str,
     confidence: float,
-    version_tag: str,
 ) -> tuple[Document, DocumentValidationResultRecord]:
     file = File(
         project_id=project.id,
@@ -341,6 +340,7 @@ def seed_tamil_nadu_demo(session: Session, password: str) -> dict[str, object]:
         },
     )
     session.add(imagery)
+    session.flush()
 
     parcel_a = _parcel(
         session,
@@ -473,7 +473,6 @@ def seed_tamil_nadu_demo(session: Session, password: str) -> dict[str, object]:
         status="VALIDATED",
         survey_number="TN-DEMO-101/4",
         confidence=0.94,
-        version_tag="validated",
     )
     _document(
         session,
@@ -483,7 +482,6 @@ def seed_tamil_nadu_demo(session: Session, password: str) -> dict[str, object]:
         status="REVIEW_REQUIRED",
         survey_number="TN-DEMO-101/5",
         confidence=0.58,
-        version_tag="review",
     )
 
     link = RecordParcelLink(
