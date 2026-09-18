@@ -77,6 +77,7 @@ export function DocumentsPage() {
 
           {detail.data.latest_validation && <section><h3>Validation: {detail.data.latest_validation.status}</h3><p>Persisted validation version {detail.data.latest_validation.version}</p><pre>{JSON.stringify(detail.data.latest_validation.confidence_summary, null, 2)}</pre>{detail.data.latest_validation.report.issues?.map((issue) => <p key={`${issue.code}-${issue.message}`}>{issue.severity}: {issue.message}</p>)}{detail.data.latest_validation.review_task_id && <Link to={`/projects/${projectId}/review`}>Open linked review case</Link>}</section>}
 
+          {(suggest.error || resolve.error) && <p className="error-copy" role="alert">{resolve.error ? "Unable to resolve the parcel association. Rejection requires a reason and confirmed records cannot be replaced implicitly." : "Unable to generate parcel candidates from the persisted validated evidence."}</p>}
           <RecordParcelLinksPanel
             projectId={projectId}
             links={links.data?.items ?? []}
@@ -121,7 +122,7 @@ function RecordParcelLinksPanel({ projectId, links, loading, canSuggest, canReso
       <p>{link.link_method.replaceAll("_", " ")} · confidence {link.confidence === null ? "not available" : `${Math.round(link.confidence * 100)}%`}</p>
       <p>Parcel UUID: <code>{link.parcel_id}</code></p>
       <div className="record-link-actions"><Link to={`/projects/${projectId}/gis?parcelId=${link.parcel_id}`}>Open parcel in Web-GIS</Link>{link.review_task_id && <Link to={`/projects/${projectId}/review`}>Open review task</Link>}</div>
-      {canResolve && (link.link_status === "SUGGESTED" || link.link_status === "REVIEW_REQUIRED") && <div className="record-link-resolution"><input aria-label="Link resolution reason" placeholder="Optional reviewer reason" value={reason} onChange={(event) => onReason(event.target.value)} /><button disabled={resolving} onClick={() => onResolve(link, "confirm")}>Confirm association</button><button disabled={resolving} onClick={() => onResolve(link, "reject")}>Reject association</button></div>}
+      {canResolve && (link.link_status === "SUGGESTED" || link.link_status === "REVIEW_REQUIRED") && <div className="record-link-resolution"><input aria-label="Link resolution reason" placeholder="Optional reviewer reason" value={reason} onChange={(event) => onReason(event.target.value)} /><button disabled={resolving} onClick={() => onResolve(link, "confirm")}>Confirm association</button><button disabled={resolving || !reason.trim()} onClick={() => onResolve(link, "reject")}>Reject association</button></div>}
     </article>)}
   </section>;
 }
