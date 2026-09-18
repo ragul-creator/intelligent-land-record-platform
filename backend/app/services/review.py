@@ -92,7 +92,7 @@ def _review_capable_assignee(
             ProjectMember.user_id == assignee_user_id,
         )
     )
-    if user is None or membership is None or "review:act" not in user_permissions(session, assignee_user_id):
+    if user is None or not user.is_active or membership is None or "review:act" not in user_permissions(session, assignee_user_id):
         raise ReviewWorkflowError("Assignee must be a project member with review:act permission.")
     return user
 
