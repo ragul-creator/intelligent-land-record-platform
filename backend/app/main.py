@@ -17,6 +17,7 @@ from app.api.v1.projects import router as projects_router
 from app.api.v1.geoai import router as geoai_router
 from app.api.v1.review import router as review_router
 from app.api.v1.documents import router as documents_router
+from app.api.v1.record_links import router as record_links_router
 from app.core.errors import ApiError
 
 app = FastAPI(
@@ -31,6 +32,7 @@ app.include_router(projects_router, prefix="/api/v1")
 app.include_router(geoai_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(record_links_router, prefix="/api/v1")
 app.include_router(project_jobs_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 

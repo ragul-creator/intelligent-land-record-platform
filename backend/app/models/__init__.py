@@ -22,6 +22,7 @@ from app.models.foundation import (
     UserRole,
 )
 from app.models.review import ReviewTask
+from app.models.record_links import RecordParcelLink
 from app.models.documents import (
     Document,
     DocumentExtractedField,
@@ -52,6 +53,7 @@ __all__ = [
     "Project",
     "ProjectMember",
     "ReviewTask",
+    "RecordParcelLink",
     "Role",
     "RolePermission",
     "Road",

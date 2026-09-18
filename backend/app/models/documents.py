@@ -19,6 +19,7 @@ class Document(TimestampedModel, Base):
 
     __tablename__ = "documents"
     __table_args__ = (
+        UniqueConstraint("project_id", "id", name="uq_documents_project_id_id"),
         CheckConstraint(
             "status IN ('UPLOADED', 'QUEUED', 'PROCESSING', 'EXTRACTED', 'VALIDATING', 'REVIEW_REQUIRED', 'VALIDATED', 'FAILED')",
             name="ck_documents_status",
@@ -109,6 +110,7 @@ class DocumentValidationResultRecord(Base):
 
     __tablename__ = "document_validation_results"
     __table_args__ = (
+        UniqueConstraint("document_id", "id", name="uq_document_validation_results_document_id_id"),
         UniqueConstraint("document_id", "version", name="uq_document_validation_results_document_version"),
         UniqueConstraint("processing_job_id", name="uq_document_validation_results_processing_job"),
         Index("ix_document_validation_results_document_version", "document_id", "version"),

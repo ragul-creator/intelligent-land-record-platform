@@ -8,6 +8,7 @@ from app.models.documents import (
     DocumentProcessingJob,
     DocumentValidationResultRecord,
 )
+from app.models.record_links import RecordParcelLink
 
 
 def test_foundational_geoai_and_document_ai_tables_are_registered() -> None:
@@ -38,6 +39,7 @@ def test_foundational_geoai_and_document_ai_tables_are_registered() -> None:
         "document_extracted_fields",
         "document_validation_results",
         "document_field_corrections",
+        "record_parcel_links",
     }
 
 
@@ -74,3 +76,13 @@ def test_document_ai_version_and_referential_constraints_are_declared() -> None:
     assert {"uq_document_validation_results_document_version", "uq_document_validation_results_processing_job"} <= validation_constraints
     assert "uq_document_field_corrections_field_version" in correction_constraints
     assert DocumentProcessingJob.__table__.foreign_keys
+
+
+def test_record_parcel_link_constraints_are_declared() -> None:
+    constraints = {constraint.name for constraint in RecordParcelLink.__table__.constraints}
+    assert {
+        "ck_record_parcel_links_status",
+        "ck_record_parcel_links_method",
+        "ck_record_parcel_links_confidence",
+    } <= constraints
+    assert len(RecordParcelLink.__table__.foreign_key_constraints) == 6

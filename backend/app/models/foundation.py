@@ -242,6 +242,7 @@ class Parcel(TimestampedModel, Base):
 
     __tablename__ = "parcels"
     __table_args__ = (
+        UniqueConstraint("project_id", "id", name="uq_parcels_project_id_id"),
         CheckConstraint("current_geometry_version >= 1", name="ck_parcels_current_geometry_version"),
         Index("ix_parcels_project_status", "project_id", "status"),
         Index("ix_parcels_project_external_identifier", "project_id", "external_identifier"),
