@@ -54,6 +54,7 @@ def test_h1_project_api_role_matrix_blocks_privilege_drift() -> None:
             session.add(ProjectMember(project_id=project.id, user_id=user.id, role=role))
         session.commit()
         project_id = project.id
+        viewer_id = users["VIEWER"].id
         login_ids = {role: user.login_id for role, user in users.items()}
 
     client = TestClient(app)
@@ -99,7 +100,7 @@ def test_h1_project_api_role_matrix_blocks_privilege_drift() -> None:
     for role in ("OFFICER", "REVIEWER", "SURVEYOR", "VIEWER"):
         response = client.post(
             f"/api/v1/projects/{project_id}/members",
-            json={"user_id": str(users["VIEWER"].id), "role": "VIEWER"},
+            json={"user_id": str(viewer_id), "role": "VIEWER"},
             headers=headers[role],
         )
         assert response.status_code == 403
