@@ -269,3 +269,9 @@ The Documents workspace displays persisted Record ↔ Parcel candidates for the 
 Deep links are supported with `?documentId=<uuid>` on the Documents route and `?parcelId=<uuid>` on the Web-GIS route. These are navigation aids only; backend project membership and permission checks remain authoritative.
 
 The integrated demo does not auto-publish land records, certify ownership, or treat an AI-derived parcel as a legal boundary. Confirmed Record ↔ Parcel links remain auditable workflow associations. Final statutory verification and live government-system integration require external departmental processes/adapters.
+
+## Phase H.1 Regression And Security Hardening
+
+Phase H.1 adds regression coverage and targeted hardening across authentication, project isolation, RBAC, human review, Document AI workflow states, async retry/failure semantics, audit redaction, and the browser API boundary. The backend now accepts browser requests only from explicitly configured `CORS_ALLOWED_ORIGINS` (default local demo origin `http://localhost:5173`); wildcard CORS is rejected.
+
+Retryable Celery failures are persisted back to `QUEUED` so the configured retry can actually run, while final failures retain only a generic error signal. Inactive reviewers cannot receive new assignments, and Document AI reprocessing requires prior persisted OCR evidence. See [`docs/H1_REGRESSION_SECURITY.md`](docs/H1_REGRESSION_SECURITY.md) for the verification scope and known MVP limits.
