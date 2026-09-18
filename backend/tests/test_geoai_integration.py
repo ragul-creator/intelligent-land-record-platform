@@ -75,7 +75,7 @@ def test_invalid_geoai_input_is_terminal_and_does_not_persist_partial_parcel() -
             session,
             project,
             {
-                "source_type": "NO_VISIBLE_EVIDENCE",
+                "source_type": "UNSUPPORTED_SOURCE",
                 "source_payload": None,
                 "source_crs": "EPSG:4326",
             },
