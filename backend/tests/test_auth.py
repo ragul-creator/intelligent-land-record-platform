@@ -68,3 +68,28 @@ def test_role_permission_mapping_matches_the_approved_baseline() -> None:
     assert ROLE_PERMISSION_CODES["VIEWER"] == {
         "project:read", "document:read", "record:read", "geo:read", "dashboard:read", "export:read",
     }
+
+
+def test_h1_role_permission_matrix_has_no_privilege_drift() -> None:
+    expected = {
+        "ADMIN": frozenset(PERMISSION_CODES),
+        "OFFICER": frozenset({
+            "project:read", "project:create", "project:update", "document:upload", "document:read",
+            "document:process", "document:reprocess", "field:read", "field:correct", "record:read",
+            "validation:run", "validation:resolve", "review:read", "dashboard:read", "audit:read",
+            "export:read", "geo:read", "imagery:upload",
+        }),
+        "REVIEWER": frozenset({
+            "project:read", "document:read", "field:read", "field:correct", "record:read",
+            "validation:run", "validation:resolve", "review:read", "review:act", "geo:read",
+            "geo:approve", "dashboard:read", "export:read",
+        }),
+        "SURVEYOR": frozenset({
+            "project:read", "document:read", "record:read", "imagery:upload", "geoai:process",
+            "geo:read", "geo:edit_draft", "dashboard:read", "export:read",
+        }),
+        "VIEWER": frozenset({
+            "project:read", "document:read", "record:read", "geo:read", "dashboard:read", "export:read",
+        }),
+    }
+    assert ROLE_PERMISSION_CODES == expected
