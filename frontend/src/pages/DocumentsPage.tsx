@@ -69,7 +69,8 @@ export function DocumentsPage() {
         {detail.data && <>
           <h2>{detail.data.filename}</h2>
           <p><strong>Status:</strong> {detail.data.status}</p>
-          {can(detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "document:process" : "document:reprocess") && <button onClick={() => process.mutate(detail.data.status !== "UPLOADED" && detail.data.status !== "FAILED")}>{process.isPending ? "Queuing…" : detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "Process" : "Reprocess"}</button>}
+          {detail.data.filename.startsWith("tn_demo_") && <p className="demo-fixture-note">Synthetic H.2 evidence snapshot. Upload a new PDF/image when demonstrating live OCR; seeded evidence is kept stable for the judging walkthrough.</p>}
+          {!detail.data.filename.startsWith("tn_demo_") && can(detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "document:process" : "document:reprocess") && <button onClick={() => process.mutate(detail.data.status !== "UPLOADED" && detail.data.status !== "FAILED")}>{process.isPending ? "Queuing…" : detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "Process" : "Reprocess"}</button>}
 
           {detail.data.latest_ocr && <section><h3>Preliminary OCR</h3><p>{detail.data.latest_ocr.engine} · {detail.data.latest_ocr.requested_languages.join("+")} · confidence {detail.data.latest_ocr.confidence ?? "unknown"}</p>{detail.data.latest_ocr.payload.pages?.slice(0, 2).map((page, index) => <pre key={index}>{page.text}</pre>)}</section>}
 
