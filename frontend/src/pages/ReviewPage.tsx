@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
@@ -192,7 +192,9 @@ export function ReviewPage() {
           <p>Project: {projectId}</p>
         </div>
         <nav className="review-nav" aria-label="Project review navigation">
-          <Link to={`/projects/${projectId}/gis`}>Open Web-GIS</Link>
+          <Link to={`/projects/${projectId}`}>Dashboard</Link>
+          <Link to={`/projects/${projectId}/documents`}>Documents</Link>
+          <Link to={`/projects/${projectId}/gis`}>Web-GIS</Link>
           <Link to="/">Platform home</Link>
         </nav>
       </header>
@@ -271,7 +273,7 @@ export function ReviewPage() {
                 {selected.source_refs.length ? <ul className="review-source-list">{selected.source_refs.map((source) => <li key={source}>{source}</li>)}</ul> : <p className="review-muted">No source reference was attached to this case.</p>}
 
                 <h3>Case metadata</h3>
-                {metadataEntries(selected.metadata).length ? <dl>{metadataEntries(selected.metadata).map(([key, value]) => <><dt key={`${key}-dt`}>{key}</dt><dd key={`${key}-dd`}>{typeof value === "string" ? value : JSON.stringify(value)}</dd></>)}</dl> : <p className="review-muted">No additional metadata.</p>}
+                {metadataEntries(selected.metadata).length ? <dl>{metadataEntries(selected.metadata).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd></Fragment>)}</dl> : <p className="review-muted">No additional metadata.</p>}
               </section>
 
               <section className="review-actions">
