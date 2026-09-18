@@ -1,8 +1,16 @@
 from app.core.permissions import APPLICATION_ROLES, PERMISSION_CODES
 from app.models import foundation
+from app.models.documents import (
+    Document,
+    DocumentExtractedField,
+    DocumentFieldCorrection,
+    DocumentOcrResultRecord,
+    DocumentProcessingJob,
+    DocumentValidationResultRecord,
+)
 
 
-def test_foundational_and_geoai_tables_are_registered() -> None:
+def test_foundational_geoai_and_document_ai_tables_are_registered() -> None:
     assert set(foundation.Base.metadata.tables) == {
         "users",
         "roles",
@@ -23,6 +31,13 @@ def test_foundational_and_geoai_tables_are_registered() -> None:
         "land_use_features",
         "topology_errors",
         "audit_logs",
+        "review_tasks",
+        "documents",
+        "document_processing_jobs",
+        "document_ocr_results",
+        "document_extracted_fields",
+        "document_validation_results",
+        "document_field_corrections",
     }
 
 
@@ -43,3 +58,19 @@ def test_foundational_constraints_are_declared() -> None:
     assert "ck_projects_state" in project_constraints
     parcel_version_constraints = {constraint.name for constraint in foundation.ParcelGeometryVersion.__table__.constraints}
     assert "uq_parcel_geometry_versions_parcel_version" in parcel_version_constraints
+
+
+def test_document_ai_version_and_referential_constraints_are_declared() -> None:
+    document_constraints = {constraint.name for constraint in Document.__table__.constraints}
+    ocr_constraints = {constraint.name for constraint in DocumentOcrResultRecord.__table__.constraints}
+    field_constraints = {constraint.name for constraint in DocumentExtractedField.__table__.constraints}
+    validation_constraints = {constraint.name for constraint in DocumentValidationResultRecord.__table__.constraints}
+    correction_constraints = {constraint.name for constraint in DocumentFieldCorrection.__table__.constraints}
+
+    assert "ck_documents_status" in document_constraints
+    assert "uq_document_ocr_results_document_version" in ocr_constraints
+    assert "uq_document_ocr_results_processing_job" in ocr_constraints
+    assert "uq_document_extracted_fields_result_index" in field_constraints
+    assert {"uq_document_validation_results_document_version", "uq_document_validation_results_processing_job"} <= validation_constraints
+    assert "uq_document_field_corrections_field_version" in correction_constraints
+    assert DocumentProcessingJob.__table__.foreign_keys

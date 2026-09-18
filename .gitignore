@@ -44,3 +44,5 @@ ai/geoai/checkpoints/
 data/models/tesseract/
 data/raw/document_ai/
 .pytest-tmp/
+.pytest-tmp-*/
+.docker-*.log

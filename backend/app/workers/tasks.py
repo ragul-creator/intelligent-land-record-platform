@@ -1,12 +1,18 @@
-"""Minimal, database-backed Celery task foundation without AI processing."""
+"""Database-backed Celery tasks for registered files, GeoAI, and Document AI."""
 
 import uuid
+import tempfile
+from pathlib import Path
+from sqlalchemy import select
 
 from app.core.database import SessionLocal
+from app.core.storage import get_storage_service
 from app.audit.service import record_audit
-from app.models import GeoAIJob, ProcessingJob
+from app.models import Document, DocumentProcessingJob, DocumentOcrResultRecord, File, GeoAIJob, ProcessingJob
 from app.services.geoai import GeoAIServiceError, persist_parcel_import
+from app.services.documents import extraction_from_records, persist_extraction, persist_ocr_result, persist_validation
 from app.services.processing_jobs import mark_job_completed, mark_job_failed, mark_job_processing
+from app.services.review import create_review_task
 from app.workers.celery_app import celery_app
 
 
@@ -69,4 +75,127 @@ def process_geoai_parcel_import(self, geoai_job_id: str) -> None:
                 session.commit()
             if isinstance(error, GeoAIServiceError):
                 return
+            raise
+
+
+@celery_app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
+def process_document_ai(self, job_id: str) -> None:
+    """Run F.1 -> F.2 -> F.3 without exposing or mutating the source object."""
+    job_uuid = uuid.UUID(job_id)
+    with SessionLocal() as session:
+        job = session.get(ProcessingJob, job_uuid)
+        detail = session.get(DocumentProcessingJob, job_uuid)
+        if job is None or detail is None or job.status != "QUEUED":
+            return
+        document = session.get(Document, detail.document_id)
+        if document is None:
+            return
+        try:
+            job.retry_count = self.request.retries
+            mark_job_processing(session, job)
+            document.status = "PROCESSING"
+            record_audit(session, "document.processing_started", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
+            session.commit()
+
+            file = session.get(File, document.file_id)
+            if file is None:
+                raise RuntimeError("Document source artifact is unavailable.")
+            source_bytes = get_storage_service().read_private_object(file.storage_key)
+            suffix = Path(file.original_name).suffix or ".bin"
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary:
+                temporary.write(source_bytes)
+                source_path = Path(temporary.name)
+            try:
+                from ai.document_ai.extraction import extract_land_record_fields
+                from ai.document_ai.pipeline import OcrPipeline
+
+                result = OcrPipeline().process(source_path, source_id=str(document.id), languages=detail.requested_languages_json, allowed_root=source_path.parent)
+            finally:
+                source_path.unlink(missing_ok=True)
+
+            ocr = persist_ocr_result(session, document=document, job=job, detail=detail, result=result)
+            extraction = extract_land_record_fields(result)
+            persist_extraction(session, document=document, ocr=ocr, extraction=extraction)
+            document.status = "EXTRACTED"
+            document.status = "VALIDATING"
+            validation, result_validation = persist_validation(session, document=document, ocr=ocr, job=job, extraction=extraction)
+            recommendation = result_validation.review_recommendation
+            if recommendation and recommendation.required:
+                if validation.review_task_id is None:
+                    recommendation_metadata = result_validation.to_dict()["review_recommendation"]["metadata"]
+                    review = create_review_task(
+                        session, project_id=document.project_id, queue_type="DOCUMENT", target_type="LAND_RECORD",
+                        target_id=document.id, severity=recommendation.severity, summary=recommendation.summary,
+                        source_refs=list(recommendation.source_refs), blocking_issue_count=recommendation.blocking_issue_count,
+                        metadata={**recommendation_metadata, "document_id": str(document.id), "validation_result_id": str(validation.id), "validation_version": validation.version},
+                    )
+                    validation.review_task_id = review.id
+                    record_audit(session, "document.review_required", "document", document.id, project_id=document.project_id, metadata={"review_task_id": str(review.id), "validation_result_id": str(validation.id)})
+                document.status = "REVIEW_REQUIRED"
+            else:
+                document.status = "VALIDATED"
+                record_audit(session, "document.validated", "document", document.id, project_id=document.project_id, metadata={"validation_result_id": str(validation.id)})
+            detail.output_refs_json = {"ocr_result_id": str(ocr.id), "validation_result_id": str(validation.id), "document_status": document.status}
+            mark_job_completed(session, job)
+            session.commit()
+        except Exception:
+            session.rollback()
+            job = session.get(ProcessingJob, job_uuid)
+            document = session.get(Document, detail.document_id) if detail else None
+            if job is not None and job.status == "PROCESSING":
+                mark_job_failed(session, job, "Document AI processing failed")
+                if document is not None:
+                    document.status = "FAILED"
+                    record_audit(session, "document.processing_failed", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
+                session.commit()
+            raise
+
+
+@celery_app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
+def revalidate_document(self, job_id: str) -> None:
+    """Apply F.3 to persisted candidate evidence plus append-only corrections."""
+    job_uuid = uuid.UUID(job_id)
+    with SessionLocal() as session:
+        job = session.get(ProcessingJob, job_uuid)
+        detail = session.get(DocumentProcessingJob, job_uuid)
+        if job is None or detail is None or detail.job_type != "DOCUMENT_REVALIDATE" or job.status != "QUEUED":
+            return
+        document = session.get(Document, detail.document_id)
+        if document is None:
+            return
+        try:
+            mark_job_processing(session, job)
+            document.status = "VALIDATING"
+            session.commit()
+            ocr = session.scalar(
+                select(DocumentOcrResultRecord)
+                .where(DocumentOcrResultRecord.document_id == document.id)
+                .order_by(DocumentOcrResultRecord.version.desc())
+            )
+            if ocr is None:
+                raise RuntimeError("Persisted OCR result is unavailable.")
+            extraction = extraction_from_records(session, document_id=document.id, ocr=ocr, include_corrections=True)
+            validation, result_validation = persist_validation(session, document=document, ocr=ocr, job=job, extraction=extraction)
+            recommendation = result_validation.review_recommendation
+            if recommendation and recommendation.required:
+                if validation.review_task_id is None:
+                    recommendation_metadata = result_validation.to_dict()["review_recommendation"]["metadata"]
+                    review = create_review_task(session, project_id=document.project_id, queue_type="DOCUMENT", target_type="LAND_RECORD", target_id=document.id, severity=recommendation.severity, summary=recommendation.summary, source_refs=list(recommendation.source_refs), blocking_issue_count=recommendation.blocking_issue_count, metadata={**recommendation_metadata, "document_id": str(document.id), "validation_result_id": str(validation.id), "validation_version": validation.version})
+                    validation.review_task_id = review.id
+                document.status = "REVIEW_REQUIRED"
+            else:
+                document.status = "VALIDATED"
+            detail.output_refs_json = {"validation_result_id": str(validation.id), "document_status": document.status}
+            mark_job_completed(session, job)
+            session.commit()
+        except Exception:
+            session.rollback()
+            job = session.get(ProcessingJob, job_uuid)
+            if job is not None and job.status == "PROCESSING":
+                mark_job_failed(session, job, "Document revalidation failed")
+                document = session.get(Document, detail.document_id)
+                if document is not None:
+                    document.status = "FAILED"
+                    record_audit(session, "document.processing_failed", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
+                session.commit()
             raise

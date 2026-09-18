@@ -153,6 +153,18 @@ File completion is idempotent: repeating `POST /api/v1/files/complete` for an up
 
 The next planned phase is **Phase C: GeoAI**. Current Phase B deliberately does not implement OCR/HTR, GeoAI, Web-GIS, document extraction, statutory approval, or frontend login/dashboard UI.
 
+## Document AI Integration (Phase F.4)
+
+Phase F.4 connects the existing F.1 OCR, F.2 extraction, and F.3 validation libraries to the private storage, PostgreSQL, Celery, audit, and E.2 review foundations. A project member uploads a PDF, PNG, JPG/JPEG, or TIFF/TIF through `POST /api/v1/projects/{project_id}/documents`. The immutable original is stored privately in MinIO through the existing storage adapter; `GET .../{document_id}/source-url` requires `document:read` and returns only a short-lived signed URL.
+
+`POST .../{document_id}/process` queues an idempotent `DOCUMENT_AI_PROCESS` job, and `POST .../{document_id}/reprocess` creates a new append-only OCR version. The worker applies `F.1 -> F.2 -> F.3`, preserving OCR page/token evidence, extracted candidates, validation reports, confidence summaries, provenance, and timestamps. The document progresses through `UPLOADED`, `QUEUED`, `PROCESSING`, `EXTRACTED`, `VALIDATING`, then `REVIEW_REQUIRED` or `VALIDATED`; it never auto-publishes a land record. Failures are safely reported as `FAILED` without deleting previous versions.
+
+Read APIs are `GET .../{document_id}`, `/ocr`, `/fields`, and `/validation`. A `REVIEW_REQUIRED` result creates exactly one E.2 `DOCUMENT` task for that persisted validation version, with the document UUID as its target. Field corrections use `POST .../fields/{field_id}/corrections`, require `field:correct` and a reason, and create a versioned correction record without changing OCR or extracted evidence. The correction ID is a valid E.2 `CORRECT` reference.
+
+The React demo route is `/projects/{project_id}/documents`. It keeps preliminary OCR, original extracted values, confidence, validation issues, and later corrections visibly separate, and links review-required documents to the existing Review Workspace. Backend permissions remain authoritative.
+
+The backend/worker Docker image installs Tesseract plus the English and Tamil Debian language packages for the documented demo. OCR languages remain configurable through the process request; other language packs must be installed and evaluated separately. Handwritten-document OCR remains preliminary and requires human review. No government verification is configured, so F.3 reports that check as `NOT_PERFORMED`.
+
 ## GeoAI Persistence (Phase C.7)
 
 Phase C.7 connects the existing GeoAI parcel acquisition and topology libraries to PostGIS and Celery. `POST /api/v1/projects/{project_id}/geoai/jobs` creates a project-scoped asynchronous job; `PARCEL_IMPORT` is the complete supported path. The worker invokes the existing C.4 `create_parcel()` code, stores declared world geometry as EPSG:4326, retains `source_crs` and input provenance, creates a parcel plus immutable geometry version 1, and records safe audit events. `GET /api/v1/projects/{project_id}/geoai/jobs/{job_id}` and `/cancel` expose project-scoped job state.

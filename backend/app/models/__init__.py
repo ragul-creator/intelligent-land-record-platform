@@ -22,11 +22,25 @@ from app.models.foundation import (
     UserRole,
 )
 from app.models.review import ReviewTask
+from app.models.documents import (
+    Document,
+    DocumentExtractedField,
+    DocumentFieldCorrection,
+    DocumentOcrResultRecord,
+    DocumentProcessingJob,
+    DocumentValidationResultRecord,
+)
 
 __all__ = [
     "AuditLog",
     "AuthSession",
     "Building",
+    "Document",
+    "DocumentExtractedField",
+    "DocumentFieldCorrection",
+    "DocumentOcrResultRecord",
+    "DocumentProcessingJob",
+    "DocumentValidationResultRecord",
     "File",
     "GeoAIJob",
     "ImageryAsset",

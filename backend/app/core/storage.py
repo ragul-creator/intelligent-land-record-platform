@@ -4,7 +4,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any
+from typing import Any, BinaryIO
 
 import boto3
 from botocore.client import BaseClient
@@ -120,6 +120,37 @@ class PrivateObjectStorage:
             content_type=str(response.get("ContentType", "")),
             metadata={str(key).lower(): str(value) for key, value in response.get("Metadata", {}).items()},
         )
+
+    def put_private_object(
+        self, storage_key: str, body: BinaryIO, *, content_type: str, size_bytes: int, checksum: str
+    ) -> None:
+        """Store an uploaded immutable original without returning any public URL."""
+        self.ensure_private_bucket()
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=storage_key)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") not in {"404", "NoSuchKey", "NotFound"}:
+                raise
+        else:
+            raise StorageObjectAlreadyExistsError(storage_key)
+        self.client.put_object(
+            Bucket=self.bucket,
+            Key=storage_key,
+            Body=body,
+            ContentType=content_type,
+            ContentLength=size_bytes,
+            Metadata={"sha256": checksum},
+        )
+
+    def read_private_object(self, storage_key: str) -> bytes:
+        """Read source bytes internally for workers; callers never receive a public URL."""
+        try:
+            response = self.client.get_object(Bucket=self.bucket, Key=storage_key)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                raise StorageObjectNotFoundError(storage_key) from error
+            raise
+        return response["Body"].read()
 
 
 def get_storage_service() -> PrivateObjectStorage:

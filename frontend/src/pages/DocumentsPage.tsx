@@ -1,0 +1,30 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useParams } from "react-router-dom";
+import { loadCurrentUser } from "../api/gis";
+import { correctDocumentField, loadDocument, loadDocuments, loadFields, processDocument, uploadDocument } from "../api/documents";
+
+export function DocumentsPage() {
+  const { projectId } = useParams(); const client = useQueryClient(); const [selected, setSelected] = useState<string>(); const [file, setFile] = useState<File>();
+  const user = useQuery({ queryKey: ["current-user"], queryFn: loadCurrentUser, retry: false });
+  const documents = useQuery({ queryKey: ["documents", projectId], queryFn: () => loadDocuments(projectId!), enabled: Boolean(projectId), retry: false });
+  const detail = useQuery({ queryKey: ["document", projectId, selected], queryFn: () => loadDocument(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
+  const fields = useQuery({ queryKey: ["document-fields", projectId, selected], queryFn: () => loadFields(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
+  const permissions = user.data?.permissions ?? []; const membership = user.data?.project_memberships.some((item) => item.project_id === projectId); const can = (permission: string) => Boolean(membership && permissions.includes(permission));
+  const refresh = () => client.invalidateQueries({ queryKey: ["documents", projectId] });
+  const upload = useMutation({ mutationFn: () => uploadDocument(projectId!, file!), onSuccess: async (item) => { setSelected(item.id); setFile(undefined); await refresh(); } });
+  const process = useMutation({ mutationFn: (reprocess: boolean) => processDocument(projectId!, selected!, reprocess), onSuccess: refresh });
+  if (!projectId) return <main className="app-shell"><h1>Documents route unavailable</h1></main>;
+  return <main className="documents-shell"><header><p className="eyebrow">SIH18 · Document AI</p><h1>Project documents</h1><p>OCR and extracted fields are preliminary evidence, not verified land records.</p><Link to={`/projects/${projectId}/review`}>Open review workspace</Link></header>
+    {can("document:upload") && <section className="document-upload"><input aria-label="Choose document" type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" onChange={(event) => setFile(event.target.files?.[0])} /><button disabled={!file || upload.isPending} onClick={() => upload.mutate()}>{upload.isPending ? "Uploading…" : "Upload document"}</button>{upload.error && <p role="alert">Upload failed.</p>}</section>}
+    <section className="documents-grid"><aside><h2>Documents</h2>{documents.data?.items.map((item) => <button key={item.id} className="document-row" onClick={() => setSelected(item.id)}><strong>{item.filename}</strong><span>{item.status}</span></button>)}{documents.data?.items.length === 0 && <p>No documents have been uploaded.</p>}</aside>
+      <section className="document-detail">{!selected && <p>Select a document to inspect its evidence.</p>}{detail.data && <><h2>{detail.data.filename}</h2><p><strong>Status:</strong> {detail.data.status}</p>{can(detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "document:process" : "document:reprocess") && <button onClick={() => process.mutate(detail.data.status !== "UPLOADED" && detail.data.status !== "FAILED")}>{process.isPending ? "Queuing…" : detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "Process" : "Reprocess"}</button>}
+        {detail.data.latest_ocr && <section><h3>Preliminary OCR</h3><p>{detail.data.latest_ocr.engine} · {detail.data.latest_ocr.requested_languages.join("+")} · confidence {detail.data.latest_ocr.confidence ?? "unknown"}</p>{detail.data.latest_ocr.payload.pages?.slice(0, 2).map((page, index) => <pre key={index}>{page.text}</pre>)}</section>}
+        <section><h3>Extracted fields</h3>{fields.data?.fields.map((field) => <Field key={field.id} field={field} canCorrect={can("field:correct")} onCorrect={(value, reason) => correctDocumentField(projectId, selected!, field.id, value, reason).then(() => client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] }))} />)}</section>
+        {detail.data.latest_validation && <section><h3>Validation: {detail.data.latest_validation.status}</h3><pre>{JSON.stringify(detail.data.latest_validation.confidence_summary, null, 2)}</pre>{detail.data.latest_validation.report.issues?.map((issue) => <p key={`${issue.code}-${issue.message}`}>{issue.severity}: {issue.message}</p>)}{detail.data.latest_validation.review_task_id && <Link to={`/projects/${projectId}/review`}>Open linked review case</Link>}</section>}</>}</section></section></main>;
+}
+
+function Field({ field, canCorrect, onCorrect }: { field: { field_name: string; original_value: string; normalized_value: unknown; confidence: number | null; corrections: Array<{ corrected_value: string; reason: string }> }; canCorrect: boolean; onCorrect: (value: string, reason: string) => void }) {
+  const [value, setValue] = useState(field.original_value); const [reason, setReason] = useState("");
+  return <article className="document-field"><strong>{field.field_name}</strong><p>Original evidence: {field.original_value}</p><p>Normalized: {typeof field.normalized_value === "string" ? field.normalized_value : JSON.stringify(field.normalized_value)} · confidence {field.confidence ?? "unknown"}</p>{field.corrections.map((item, index) => <p key={index}>Correction: {item.corrected_value} ({item.reason})</p>)}{canCorrect && <><input aria-label={`${field.field_name} corrected value`} value={value} onChange={(event) => setValue(event.target.value)} /><input aria-label={`${field.field_name} correction reason`} placeholder="Reason required" value={reason} onChange={(event) => setReason(event.target.value)} /><button disabled={!value.trim() || !reason.trim()} onClick={() => onCorrect(value, reason)}>Save correction</button></>}</article>;
+}
