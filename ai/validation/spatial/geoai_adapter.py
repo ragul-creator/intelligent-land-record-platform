@@ -1,4 +1,4 @@
-"""Adapter from existing C.6 topology issues to the unified E.1 contract."""
+"""Adapter from existing C.6 topology issues to the unified validation contract."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from ai.validation.models import EvidenceReference, Severity, ValidationIssue
 
 
 _SEVERITY_MAP = {
-    "ERROR": Severity.ERROR,
-    "REVIEW": Severity.ERROR,
-    "WARNING": Severity.WARNING,
+    "ERROR": Severity.HIGH,
+    "REVIEW": Severity.MEDIUM,
+    "WARNING": Severity.LOW,
     "INFO": Severity.INFO,
 }
 
@@ -21,7 +21,7 @@ def from_topology_issue(
 ) -> tuple[ValidationIssue, ...]:
     """Convert one topology issue to one unified issue per referenced parcel."""
 
-    severity = _SEVERITY_MAP.get(issue.severity.upper(), Severity.WARNING)
+    severity = _SEVERITY_MAP.get(issue.severity.upper(), Severity.LOW)
     parcel_ids = issue.parcel_ids or ("UNKNOWN",)
     evidence = (
         EvidenceReference(source_type="GIS_TOPOLOGY", source_id=source_reference),

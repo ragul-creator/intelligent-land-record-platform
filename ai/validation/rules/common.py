@@ -21,7 +21,7 @@ def required_field_issue(
         return None
     return ValidationIssue(
         code="REQUIRED_FIELD_MISSING",
-        severity=Severity.ERROR,
+        severity=Severity.MEDIUM,
         message=f"Required field '{field_name}' is missing.",
         entity_type=entity_type,
         entity_id=entity_id,
@@ -45,7 +45,7 @@ def format_issue(
         return None
     return ValidationIssue(
         code="INVALID_FIELD_FORMAT",
-        severity=Severity.ERROR,
+        severity=Severity.MEDIUM,
         message=f"Field '{field_name}' does not match the configured format.",
         entity_type=entity_type,
         entity_id=entity_id,
@@ -71,7 +71,7 @@ def consistency_issue(
         return None
     return ValidationIssue(
         code="CROSS_FIELD_CONFLICT",
-        severity=Severity.ERROR,
+        severity=Severity.MEDIUM,
         message=message,
         entity_type=entity_type,
         entity_id=entity_id,
