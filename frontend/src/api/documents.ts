@@ -4,7 +4,7 @@ const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export interface DocumentSummary { id: string; project_id: string; filename: string; content_type: string; size_bytes: number; status: string; latest_processing_job_id: string | null; uploaded_at: string; updated_at: string; }
 export interface DocumentField { id: string; field_name: string; original_value: string; normalized_value: unknown; confidence: number | null; page_number: number; source_id: string; corrections: Array<{ id: string; corrected_value: string; reason: string; created_at: string }>; }
-export interface DocumentDetail extends DocumentSummary { latest_ocr: { confidence: number | null; requested_languages: string[]; engine: string; engine_version: string | null; payload: { pages?: Array<{ text?: string }> } } | null; latest_validation: { status: string; report: { issues?: Array<{ code: string; message: string; severity: string }> }; confidence_summary: Record<string, unknown>; review_task_id: string | null } | null; }
+export interface DocumentDetail extends DocumentSummary { latest_ocr: { id: string; version: number; confidence: number | null; requested_languages: string[]; engine: string; engine_version: string | null; payload: { pages?: Array<{ text?: string }> } } | null; latest_validation: { id: string; version: number; status: string; report: { issues?: Array<{ code: string; message: string; severity: string }> }; confidence_summary: Record<string, unknown>; review_task_id: string | null } | null; }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem("access_token");
