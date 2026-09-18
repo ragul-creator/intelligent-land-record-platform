@@ -28,6 +28,7 @@ function installProjectFetch() {
     const url = String(input);
     if (url.includes("/users/me")) return new Response(JSON.stringify(currentUser), { status: 200 });
     if (url.includes("/versions")) return new Response(JSON.stringify(page([parcel.current_version])), { status: 200 });
+    if (url.includes("/record-parcel-links")) return new Response(JSON.stringify(page([{ id: "link-1", project_id: "project-1", document_id: "doc-1", document_validation_result_id: "validation-1", parcel_id: "parcel-1", parcel_display_identifier: "Draft parcel A", link_status: "CONFIRMED", link_method: "EXACT_SURVEY_IDENTIFIER", confidence: 0.97, rationale: {}, provenance: {}, review_required: false, review_task_id: null, review_reason: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }])), { status: 200 });
     if (url.includes("/parcels?")) return new Response(JSON.stringify(page([parcel, notDeterminedParcel])), { status: 200 });
     if (url.includes("/buildings")) return new Response(JSON.stringify(page([{ id: "building-1" }])), { status: 200 });
     if (url.includes("/roads")) return new Response(JSON.stringify(page([{ id: "road-1", source: "EXISTING_GIS", source_reference: "road-survey", confidence: 0.9, model_version: null, status: "DRAFT", verification_status: "UNVERIFIED", processed_at: null, geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] }, properties: { road_class: "ROAD", length_m: 155.5 } }])), { status: 200 });
@@ -66,6 +67,8 @@ describe("GisPage", () => {
     expect(screen.getByText(/NEIGHBOUR_OVERLAP/)).toBeInTheDocument();
     expect(screen.getByText(/overlaps a neighbour/i)).toBeInTheDocument();
     expect(screen.getByText(/4.25 m² affected/i)).toBeInTheDocument();
+    expect(await screen.findByText(/EXACT SURVEY IDENTIFIER/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open source record/i })).toHaveAttribute("href", "/projects/project-1/documents?documentId=doc-1");
 
     fireEvent.click(screen.getByRole("button", { name: /select road/i }));
     expect(await screen.findByRole("heading", { name: "ROAD" })).toBeInTheDocument();
