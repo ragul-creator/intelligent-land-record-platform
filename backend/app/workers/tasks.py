@@ -11,7 +11,7 @@ from app.audit.service import record_audit
 from app.models import Document, DocumentProcessingJob, DocumentOcrResultRecord, File, GeoAIJob, ProcessingJob
 from app.services.geoai import GeoAIServiceError, persist_parcel_import
 from app.services.documents import extraction_from_records, persist_extraction, persist_ocr_result, persist_validation
-from app.services.processing_jobs import mark_job_completed, mark_job_failed, mark_job_processing
+from app.services.processing_jobs import mark_job_completed, mark_job_failed, mark_job_processing, mark_job_retry_queued
 from app.services.review import create_review_task
 from app.workers.celery_app import celery_app
 
@@ -27,6 +27,7 @@ def process_file_registration(self, job_id: str) -> None:
             job.retry_count = self.request.retries
             mark_job_processing(session, job)
             record_audit(session, "processing_job.started", "processing_job", job.id, project_id=job.project_id)
+            session.commit()
             # Future OCR/GeoAI services replace this deliberately minimal handoff task.
             mark_job_completed(session, job)
             record_audit(session, "processing_job.completed", "processing_job", job.id, project_id=job.project_id)
@@ -34,9 +35,13 @@ def process_file_registration(self, job_id: str) -> None:
         except Exception as error:
             session.rollback()
             job = session.get(ProcessingJob, uuid.UUID(job_id))
-            if job is not None:
-                mark_job_failed(session, job, str(error))
-                record_audit(session, "processing_job.failed", "processing_job", job.id, project_id=job.project_id)
+            if job is not None and job.status == "PROCESSING":
+                if self.request.retries < self.max_retries:
+                    mark_job_retry_queued(session, job, self.request.retries + 1)
+                    record_audit(session, "processing_job.retry_queued", "processing_job", job.id, project_id=job.project_id, metadata={"retry_count": job.retry_count})
+                else:
+                    mark_job_failed(session, job, str(error))
+                    record_audit(session, "processing_job.failed", "processing_job", job.id, project_id=job.project_id)
                 session.commit()
             raise
 
@@ -69,9 +74,14 @@ def process_geoai_parcel_import(self, geoai_job_id: str) -> None:
             processing_job = session.get(ProcessingJob, job_uuid)
             geoai_job = session.get(GeoAIJob, job_uuid)
             if processing_job is not None and processing_job.status == "PROCESSING":
-                mark_job_failed(session, processing_job, str(error))
-                if geoai_job is not None:
-                    record_audit(session, "geoai.job_failed", "geoai_job", geoai_job.id, project_id=geoai_job.project_id)
+                if isinstance(error, GeoAIServiceError) or self.request.retries >= self.max_retries:
+                    mark_job_failed(session, processing_job, str(error))
+                    if geoai_job is not None:
+                        record_audit(session, "geoai.job_failed", "geoai_job", geoai_job.id, project_id=geoai_job.project_id)
+                else:
+                    mark_job_retry_queued(session, processing_job, self.request.retries + 1)
+                    if geoai_job is not None:
+                        record_audit(session, "geoai.job_retry_queued", "geoai_job", geoai_job.id, project_id=geoai_job.project_id, metadata={"retry_count": processing_job.retry_count})
                 session.commit()
             if isinstance(error, GeoAIServiceError):
                 return
@@ -143,10 +153,16 @@ def process_document_ai(self, job_id: str) -> None:
             job = session.get(ProcessingJob, job_uuid)
             document = session.get(Document, detail.document_id) if detail else None
             if job is not None and job.status == "PROCESSING":
-                mark_job_failed(session, job, "Document AI processing failed")
-                if document is not None:
-                    document.status = "FAILED"
-                    record_audit(session, "document.processing_failed", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
+                if self.request.retries < self.max_retries:
+                    mark_job_retry_queued(session, job, self.request.retries + 1)
+                    if document is not None:
+                        document.status = "QUEUED"
+                        record_audit(session, "document.processing_retry_queued", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id), "retry_count": job.retry_count})
+                else:
+                    mark_job_failed(session, job, "Document AI processing failed")
+                    if document is not None:
+                        document.status = "FAILED"
+                        record_audit(session, "document.processing_failed", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
                 session.commit()
             raise
 
@@ -192,10 +208,16 @@ def revalidate_document(self, job_id: str) -> None:
             session.rollback()
             job = session.get(ProcessingJob, job_uuid)
             if job is not None and job.status == "PROCESSING":
-                mark_job_failed(session, job, "Document revalidation failed")
                 document = session.get(Document, detail.document_id)
-                if document is not None:
-                    document.status = "FAILED"
-                    record_audit(session, "document.processing_failed", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
+                if self.request.retries < self.max_retries:
+                    mark_job_retry_queued(session, job, self.request.retries + 1)
+                    if document is not None:
+                        document.status = "VALIDATING"
+                        record_audit(session, "document.revalidation_retry_queued", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id), "retry_count": job.retry_count})
+                else:
+                    mark_job_failed(session, job, "Document revalidation failed")
+                    if document is not None:
+                        document.status = "FAILED"
+                        record_audit(session, "document.processing_failed", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
                 session.commit()
             raise
