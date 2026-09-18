@@ -49,8 +49,8 @@ export function GisPage() {
   }, [projectId]);
   useEffect(() => {
     const parcelId = searchParams.get("parcelId");
-    if (parcelId && (selected?.kind !== "PARCEL" || selected.id !== parcelId)) setSelected({ kind: "PARCEL", id: parcelId });
-  }, [searchParams, selected]);
+    if (parcelId) setSelected({ kind: "PARCEL", id: parcelId });
+  }, [searchParams]);
   useEffect(() => {
     if (!projectId) return;
     try { localStorage.setItem(layerStorageKey(projectId), JSON.stringify(layers)); } catch { /* Preferences are best effort only. */ }
