@@ -33,6 +33,7 @@ infrastructure/volumes/
 data/raw/imagery/*
 !data/raw/imagery/.gitkeep
 data/processed/geoai/
+data/processed/document_ai/
 ai/geoai/artifacts/
 ai/geoai/checkpoints/
 *.ckpt
