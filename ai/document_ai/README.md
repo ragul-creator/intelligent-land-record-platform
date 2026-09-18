@@ -78,7 +78,7 @@ Optional E.1 `DuplicateDetector` and `MasterDataVerifier` adapters can be passed
 
 Document confidence is the minimum representative confidence among populated fields with known confidence, so a low candidate cannot be hidden by a higher one. It is `null` when confidence is unknown, required configured fields are missing, or no usable evidence is available. Missing/conflicting field counts remain explicit in the summary; this is not legal certainty or final record confidence.
 
-The review recommendation maps E.1 `INFO/LOW/MEDIUM/HIGH` directly to E.2-compatible DOCUMENT severities. Missing required fields, conflicting/malformed official identifiers, invalid required area, and failed configured blocking verification are counted as blocking. Low confidence recommends review but is non-blocking by default. F.4 will later persist this draft with the existing E.2 `create_review_task(...)` flow; reviewer actions and automatic correction remain outside F.3.
+The review recommendation maps E.1 `INFO/LOW/MEDIUM/HIGH` directly to E.2-compatible DOCUMENT severities. Missing required fields, conflicting/malformed official identifiers, invalid required area, and failed configured blocking verification are counted as blocking. Low confidence recommends review but is non-blocking by default. F.4 persists this draft through the existing E.2 `create_review_task(...)` flow; reviewer actions remain governed by E.2.
 
 Use the pure library boundary after F.2:
 
@@ -89,3 +89,11 @@ from ai.document_ai.validation import validate_document_extraction
 extraction_result = extract_land_record_fields(document_ocr_result)
 validation_result = validate_document_extraction(extraction_result)
 ```
+
+## Backend Integration: Phase F.4
+
+F.4 runs this package only from the project’s private asynchronous Document AI workflow: immutable upload -> F.1 OCR -> F.2 extraction -> F.3 validation -> `REVIEW_REQUIRED` or `VALIDATED`. The persisted workflow stores every OCR, extraction, validation, and human-correction version separately; processing never overwrites the original object, source OCR payload, or prior extraction candidate.
+
+Tamil plus English (`tam+eng`) remains the tested demo request. The backend accepts safe installed Tesseract configurations through its process request and does not silently fall back to English. The Docker image installs `eng` and `tam` for the local demo only; other requested Indian-language packs require installation and independent evaluation. Printed-text Tesseract is still not a production handwriting/HTR claim, and low-confidence handwriting should route to human review.
+
+F.4 creates an E.2 `DOCUMENT` review task only when the F.3 recommendation requires review. No live government verifier is connected, so duplicate/master-data checks remain `NOT_PERFORMED`. A human correction is versioned with a required reason and leaves original OCR/extraction evidence visible; it is useful future learning feedback but does not train a model or establish legal validity.

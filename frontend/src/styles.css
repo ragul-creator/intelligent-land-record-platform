@@ -28,3 +28,10 @@ dl { display: grid; grid-template-columns: 9rem 1fr; gap: .4rem .7rem; margin: 1
 .review-muted { color: #66797d; }.review-warning { margin: 0; padding: .55rem .65rem; border-left: 4px solid #c87536; background: #fff3e4; color: #7d421f; font-size: .82rem; }.review-error { padding: .55rem .65rem; border-left: 4px solid #a94232; background: #ffebe5; color: #812f24; font-size: .82rem; }.review-success { padding: .55rem .65rem; border-left: 4px solid #3f7b5a; background: #edf7ef; color: #2d6849; font-size: .82rem; }.review-disclaimer { max-width: 1500px; margin: .85rem auto 0; color: #6c4b37; font-size: .78rem; }
 @media (max-width: 980px) { .review-columns { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .review-shell { padding: .7rem; }.review-header { display: grid; gap: .7rem; }.review-workspace { grid-template-columns: 1fr; }.review-list-panel { border-right: 0; border-bottom: 1px solid #d8dfd3; }.review-toolbar { align-items: stretch; }.review-tabs { width: 100%; }.review-tabs button { flex: 1; } }
+/* Phase F.4 keeps the document evidence panel compact and distinct from the review workspace. */
+.documents-shell { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+.documents-grid { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 2fr); gap: 1.5rem; margin-top: 1.5rem; }
+.document-row { display: grid; width: 100%; text-align: left; gap: .25rem; margin: .4rem 0; padding: .7rem; }
+.document-detail, .document-field, .document-upload { padding: 1rem; margin: .75rem 0; border: 1px solid rgba(50, 70, 70, .25); border-radius: .5rem; }
+.document-field input { display: block; width: min(100%, 34rem); margin: .4rem 0; }
+@media (max-width: 720px) { .documents-grid { grid-template-columns: 1fr; } .documents-shell { padding: 1rem; } }
