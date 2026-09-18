@@ -63,3 +63,29 @@ from ai.document_ai.extraction import extract_land_record_fields
 
 extraction_result = extract_land_record_fields(document_ocr_result)
 ```
+
+## Document Validation: Phase F.3
+
+F.3 is pure preliminary decision support. It validates F.2 field candidates through the shared `ai.validation` E.1 contracts and produces an existing `ValidationReport`, a conservative document confidence summary, check metadata, and a non-persisted DOCUMENT review recommendation. It does not determine legal validity, publish records, correct values, call a government system, create a database row, or create an E.2 review task.
+
+F.2 candidate provenance maps directly to E.1 `EvidenceReference`: `source_type` is `DOCUMENT_OCR`, `source_id` and page are retained, and a bounding box becomes `(left, top, width, height)` only when F.2 supplied one. Field original/normalized values, extraction confidence, OCR/extractor versions, candidate reference, and rule metadata remain attached to issues for future correction capture.
+
+`DocumentValidationPolicy` is caller-configurable. Its `required_fields`, identifier patterns, confidence policy, unknown-confidence handling, duplicate detector, master-data verifier, and blocking-field choices are MVP implementation settings, not statutory requirements. The default confidence bands are `HIGH >= 0.90`, `MEDIUM >= 0.75`, and `LOW < 0.75`; these are hackathon defaults, never legal thresholds. A low candidate confidence creates `LOW_CONFIDENCE`; unknown confidence creates `UNKNOWN_CONFIDENCE` and review by default unless the caller explicitly disables that behavior.
+
+Candidates for a required field must be non-empty. Missing configured fields create `REQUIRED_FIELD_MISSING` without inventing a candidate. Different normalized candidates create `FIELD_VALUE_CONFLICT` while retaining all evidence; Tamil/English values are not translated or silently declared equivalent. Identifier checks are syntax-only, and area checks require a positive value plus a supported canonical unit. Neither check confirms a governmental/legal identifier or reconciles area with GIS evidence.
+
+Optional E.1 `DuplicateDetector` and `MasterDataVerifier` adapters can be passed through the policy. Without either adapter, their check metadata is explicitly `NOT_PERFORMED`; F.3 never claims that a duplicate or master-data database was checked. Configured adapter results preserve external candidate IDs, scores, reasons, source names, and references. Failed verification requires review but never overwrites OCR evidence.
+
+Document confidence is the minimum representative confidence among populated fields with known confidence, so a low candidate cannot be hidden by a higher one. It is `null` when confidence is unknown, required configured fields are missing, or no usable evidence is available. Missing/conflicting field counts remain explicit in the summary; this is not legal certainty or final record confidence.
+
+The review recommendation maps E.1 `INFO/LOW/MEDIUM/HIGH` directly to E.2-compatible DOCUMENT severities. Missing required fields, conflicting/malformed official identifiers, invalid required area, and failed configured blocking verification are counted as blocking. Low confidence recommends review but is non-blocking by default. F.4 will later persist this draft with the existing E.2 `create_review_task(...)` flow; reviewer actions and automatic correction remain outside F.3.
+
+Use the pure library boundary after F.2:
+
+```python
+from ai.document_ai.extraction import extract_land_record_fields
+from ai.document_ai.validation import validate_document_extraction
+
+extraction_result = extract_land_record_fields(document_ocr_result)
+validation_result = validate_document_extraction(extraction_result)
+```
