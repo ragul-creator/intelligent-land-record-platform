@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from botocore.exceptions import BotoCoreError, ClientError
 from redis import Redis
 from redis.exceptions import RedisError
@@ -21,11 +22,21 @@ from app.api.v1.record_links import router as record_links_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.core.errors import ApiError
 
+settings = get_settings()
+
 app = FastAPI(
     title="Intelligent Land Record Platform API",
     version="0.1.0",
     description="Backend integration boundary. Public API contracts begin under /api/v1.",
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
 app.include_router(files_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
