@@ -5,21 +5,23 @@ from fastapi.testclient import TestClient
 
 from app.audit.service import sanitize_audit_metadata
 from app.core.config import Settings
-from app.main import app
+from app.main import app, settings as app_settings
 
 
 def test_browser_cors_allows_configured_local_frontend_and_denies_unknown_origin() -> None:
     client = TestClient(app)
+    assert app_settings.cors_origins
+    allowed_origin = app_settings.cors_origins[0]
     allowed = client.options(
         "/api/v1/projects",
         headers={
-            "Origin": "http://localhost:5173",
+            "Origin": allowed_origin,
             "Access-Control-Request-Method": "GET",
             "Access-Control-Request-Headers": "authorization",
         },
     )
     assert allowed.status_code == 200
-    assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert allowed.headers["access-control-allow-origin"] == allowed_origin
     assert "authorization" in allowed.headers["access-control-allow-headers"].lower()
     assert allowed.headers.get("access-control-allow-credentials") != "true"
 
