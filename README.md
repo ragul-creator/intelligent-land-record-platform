@@ -290,4 +290,4 @@ docker compose -f infrastructure\docker-compose.yml --env-file .env run --rm --b
   python -m app.cli.seed_demo
 ```
 
-The command prints the generated role login IDs and project UUID. Open `http://localhost:5173/`, sign in, and launch **Tamil Nadu Integrated Land Records Demo** from the project chooser. See [`docs/H2_DEMO_GUIDE.md`](docs/H2_DEMO_GUIDE.md) for the presentation sequence and synthetic-data boundaries.
+The command prints the generated role login IDs and project UUID. Re-running the seed refreshes the synthetic demo-account passwords to the supplied `DEMO_SEED_PASSWORD` without duplicating the demo project. Open `http://localhost:5173/`, sign in, and launch **Tamil Nadu Integrated Land Records Demo** from the project chooser. See [`docs/H2_DEMO_GUIDE.md`](docs/H2_DEMO_GUIDE.md) for the presentation sequence and synthetic-data boundaries.
