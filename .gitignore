@@ -41,3 +41,6 @@ ai/geoai/checkpoints/
 *.pth
 *.safetensors
 *.onnx
+data/models/tesseract/
+data/raw/document_ai/
+.pytest-tmp/

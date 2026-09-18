@@ -1,4 +1,4 @@
-# Document AI: Phase F.1
+﻿# Document AI: Phase F.1
 
 Phase F.1 converts local PDF and image documents into **preliminary OCR output**. It does not validate a land record, infer structured fields, persist data, call government systems, or provide an API/UI workflow.
 
@@ -43,3 +43,23 @@ Get-Content -Raw -Encoding utf8 data/processed/document_ai/local-smoke.json
 ## Deliberate deferrals
 
 F.1 does not implement handwriting training, structured field extraction, document validation, persistence, Celery jobs, backend endpoints, user workflows, or any statutory/legal determination. Those concerns remain in later Phase F work.
+
+## Structured Field Extraction: Phase F.2
+
+F.2 consumes the vendor-neutral `DocumentOcrResult` from F.1 and produces evidence-grounded, **preliminary** land-record field candidates. It never edits OCR results or original documents, and it never invents a survey, khasra, khata, or registration identifier when source evidence is absent or ambiguous.
+
+The canonical fields are `survey_number`, `khasra_number`, `khata_number`, `owner_details`, `plot_area`, `village`, `tehsil`, `district`, `land_classification`, `mutation_records`, and `registration_information`. Every result includes every canonical field as a candidate list; an unavailable field remains an empty list rather than a fabricated value. Repeated or conflicting candidates are retained with their own evidence for F.3 to assess later.
+
+The deterministic extractor currently recognizes the demonstrated Tamil and English label dictionaries, including `Survey No`, `Owner`, `Area`, `Village`, `Tehsil`/`Taluk`, `District`, `Mutation`, and `Registration`, as well as `சர்வே எண்`, `உரிமையாளர்`, `பரப்பளவு`, `கிராமம்`, `மாவட்டம்`, `தாலுகா`, and `வட்டம்`. The dictionary is modular; it is not a claim that terminology is complete or universally correct across Indian jurisdictions and languages.
+
+Candidates preserve the source-language `original_value`, a deterministic `normalized_value`, extraction-stage confidence, source ID, page number, value-token bounding box when available, OCR model version, extractor version, and UTC timestamp. Text normalization only collapses ordinary whitespace. Identifiers retain meaningful letters, digits, `/`, and `-`; areas with an explicit unit become objects such as `{ "value": 1200, "unit": "sq_ft" }`, including Tamil `சதுர அடி`. Mutation and registration details remain repeatable entry structures, with only unambiguous ISO-like dates normalized.
+
+F.2 confidence combines available OCR token confidence with strong label, proximity, and normalization signals. It is `null` when value-token OCR confidence is unavailable and is **not** an F.3 record-confidence, validation threshold, conflict decision, or review-routing signal. F.3 owns validation/review decisions; F.4 owns persistence, Celery, backend APIs, and UI integration.
+
+Use the library boundary for later orchestration:
+
+```python
+from ai.document_ai.extraction import extract_land_record_fields
+
+extraction_result = extract_land_record_fields(document_ocr_result)
+```
