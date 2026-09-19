@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Native runtime dependency required by Rasterio/GDAL wheels.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Keep PyTorch, Rasterio, and the C.2 checkpoint runtime out of the FastAPI image.
+COPY backend /app/backend
+COPY ai /app/ai
+
+WORKDIR /app/backend
+RUN pip install --no-cache-dir --retries 5 --timeout 120 . \
+    && pip install --no-cache-dir --retries 5 --timeout 120 -r /app/ai/geoai/requirements.txt
+
+ENV PYTHONPATH=/app:/app/backend
+
+CMD ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "--loglevel=info", "--queues=geoai"]

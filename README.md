@@ -43,6 +43,10 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml up --build
 
 This starts the frontend, FastAPI backend, Celery worker, PostgreSQL/PostGIS, Redis, and private MinIO service. Apply the database schema explicitly with Alembic as described below. Phase B provides backend authentication, RBAC, project isolation, private storage, and job persistence; OCR, GeoAI, GIS, and frontend application features remain outside this phase.
 
+### H.2B.1 imagery and GeoAI
+
+The Compose stack also includes a dedicated `geoai-worker`; FastAPI and the regular worker remain free of PyTorch and raster processing dependencies. Upload a project GeoTIFF from the GIS view, wait for registration, and run building processing only after provisioning a local C.2 checkpoint at `GEOAI_BUILDING_CHECKPOINT` in the GeoAI worker. Leave the variable blank to fail a building job safely instead of fabricating output. See [H.2B1 imagery and GeoAI](docs/H2B1_IMAGERY_GEOAI.md) for the private-preview, provenance, manual draft, and review workflow.
+
 Stop the stack with:
 
 ```powershell

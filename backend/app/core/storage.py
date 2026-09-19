@@ -2,6 +2,7 @@
 
 import re
 import uuid
+from io import BytesIO
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, BinaryIO
@@ -35,7 +36,12 @@ class ObjectInfo:
 class PrivateObjectStorage:
     """Provider-neutral boundary for private S3-compatible object storage."""
 
-    def __init__(self, settings: Settings, client: BaseClient | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        client: BaseClient | None = None,
+        public_client: BaseClient | None = None,
+    ) -> None:
         self.bucket = settings.s3_bucket
         self.expiry_seconds = settings.signed_url_expiry_seconds
         self.client = client or boto3.client(
@@ -44,6 +50,18 @@ class PrivateObjectStorage:
             aws_access_key_id=settings.s3_access_key,
             aws_secret_access_key=settings.s3_secret_key,
             region_name=settings.s3_region,
+        )
+        public_endpoint = settings.s3_public_endpoint or settings.s3_endpoint
+        self.public_client = public_client or (
+            self.client
+            if client is not None and public_endpoint == settings.s3_endpoint
+            else boto3.client(
+                "s3",
+                endpoint_url=public_endpoint,
+                aws_access_key_id=settings.s3_access_key,
+                aws_secret_access_key=settings.s3_secret_key,
+                region_name=settings.s3_region,
+            )
         )
 
     def ensure_private_bucket(self) -> None:
@@ -81,7 +99,7 @@ class PrivateObjectStorage:
             raise StorageObjectAlreadyExistsError(storage_key)
 
         metadata = {"sha256": checksum} if checksum else {}
-        url = self.client.generate_presigned_url(
+        url = self.public_client.generate_presigned_url(
             "put_object",
             Params={
                 "Bucket": self.bucket,
@@ -99,7 +117,7 @@ class PrivateObjectStorage:
 
     def presign_download(self, storage_key: str) -> str:
         """Return a short-lived GET URL for a private stored object."""
-        return self.client.generate_presigned_url(
+        return self.public_client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.bucket, "Key": storage_key},
             ExpiresIn=self.expiry_seconds,
@@ -151,6 +169,18 @@ class PrivateObjectStorage:
                 raise StorageObjectNotFoundError(storage_key) from error
             raise
         return response["Body"].read()
+
+    def put_derived_bytes(self, storage_key: str, payload: bytes, *, content_type: str) -> None:
+        """Store an immutable worker-generated preview without exposing it publicly."""
+        import hashlib
+
+        self.put_private_object(
+            storage_key,
+            BytesIO(payload),
+            content_type=content_type,
+            size_bytes=len(payload),
+            checksum=hashlib.sha256(payload).hexdigest(),
+        )
 
 
 def get_storage_service() -> PrivateObjectStorage:

@@ -20,6 +20,7 @@ class GeoAIJobCreateRequest(BaseModel):
     source_crs: str | None = Field(default=None, max_length=255)
     source_reference: str | None = Field(default=None, max_length=1024)
     model_version: str | None = Field(default=None, max_length=255)
+    imagery_asset_id: uuid.UUID | None = None
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=255)
 
 
@@ -33,6 +34,38 @@ class GeoAIJobResponse(BaseModel):
     output_references: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class ImageryRegistrationRequest(BaseModel):
+    file_id: uuid.UUID
+    source_reference: str | None = Field(default=None, max_length=1024)
+
+
+class ImageryAssetResponse(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    # H.2 metadata-only demo imagery predates private-file-backed H.2B.1 uploads.
+    file_id: uuid.UUID | None
+    filename: str | None
+    source_reference: str | None
+    source_crs: str | None
+    coordinate_space: str
+    metadata: dict[str, Any]
+    registration_job_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ImageryAssetListResponse(BaseModel):
+    items: list[ImageryAssetResponse]
+    page: PageMetadata
+
+
+class ImageryPreviewResponse(BaseModel):
+    imagery_asset_id: uuid.UUID
+    preview_url: str
+    corners_wgs84: list[list[float]]
+    expires_in_seconds: int
 
 
 class ParcelVersionResponse(BaseModel):

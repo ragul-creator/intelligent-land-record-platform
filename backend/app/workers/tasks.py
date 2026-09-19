@@ -1,15 +1,18 @@
 """Database-backed Celery tasks for registered files, GeoAI, and Document AI."""
 
-import uuid
 import tempfile
+import uuid
+from datetime import datetime
 from pathlib import Path
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.core.storage import get_storage_service
 from app.audit.service import record_audit
-from app.models import Document, DocumentProcessingJob, DocumentOcrResultRecord, File, GeoAIJob, ProcessingJob
-from app.services.geoai import GeoAIServiceError, persist_parcel_import
+from app.models import Building, Document, DocumentProcessingJob, DocumentOcrResultRecord, File, GeoAIJob, ImageryAsset, ProcessingJob
+from app.services.geoai import GeoAIServiceError, _to_wgs84, persist_parcel_import
+from app.core.config import get_settings
+from geoalchemy2.shape import from_shape
 from app.services.documents import extraction_from_records, persist_extraction, persist_ocr_result, persist_validation
 from app.services.processing_jobs import mark_job_completed, mark_job_failed, mark_job_processing, mark_job_retry_queued
 from app.services.review import create_review_task
@@ -86,6 +89,127 @@ def process_geoai_parcel_import(self, geoai_job_id: str) -> None:
             if isinstance(error, GeoAIServiceError):
                 return
             raise
+
+
+def _fail_geoai_job(session, job: ProcessingJob, geoai_job: GeoAIJob | None, message: str) -> None:
+    mark_job_failed(session, job, message)
+    if geoai_job is not None:
+        record_audit(session, "geoai.job_failed", "geoai_job", geoai_job.id, project_id=geoai_job.project_id, metadata={"reason": message})
+
+
+@celery_app.task(bind=True)
+def process_imagery_registration(self, job_id: str, imagery_asset_id: str) -> None:
+    """Inspect a private GeoTIFF and create a private PNG preview in the GeoAI runtime."""
+    job_uuid, asset_uuid = uuid.UUID(job_id), uuid.UUID(imagery_asset_id)
+    with SessionLocal() as session:
+        job, asset = session.get(ProcessingJob, job_uuid), session.get(ImageryAsset, asset_uuid)
+        if job is None or asset is None or job.status != "QUEUED":
+            return
+        try:
+            mark_job_processing(session, job)
+            session.commit()
+            source = session.get(File, asset.file_id)
+            if source is None or source.project_id != asset.project_id:
+                raise GeoAIServiceError("The imagery source is unavailable in this project.")
+            metadata = dict(asset.metadata_json or {})
+            metadata["registration_status"] = "PROCESSING"
+            asset.metadata_json = metadata
+            session.commit()
+            source_bytes = get_storage_service().read_private_object(source.storage_key)
+            with tempfile.NamedTemporaryFile(suffix=Path(source.original_name).suffix or ".tif", delete=False) as temporary:
+                temporary.write(source_bytes)
+                source_path = Path(temporary.name)
+            try:
+                from ai.geoai.runtime.imagery import inspect_and_render_preview
+
+                inspected, preview_png, preview_corners = inspect_and_render_preview(source_path)
+            finally:
+                source_path.unlink(missing_ok=True)
+            preview_key = f"projects/{asset.project_id}/derived/imagery/{asset.id}/preview.png"
+            get_storage_service().put_derived_bytes(preview_key, preview_png, content_type="image/png")
+            metadata = dict(inspected)
+            metadata.update({"registration_status": "READY", "registration_job_id": str(job.id), "preview_storage_key": preview_key, "preview_corners_wgs84": preview_corners})
+            asset.metadata_json = metadata
+            asset.source_crs = str(metadata.get("source_crs") or metadata.get("crs_wkt") or "") or None
+            asset.coordinate_space = "WORLD"
+            job.progress = 100
+            mark_job_completed(session, job)
+            record_audit(session, "imagery.registered", "imagery_asset", asset.id, project_id=asset.project_id, metadata={"file_id": str(source.id), "source_crs": asset.source_crs})
+            session.commit()
+        except Exception as error:
+            session.rollback()
+            job, asset = session.get(ProcessingJob, job_uuid), session.get(ImageryAsset, asset_uuid)
+            if job is not None and job.status == "PROCESSING":
+                _fail_geoai_job(session, job, None, str(error))
+                if asset is not None:
+                    metadata = dict(asset.metadata_json or {})
+                    metadata["registration_status"] = "FAILED"
+                    asset.metadata_json = metadata
+                    record_audit(session, "imagery.registration_failed", "imagery_asset", asset.id, project_id=asset.project_id)
+                session.commit()
+            return
+
+
+@celery_app.task(bind=True)
+def process_geoai_buildings(self, geoai_job_id: str) -> None:
+    """Run the real C.2/C.3 building pipeline; never fabricate a model result."""
+    job_uuid = uuid.UUID(geoai_job_id)
+    with SessionLocal() as session:
+        geoai_job, job = session.get(GeoAIJob, job_uuid), session.get(ProcessingJob, job_uuid)
+        if geoai_job is None or job is None or job.status != "QUEUED":
+            return
+        try:
+            mark_job_processing(session, job)
+            session.commit()
+            checkpoint = get_settings().geoai_building_checkpoint
+            if not checkpoint or not Path(checkpoint).is_file():
+                raise GeoAIServiceError("Building GeoAI is unavailable: GEOAI_BUILDING_CHECKPOINT is not configured to a readable checkpoint.")
+            asset = session.get(ImageryAsset, geoai_job.imagery_asset_id)
+            source = session.get(File, asset.file_id) if asset else None
+            if asset is None or source is None or asset.project_id != geoai_job.project_id:
+                raise GeoAIServiceError("The requested imagery asset is unavailable in this project.")
+            source_bytes = get_storage_service().read_private_object(source.storage_key)
+            with tempfile.NamedTemporaryFile(suffix=Path(source.original_name).suffix or ".tif", delete=False) as temporary:
+                temporary.write(source_bytes)
+                source_path = Path(temporary.name)
+            try:
+                from ai.geoai.runtime.buildings import infer_and_vectorize_geotiff
+
+                result = infer_and_vectorize_geotiff(source_path, checkpoint=Path(checkpoint), device=get_settings().geoai_device, source_image=f"imagery:{asset.id}")
+            finally:
+                source_path.unlink(missing_ok=True)
+            if result.coordinate_space != "WORLD" or not result.source_crs:
+                raise GeoAIServiceError("Building processing requires georeferenced imagery; pixel-space outputs were not persisted.")
+            created_ids: list[str] = []
+            for feature in result.features:
+                building = Building(
+                    project_id=geoai_job.project_id,
+                    geometry=from_shape(_to_wgs84(feature.geometry, result.source_crs), srid=4326),
+                    source="AI_CANDIDATE",
+                    source_reference=f"imagery:{asset.id}",
+                    confidence=feature.confidence,
+                    model_version=feature.model_version,
+                    status="AI_PRELIMINARY",
+                    verification_status="UNVERIFIED",
+                    area_m2=feature.area_m2,
+                    area_sqft=feature.area_sqft,
+                    processed_at=datetime.fromisoformat(feature.processed_at.replace("Z", "+00:00")),
+                )
+                session.add(building)
+                session.flush()
+                created_ids.append(str(building.id))
+            geoai_job.output_refs_json = {"imagery_asset_id": str(asset.id), "building_ids": created_ids, "feature_count": len(created_ids), "model_version": result.features[0].model_version if result.features else None}
+            job.progress = 100
+            mark_job_completed(session, job)
+            record_audit(session, "geoai.buildings_created", "geoai_job", geoai_job.id, project_id=geoai_job.project_id, metadata={"imagery_asset_id": str(asset.id), "feature_count": len(created_ids)})
+            session.commit()
+        except Exception as error:
+            session.rollback()
+            job, geoai_job = session.get(ProcessingJob, job_uuid), session.get(GeoAIJob, job_uuid)
+            if job is not None and job.status == "PROCESSING":
+                _fail_geoai_job(session, job, geoai_job, str(error))
+                session.commit()
+            return
 
 
 @celery_app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)

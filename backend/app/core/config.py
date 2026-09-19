@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     db_password: str = ""
     redis_url: str = "redis://redis:6379/0"
     s3_endpoint: str = "http://minio:9000"
+    s3_public_endpoint: str | None = None
     s3_access_key: str = ""
     s3_secret_key: str = ""
     s3_bucket: str = "land-records"
@@ -34,6 +35,8 @@ class Settings(BaseSettings):
     bootstrap_admin_password: str | None = None
     bootstrap_admin_full_name: str = "Development Administrator"
     bootstrap_admin_login_id: str | None = None
+    geoai_building_checkpoint: str | None = None
+    geoai_device: str = "auto"
 
     @property
     def cors_origins(self) -> list[str]:

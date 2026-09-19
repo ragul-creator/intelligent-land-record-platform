@@ -20,10 +20,10 @@ const parcel = {
   current_version: { id: "version-1", version: 1, geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, source: "EXISTING_GIS", source_reference: "survey-2026", coordinate_space: "WORLD", source_crs: "EPSG:32643", area_m2: 120, area_sqft: 1291.67, change_reason: null, validation_status: "VALID", created_by_user_id: null, created_by_type: "IMPORT", processed_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z" },
 };
 const notDeterminedParcel = { ...parcel, id: "parcel-no-geometry", external_identifier: "Not determined", ai_boundary_status: "NOT_DETERMINED", current_version: { ...parcel.current_version, id: "version-no-geometry", geometry: null } };
-const currentUser = { id: "user-1", login_id: "SUR-TN-1", email: "surveyor@example.invalid", full_name: "Surveyor", roles: ["SURVEYOR"], permissions: ["geo:read", "geo:edit_draft"], project_memberships: [{ project_id: "project-1", role: "SURVEYOR" }] };
+const currentUser = { id: "user-1", login_id: "SUR-TN-1", email: "surveyor@example.invalid", full_name: "Surveyor", roles: ["SURVEYOR"], permissions: ["geo:read", "geo:edit_draft", "imagery:upload", "geoai:process"], project_memberships: [{ project_id: "project-1", role: "SURVEYOR" }] };
 const topologyIssue = { id: "topology-1", project_id: "project-1", parcel_id: "parcel-1", related_parcel_id: null, code: "NEIGHBOUR_OVERLAP", severity: "REVIEW", area_m2: 4.25, message: "Edited parcel overlaps a neighbour.", resolved: false, created_at: "2026-01-01T00:00:00Z" };
 
-function installProjectFetch() {
+function installProjectFetch(imageryAssets: unknown[] = []) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/users/me")) return new Response(JSON.stringify(currentUser), { status: 200 });
@@ -34,6 +34,7 @@ function installProjectFetch() {
     if (url.includes("/roads")) return new Response(JSON.stringify(page([{ id: "road-1", source: "EXISTING_GIS", source_reference: "road-survey", confidence: 0.9, model_version: null, status: "DRAFT", verification_status: "UNVERIFIED", processed_at: null, geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] }, properties: { road_class: "ROAD", length_m: 155.5 } }])), { status: 200 });
     if (url.includes("/land-use")) return new Response(JSON.stringify(page([{ id: "land-use-1" }])), { status: 200 });
     if (url.includes("/topology-errors")) return new Response(JSON.stringify(page([topologyIssue])), { status: 200 });
+    if (url.includes("/imagery")) return new Response(JSON.stringify(page(imageryAssets)), { status: 200 });
     return new Response(JSON.stringify(page([])), { status: 200 });
   }));
 }
@@ -110,5 +111,30 @@ describe("GisPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText(/no gis features are available/i)).toBeInTheDocument());
     expect(screen.getByText(/building footprints remain separate/i)).toBeInTheDocument();
+  });
+
+  it("renders legacy metadata-only imagery without requesting a preview", async () => {
+    const legacy = { id: "legacy-imagery", project_id: "project-1", file_id: null, filename: null, source_reference: "H2-SYNTHETIC-TN-DEMO:ORTHOMOSAIC", source_crs: "EPSG:4326", coordinate_space: "WORLD", metadata: { demo: true, registration_status: "READY" }, registration_job_id: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" };
+    installProjectFetch([legacy]);
+    renderPage();
+    expect(await screen.findByRole("heading", { name: /project cadastral viewer/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /metadata-only imagery/i })).toBeInTheDocument();
+    expect(screen.getByText(/has no private source file/i)).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes("/imagery/legacy-imagery/preview-url"))).toBe(false);
+  });
+
+  it("keeps imagery controls above the map stage and switches the basemap selection", async () => {
+    installProjectFetch();
+    renderPage();
+    await screen.findByRole("heading", { name: /project cadastral viewer/i });
+    expect(screen.getByRole("region", { name: /imagery and geoai controls/i })).toBeVisible();
+    expect(screen.getByLabelText(/upload geotiff/i)).toBeEnabled();
+    const street = screen.getByRole("button", { name: "Street" });
+    const satellite = screen.getByRole("button", { name: "Satellite" });
+    expect(street).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(satellite);
+    expect(satellite).toHaveAttribute("aria-pressed", "true");
+    expect(street).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("gis-map").parentElement).toHaveClass("map-stage");
   });
 });

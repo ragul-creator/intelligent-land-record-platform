@@ -67,9 +67,26 @@ def save_checkpoint(
 
 
 def load_checkpoint(path: str | Path, *, device: torch.device) -> tuple[BuildingSegmenter, dict[str, Any]]:
-    payload = torch.load(Path(path), map_location=device, weights_only=False)
+    # Checkpoints may have been created on Windows and contain serialized
+    # pathlib.WindowsPath metadata. Linux cannot instantiate WindowsPath, so
+    # temporarily map it to PosixPath only while deserializing the trusted
+    # local checkpoint.
+    import pathlib
+
+    original_windows_path = pathlib.WindowsPath
+    try:
+        if pathlib.Path().anchor != "\\":
+            pathlib.WindowsPath = pathlib.PosixPath
+        payload = torch.load(Path(path), map_location=device, weights_only=False)
+    finally:
+        pathlib.WindowsPath = original_windows_path
+
     config = ModelConfig(**payload["model_config"])
     model = create_model(config, device=device)
     model.load_state_dict(payload["model_state"])
+    # Inference tensors are float32; normalize checkpoint parameters to the
+    # same dtype so Windows-trained checkpoints cannot leave the Linux
+    # runtime with float64 parameters.
+    model = model.float()
     model.eval()
     return model, payload
