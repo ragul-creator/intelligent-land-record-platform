@@ -163,7 +163,7 @@ export function ImageryGeoAiPanel({
           <option value="">No imagery selected</option>
           {assets.map((asset) => (
             <option key={asset.id} value={asset.id}>
-              {asset.filename ?? "Metadata-only imagery"} �{" "}
+              {asset.filename ?? "Metadata-only imagery"} ·{" "}
               {String(
                 asset.metadata.registration_status ?? "METADATA_ONLY",
               )}
@@ -179,13 +179,13 @@ export function ImageryGeoAiPanel({
 
           <dt>Size</dt>
           <dd>
-            {String(selected.metadata.width ?? "?")} �{" "}
+            {String(selected.metadata.width ?? "?")} ·{" "}
             {String(selected.metadata.height ?? "?")}
           </dd>
 
           <dt>Pixel size</dt>
           <dd>
-            {String(selected.metadata.resolution_x ?? "?")} �{" "}
+            {String(selected.metadata.resolution_x ?? "?")} ·{" "}
             {String(selected.metadata.resolution_y ?? "?")}
           </dd>
 
