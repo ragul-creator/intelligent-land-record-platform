@@ -8,9 +8,10 @@ from app.services.file_policy import FileCategory, UploadMetadata
 
 
 class FakeS3Client:
-    def __init__(self) -> None:
+    def __init__(self, presign_url: str = "https://signed.example") -> None:
         self.created_buckets: list[str] = []
         self.presign_calls: list[dict] = []
+        self.presign_url = presign_url
 
     def head_bucket(self, **_kwargs) -> None:
         return None
@@ -25,7 +26,7 @@ class FakeS3Client:
 
     def generate_presigned_url(self, operation, **kwargs) -> str:
         self.presign_calls.append({"operation": operation, **kwargs})
-        return f"https://signed.example/{operation}"
+        return f"{self.presign_url}/{operation}"
 
 
 def test_storage_key_is_server_generated_and_rejects_path_traversal() -> None:
@@ -42,7 +43,10 @@ def test_storage_key_is_server_generated_and_rejects_path_traversal() -> None:
 
 def test_presigned_urls_are_private_and_expire() -> None:
     client = FakeS3Client()
-    storage = PrivateObjectStorage(Settings(signed_url_expiry_seconds=900), client=client)
+    storage = PrivateObjectStorage(
+        Settings(signed_url_expiry_seconds=900, s3_public_endpoint="http://minio:9000"),
+        client=client,
+    )
 
     upload_url, headers = storage.presign_upload("projects/a/originals/b/record.pdf", "application/pdf", "a" * 64)
     download_url = storage.presign_download("projects/a/originals/b/record.pdf")
@@ -53,6 +57,26 @@ def test_presigned_urls_are_private_and_expire() -> None:
     assert [call["operation"] for call in client.presign_calls] == ["put_object", "get_object"]
     assert all(call["ExpiresIn"] == 900 for call in client.presign_calls)
     assert all("ACL" not in call["Params"] for call in client.presign_calls)
+
+
+def test_browser_presigns_use_the_public_endpoint() -> None:
+    internal_client = FakeS3Client()
+    public_client = FakeS3Client("http://localhost:9001")
+    storage = PrivateObjectStorage(
+        Settings(
+            s3_endpoint="http://minio:9000",
+            s3_public_endpoint="http://localhost:9001",
+        ),
+        client=internal_client,
+        public_client=public_client,
+    )
+
+    storage.ensure_private_bucket()
+    upload_url, _ = storage.presign_upload("projects/a/originals/b/imagery.tif", "image/tiff", "a" * 64)
+
+    assert upload_url.startswith("http://localhost:9001/")
+    assert not internal_client.presign_calls
+    assert [call["operation"] for call in public_client.presign_calls] == ["put_object"]
 
 
 def test_upload_metadata_rejects_unsafe_or_disallowed_values() -> None:

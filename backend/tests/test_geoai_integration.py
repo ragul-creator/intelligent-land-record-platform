@@ -9,9 +9,10 @@ from sqlalchemy import select
 
 from app.core.auth import hash_password
 from app.core.database import SessionLocal
-from app.models import Building, GeoAIJob, LandUseFeature, Parcel, ParcelGeometryVersion, ProcessingJob, Project, ProjectMember, Road, Role, TopologyError, User, UserRole
+from app.core.storage import get_storage_service
+from app.models import Building, File, GeoAIJob, ImageryAsset, LandUseFeature, Parcel, ParcelGeometryVersion, ProcessingJob, Project, ProjectMember, Road, Role, TopologyError, User, UserRole
 from app.services.user_identities import generate_login_id
-from app.workers.tasks import process_geoai_parcel_import
+from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import
 
 
 pytestmark = pytest.mark.skipif(
@@ -162,3 +163,104 @@ def test_gis_layer_reads_are_project_scoped() -> None:
         assert response.status_code == 200
         assert len(response.json()["items"]) == 1
     assert client.get(f"/api/v1/projects/{project_id}/buildings", headers=headers(outsider_id)).status_code == 404
+
+
+def test_building_job_without_checkpoint_fails_terminally(monkeypatch) -> None:
+    """A missing local C.2 checkpoint must fail safely, never remain queued or fabricate output."""
+    from app.core.config import get_settings
+
+    monkeypatch.delenv("GEOAI_BUILDING_CHECKPOINT", raising=False)
+    get_settings.cache_clear()
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            processing = ProcessingJob(project_id=project.id, job_type="BUILDING_VECTORIZE", idempotency_key=f"h2b1:{uuid.uuid4()}", status="QUEUED")
+            session.add(processing)
+            session.flush()
+            geoai = GeoAIJob(id=processing.id, project_id=project.id, requested_by_user_id=surveyor.id, job_type="BUILDING_VECTORIZE", parameters_json={})
+            session.add(geoai)
+            session.commit()
+            job_id, project_id = geoai.id, project.id
+
+        process_geoai_buildings.run(str(job_id))
+
+        with SessionLocal() as session:
+            job = session.get(ProcessingJob, job_id)
+            assert job is not None
+            assert job.status == "FAILED"
+            assert job.error_json == {"message": "Processing failed."}
+            assert session.scalar(select(Building).where(Building.project_id == project_id)) is None
+    finally:
+        get_settings.cache_clear()
+
+
+def test_legacy_fileless_imagery_is_listed_but_cannot_preview_or_run(monkeypatch) -> None:
+    """H.2 metadata-only imagery remains visible without claiming private source bytes exist."""
+    from app.main import app
+
+    class PreviewStorage:
+        def presign_download(self, _storage_key: str) -> str:
+            return "https://signed.example/private-preview.png"
+
+    with SessionLocal() as session:
+        surveyor = _user(session, "SURVEYOR")
+        project = _project(session, surveyor)
+        legacy = ImageryAsset(
+            project_id=project.id,
+            file_id=None,
+            source_reference="H2-SYNTHETIC-TN-DEMO:ORTHOMOSAIC",
+            source_crs="EPSG:4326",
+            coordinate_space="WORLD",
+            metadata_json={"demo": True},
+        )
+        uploaded_file = File(
+            project_id=project.id,
+            original_name="registered.tif",
+            category="IMAGERY",
+            mime_type="image/tiff",
+            size_bytes=1024,
+            storage_key=f"projects/{project.id}/originals/registered.tif",
+            status="UPLOADED",
+        )
+        session.add_all((legacy, uploaded_file))
+        session.flush()
+        registered = ImageryAsset(
+            project_id=project.id,
+            file_id=uploaded_file.id,
+            source_crs="EPSG:4326",
+            coordinate_space="WORLD",
+            metadata_json={
+                "registration_status": "READY",
+                "preview_storage_key": f"projects/{project.id}/derived/preview.png",
+                "preview_corners_wgs84": [[80.0, 13.0], [80.1, 13.0], [80.1, 13.1], [80.0, 13.1]],
+            },
+        )
+        session.add(registered)
+        session.commit()
+        login_id, project_id, legacy_id, registered_id = surveyor.login_id, project.id, legacy.id, registered.id
+
+    client = TestClient(app)
+    response = client.post("/api/v1/auth/login", json={"identifier": login_id, "password": "c7-test-password"})
+    assert response.status_code == 200
+    headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+    app.dependency_overrides[get_storage_service] = lambda: PreviewStorage()
+    monkeypatch.setattr("app.api.v1.geoai.process_geoai_buildings.apply_async", lambda *args, **kwargs: None)
+    try:
+        listed = client.get(f"/api/v1/projects/{project_id}/imagery", headers=headers)
+        assert listed.status_code == 200
+        legacy_payload = next(item for item in listed.json()["items"] if item["id"] == str(legacy_id))
+        assert legacy_payload["file_id"] is None
+        assert legacy_payload["filename"] is None
+
+        preview = client.get(f"/api/v1/projects/{project_id}/imagery/{legacy_id}/preview-url", headers=headers)
+        assert preview.status_code == 409
+        assert preview.json()["error"]["code"] == "IMAGERY_SOURCE_UNAVAILABLE"
+        fileless_run = client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "BUILDING_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(legacy_id)})
+        assert fileless_run.status_code == 409
+        assert fileless_run.json()["error"]["code"] == "IMAGERY_SOURCE_UNAVAILABLE"
+
+        assert client.get(f"/api/v1/projects/{project_id}/imagery/{registered_id}/preview-url", headers=headers).status_code == 200
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "BUILDING_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(registered_id), "idempotency_key": f"registered:{registered_id}"}).status_code == 202
+    finally:
+        app.dependency_overrides.clear()

@@ -98,7 +98,7 @@ def persist_parcel_import(session: Session, project_id: uuid.UUID, parameters: d
             area_m2=result.area_m2,
             area_sqft=result.area_sqft,
             validation_status="NOT_DETERMINED" if result.geometry is None else "VALID",
-            created_by_type="AI" if result.ai_boundary_status else "IMPORT",
+            created_by_type="AI" if result.ai_boundary_status else "HUMAN" if result.source.value == "HUMAN_DRAWN" else "IMPORT",
             processed_at=_as_utc(result.processed_at),
         )
     )

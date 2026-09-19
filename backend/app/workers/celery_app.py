@@ -18,4 +18,8 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     broker_connection_retry_on_startup=True,
+    task_routes={
+        "app.workers.tasks.process_imagery_registration": {"queue": "geoai"},
+        "app.workers.tasks.process_geoai_buildings": {"queue": "geoai"},
+    },
 )

@@ -5,11 +5,16 @@ import type { Building, Geometry, LandUseFeature, Parcel, Road } from "../api/gi
 import type { PolygonGeometry, Position } from "../features/gis/geometry";
 
 export interface LayerVisibility { basemap: boolean; parcels: boolean; buildings: boolean; roads: boolean; landUse: boolean; topology: boolean; }
+export type BasemapStyle = "STREET" | "SATELLITE";
 export type MapFeatureKind = "BUILDING" | "ROAD" | "LAND_USE";
 type MapFeature = { type: "Feature"; id: string; geometry: Geometry; properties: Record<string, unknown> };
 type MapData = { type: "FeatureCollection"; features: MapFeature[] };
 type MapItem = { id: string; geometry: Geometry; properties?: Record<string, unknown>; topology_issue?: boolean };
 export interface EditOverlay { original: PolygonGeometry; working: PolygonGeometry; showOriginal: boolean; selectedVertex: number | null; onSelectVertex: (index: number) => void; onMoveVertex: (index: number, position: Position) => void; onCommitDrag: () => void; onAddVertex: (position: Position) => void; }
+export interface DrawOverlay { points: Position[]; onAddPoint: (position: Position) => void; }
+export interface ImageryPreviewLayer { url: string; corners: [[number, number], [number, number], [number, number], [number, number]]; }
+
+type BasemapMap = Pick<maplibregl.Map, "getLayer" | "setLayoutProperty">;
 
 const collection = (features: MapFeature[]): MapData => ({ type: "FeatureCollection", features });
 const feature = (item: MapItem): MapFeature => ({ type: "Feature", id: item.id, geometry: item.geometry, properties: { ...item, ...item.properties } });
@@ -19,18 +24,29 @@ const coordinatePairs = (coordinates: unknown): [number, number][] => {
   return coordinates.flatMap(coordinatePairs);
 };
 
-export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, visibility, selectedParcelId, onParcelSelect, onFeatureSelect, editOverlay }: { parcels: Parcel[]; buildings: Building[]; roads: Road[]; landUse: LandUseFeature[]; topologyParcelIds: string[]; visibility: LayerVisibility; selectedParcelId: string | null; onParcelSelect: (id: string) => void; onFeatureSelect: (kind: MapFeatureKind, id: string) => void; editOverlay: EditOverlay | null; }) {
+export function applyBasemapVisibility(map: BasemapMap, basemapStyle: BasemapStyle, basemapEnabled: boolean): void {
+  const visibility = (layer: BasemapStyle) => basemapEnabled && basemapStyle === layer ? "visible" : "none";
+  const layers: Array<[string, BasemapStyle]> = [["street-basemap", "STREET"], ["satellite-basemap", "SATELLITE"]];
+  for (const [layerId, style] of layers) {
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visibility(style));
+  }
+}
+
+export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, visibility, basemapStyle, selectedParcelId, onParcelSelect, onFeatureSelect, editOverlay, drawOverlay, imageryPreview, imageryZoomRequest = 0 }: { parcels: Parcel[]; buildings: Building[]; roads: Road[]; landUse: LandUseFeature[]; topologyParcelIds: string[]; visibility: LayerVisibility; basemapStyle: BasemapStyle; selectedParcelId: string | null; onParcelSelect: (id: string) => void; onFeatureSelect: (kind: MapFeatureKind, id: string) => void; editOverlay: EditOverlay | null; drawOverlay?: DrawOverlay | null; imageryPreview?: ImageryPreviewLayer | null; imageryZoomRequest?: number; }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const overlayRef = useRef<EditOverlay | null>(null); const draggingVertexRef = useRef<number | null>(null); overlayRef.current = editOverlay;
+  const overlayRef = useRef<EditOverlay | null>(null); const drawRef = useRef<DrawOverlay | null>(null); const draggingVertexRef = useRef<number | null>(null); overlayRef.current = editOverlay; drawRef.current = drawOverlay ?? null;
+  const basemapRef = useRef({ style: basemapStyle, enabled: visibility.basemap });
+  basemapRef.current = { style: basemapStyle, enabled: visibility.basemap };
   const data = { parcels: collection(parcels.flatMap((parcel) => { const geometry = parcel.current_version.geometry; return geometry ? [feature({ ...parcel, geometry, topology_issue: topologyParcelIds.includes(parcel.id) })] : []; })), buildings: collection(buildings.map(feature)), roads: collection(roads.map(feature)), landUse: collection(landUse.map(feature)) };
-  const editData = { original: collection(editOverlay?.showOriginal ? [feature({ id: "original", geometry: editOverlay.original })] : []), working: collection(editOverlay ? [feature({ id: "working", geometry: editOverlay.working })] : []), vertices: collection(editOverlay ? editOverlay.working.coordinates[0].slice(0, -1).map(([longitude, latitude], index) => feature({ id: `vertex-${index}`, geometry: { type: "Point", coordinates: [longitude, latitude] }, properties: { index, selected: editOverlay.selectedVertex === index } })) : []) };
+  const editData = { original: collection(editOverlay?.showOriginal ? [feature({ id: "original", geometry: editOverlay.original })] : []), working: collection(editOverlay ? [feature({ id: "working", geometry: editOverlay.working })] : []), vertices: collection(editOverlay ? editOverlay.working.coordinates[0].slice(0, -1).map(([longitude, latitude], index) => feature({ id: `vertex-${index}`, geometry: { type: "Point", coordinates: [longitude, latitude] }, properties: { index, selected: editOverlay.selectedVertex === index } })) : []), drawing: collection(drawOverlay && drawOverlay.points.length ? [feature({ id: "drawing", geometry: { type: drawOverlay.points.length >= 3 ? "Polygon" : "LineString", coordinates: drawOverlay.points.length >= 3 ? [[...drawOverlay.points, drawOverlay.points[0]]] : drawOverlay.points } })] : []), drawPoints: collection(drawOverlay?.points.map((point, index) => feature({ id: `draw-${index}`, geometry: { type: "Point", coordinates: point }, properties: { index } })) ?? []) };
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
-    const map = new maplibregl.Map({ container: container.current, center: [78.9629, 20.5937], zoom: 4, style: { version: 8, sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" } }, layers: [{ id: "basemap", type: "raster", source: "osm" }] } });
+    const map = new maplibregl.Map({ container: container.current, center: [78.9629, 20.5937], zoom: 4, style: { version: 8, sources: { street: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" }, satellite: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "© Esri" } }, layers: [{ id: "street-basemap", type: "raster", source: "street", layout: { visibility: basemapStyle === "STREET" ? "visible" : "none" } }, { id: "satellite-basemap", type: "raster", source: "satellite", layout: { visibility: basemapStyle === "SATELLITE" ? "visible" : "none" } }] } });
     mapRef.current = map;
     map.on("load", () => {
+      applyBasemapVisibility(map, basemapRef.current.style, basemapRef.current.enabled);
       for (const [name, sourceData] of Object.entries({ ...data, ...editData })) map.addSource(name, { type: "geojson", data: sourceData as Parameters<maplibregl.GeoJSONSource["setData"]>[0] });
       const positions = Object.values(data).flatMap((sourceData) => sourceData.features.flatMap((mapFeature) => coordinatePairs(mapFeature.geometry.coordinates))).filter(([longitude, latitude]) => Number.isFinite(longitude) && Number.isFinite(latitude));
       if (positions.length) {
@@ -44,6 +60,9 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
       map.addLayer({ id: "parcels-line", type: "line", source: "parcels", paint: { "line-color": ["case", ["==", ["get", "id"], selectedParcelId ?? ""], "#f7f3da", "#8f632f"], "line-width": ["case", ["==", ["get", "id"], selectedParcelId ?? ""], 4, 2] } });
       map.addLayer({ id: "parcel-labels", type: "symbol", source: "parcels", layout: { "text-field": ["coalesce", ["get", "external_identifier"], ""], "text-size": 12, "text-font": ["Open Sans Semibold"], "text-offset": [0, 0.8], "text-allow-overlap": false } });
       map.addLayer({ id: "topology-outline", type: "line", source: "parcels", filter: ["==", ["get", "topology_issue"], true], paint: { "line-color": "#bd4031", "line-width": 4, "line-dasharray": [1.5, 1.2] }, layout: { visibility: visibility.topology ? "visible" : "none" } });
+      map.addLayer({ id: "drawing-line", type: "line", source: "drawing", paint: { "line-color": "#174c5b", "line-width": 3, "line-dasharray": [2, 1] } });
+      map.addLayer({ id: "drawing-fill", type: "fill", source: "drawing", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#38a1a5", "fill-opacity": 0.18 } });
+      map.addLayer({ id: "drawing-points", type: "circle", source: "drawPoints", paint: { "circle-radius": 5, "circle-color": "#fffdf8", "circle-stroke-width": 2, "circle-stroke-color": "#174c5b" } });
       map.addLayer({ id: "edit-original-line", type: "line", source: "original", paint: { "line-color": "#5a6970", "line-width": 2, "line-dasharray": [2, 2] } });
       map.addLayer({ id: "edit-working-fill", type: "fill", source: "working", paint: { "fill-color": "#e86832", "fill-opacity": 0.18 } });
       map.addLayer({ id: "edit-working-line", type: "line", source: "working", paint: { "line-color": "#e86832", "line-width": 4 } });
@@ -52,6 +71,7 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
       for (const [layerId, kind] of [["buildings-fill", "BUILDING"], ["roads-line", "ROAD"], ["land-use-fill", "LAND_USE"]] as const) map.on("click", layerId, (event) => { const id = event.features?.[0]?.properties?.id; if (typeof id === "string") onFeatureSelect(kind, id); });
       map.on("click", "edit-vertices", (event) => { event.preventDefault(); const index = event.features?.[0]?.properties?.index; if (typeof index === "number") overlayRef.current?.onSelectVertex(index); });
       map.on("click", "edit-working-line", (event) => { if (!event.defaultPrevented) overlayRef.current?.onAddVertex([event.lngLat.lng, event.lngLat.lat]); });
+      map.on("click", (event) => { if (drawRef.current) drawRef.current.onAddPoint([event.lngLat.lng, event.lngLat.lat]); });
       map.on("mousedown", "edit-vertices", (event) => { const index = event.features?.[0]?.properties?.index; if (typeof index !== "number") return; draggingVertexRef.current = index; map.dragPan.disable(); event.preventDefault(); });
       map.on("mousemove", (event) => { const index = draggingVertexRef.current; if (index !== null) overlayRef.current?.onMoveVertex(index, [event.lngLat.lng, event.lngLat.lat]); });
       map.on("mouseup", () => { if (draggingVertexRef.current !== null) { overlayRef.current?.onCommitDrag(); draggingVertexRef.current = null; map.dragPan.enable(); } });
@@ -65,8 +85,94 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
     const map = mapRef.current; if (!map?.isStyleLoaded()) return;
     for (const [name, sourceData] of Object.entries({ ...data, ...editData })) (map.getSource(name) as maplibregl.GeoJSONSource | undefined)?.setData(sourceData as Parameters<maplibregl.GeoJSONSource["setData"]>[0]);
     map.setPaintProperty("parcels-line", "line-color", ["case", ["==", ["get", "id"], selectedParcelId ?? ""], "#f7f3da", "#8f632f"]);
-  }, [parcels, buildings, roads, landUse, topologyParcelIds, selectedParcelId, editOverlay]);
-  useEffect(() => { const map = mapRef.current; if (!map?.isStyleLoaded()) return; const states: Record<string, boolean> = { basemap: visibility.basemap, "parcels-fill": visibility.parcels, "parcels-line": visibility.parcels, "parcel-labels": visibility.parcels, "buildings-fill": visibility.buildings, "roads-line": visibility.roads, "land-use-fill": visibility.landUse, "topology-outline": visibility.topology }; Object.entries(states).forEach(([id, shown]) => map.setLayoutProperty(id, "visibility", shown ? "visible" : "none")); }, [visibility]);
+  }, [parcels, buildings, roads, landUse, topologyParcelIds, selectedParcelId, editOverlay, drawOverlay]);
+  useEffect(() => { const map = mapRef.current; if (!map) return; applyBasemapVisibility(map, basemapStyle, visibility.basemap); }, [basemapStyle, visibility.basemap]);
+  useEffect(() => { const map = mapRef.current; if (!map?.isStyleLoaded()) return; const states: Record<string, boolean> = { "parcels-fill": visibility.parcels, "parcels-line": visibility.parcels, "parcel-labels": visibility.parcels, "buildings-fill": visibility.buildings, "roads-line": visibility.roads, "land-use-fill": visibility.landUse, "topology-outline": visibility.topology }; Object.entries(states).forEach(([id, shown]) => map.setLayoutProperty(id, "visibility", shown ? "visible" : "none")); }, [visibility]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const applyImagery = () => {
+      const source = map.getSource("imagery-preview") as maplibregl.ImageSource | undefined;
+
+      if (imageryPreview) {
+        if (source) {
+          source.updateImage({
+            url: imageryPreview.url,
+            coordinates: imageryPreview.corners,
+          });
+        } else {
+          map.addSource("imagery-preview", {
+            type: "image",
+            url: imageryPreview.url,
+            coordinates: imageryPreview.corners,
+          });
+
+          map.addLayer(
+            {
+              id: "imagery-preview",
+              type: "raster",
+              source: "imagery-preview",
+              paint: { "raster-opacity": 0.72 },
+            },
+            "land-use-fill",
+          );
+        }
+
+        const bounds = imageryPreview.corners.reduce(
+          (result, corner) => result.extend(corner),
+          new maplibregl.LngLatBounds(
+            imageryPreview.corners[0],
+            imageryPreview.corners[0],
+          ),
+        );
+
+        map.fitBounds(bounds, {
+          padding: 48,
+          maxZoom: 19,
+          duration: 700,
+        });
+      } else if (source) {
+        if (map.getLayer("imagery-preview")) {
+          map.removeLayer("imagery-preview");
+        }
+        map.removeSource("imagery-preview");
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      applyImagery();
+    } else {
+      map.once("load", applyImagery);
+    }
+
+    return () => {
+      map.off("load", applyImagery);
+    };
+  }, [imageryPreview]);
+
+  useEffect(() => {
+    if (!imageryPreview || imageryZoomRequest <= 0) return;
+
+    const map = mapRef.current;
+    if (!map) return;
+
+    const longitude =
+      imageryPreview.corners.reduce((sum, corner) => sum + corner[0], 0) /
+      imageryPreview.corners.length;
+
+    const latitude =
+      imageryPreview.corners.reduce((sum, corner) => sum + corner[1], 0) /
+      imageryPreview.corners.length;
+
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return;
+
+    map.stop();
+    map.jumpTo({
+      center: [longitude, latitude],
+      zoom: 18,
+    });
+  }, [imageryZoomRequest, imageryPreview]);
   return <div className="gis-map" ref={container} aria-label="Project cadastral map" data-testid="gis-map" data-parcel-count={data.parcels.features.length} data-building-count={data.buildings.features.length} />;
 }
