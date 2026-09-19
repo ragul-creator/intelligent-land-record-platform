@@ -179,13 +179,13 @@ export function ImageryGeoAiPanel({
 
           <dt>Size</dt>
           <dd>
-            {String(selected.metadata.width ?? "?")} ·{" "}
+            {String(selected.metadata.width ?? "?")} ×{" "}
             {String(selected.metadata.height ?? "?")}
           </dd>
 
           <dt>Pixel size</dt>
           <dd>
-            {String(selected.metadata.resolution_x ?? "?")} ·{" "}
+            {String(selected.metadata.resolution_x ?? "?")} ×{" "}
             {String(selected.metadata.resolution_y ?? "?")}
           </dd>
 
