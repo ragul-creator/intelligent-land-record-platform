@@ -2,6 +2,7 @@
 
 import uuid
 
+from app.schemas.common import PageMetadata
 from pydantic import AliasChoices, BaseModel, Field
 
 
@@ -43,3 +44,17 @@ class CurrentUserResponse(BaseModel):
     roles: list[str]
     permissions: list[str]
     project_memberships: list[ProjectMembershipResponse]
+
+
+class UserDirectoryItem(BaseModel):
+    id: uuid.UUID
+    login_id: str
+    email: str
+    full_name: str
+    is_active: bool
+    roles: list[str]
+
+
+class UserDirectoryResponse(BaseModel):
+    items: list[UserDirectoryItem]
+    page: PageMetadata
