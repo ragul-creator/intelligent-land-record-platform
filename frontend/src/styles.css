@@ -153,6 +153,14 @@ dl { display: grid; grid-template-columns: 9rem 1fr; gap: .4rem .7rem; margin: 1
 .ocr-token small { color: #63777a; }
 .ocr-token.low-confidence, .low-confidence-field { border-color: #d69b74; background: #fff6eb; }
 .document-field-heading span { padding: .2rem .4rem; border-radius: 999px; background: #fff0d8; color: #8a4a13; font-size: .68rem; font-weight: 700; }
+.structured-record { margin: .8rem 0 1rem; overflow-x: auto; border: 1px solid #cdd8d0; border-radius: .5rem; background: #fffef9; }
+.structured-record table { width: 100%; border-collapse: collapse; min-width: 38rem; }
+.structured-record th, .structured-record td { padding: .65rem .75rem; border-bottom: 1px solid #e0e6df; text-align: left; vertical-align: top; }
+.structured-record thead th { background: #edf3ee; color: #23434b; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+.structured-record tbody th { color: #173b47; width: 22%; }
+.structured-record tbody tr:last-child th, .structured-record tbody tr:last-child td { border-bottom: 0; }
+.structured-record .structured-low-confidence { background: #fff6eb; }
+.structured-empty { padding: .7rem .8rem; border-left: 4px solid #bf7a2f; background: #fff8e8; color: #6f522b; }
 @media (max-width: 900px) { .document-evidence-grid { grid-template-columns: 1fr; }.document-source-pane iframe { min-height: 28rem; } }
 
 
