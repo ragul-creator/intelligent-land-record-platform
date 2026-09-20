@@ -186,19 +186,25 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument(
         "--engine",
-        choices=("tesseract", "indic-ocr"),
+        choices=("tesseract", "trocr", "indic-ocr"),
         default="tesseract",
-        help="Recognition engine. IndicOCR requires a prepared local gated-model checkout.",
+        help="Recognition engine. TrOCR is optional English HTR; IndicOCR requires a prepared local gated-model checkout.",
     )
     parser.add_argument(
         "--model-path",
         type=Path,
-        help="Local IndicOCR checkout/model path after separately accepting the upstream access terms.",
+        help="Optional local model path. Required for IndicOCR; for TrOCR it overrides the default Hugging Face checkpoint.",
     )
     args = parser.parse_args()
 
     engine = None
-    if args.engine == "indic-ocr":
+    if args.engine == "trocr":
+        from ai.document_ai.ocr.trocr_htr import DEFAULT_TROCR_HANDWRITTEN_MODEL, TrOcrHtrEngine
+
+        engine = TrOcrHtrEngine(
+            model_name_or_path=args.model_path or DEFAULT_TROCR_HANDWRITTEN_MODEL,
+        )
+    elif args.engine == "indic-ocr":
         if args.model_path is None:
             parser.error("--model-path is required when --engine indic-ocr is selected.")
         from ai.document_ai.ocr.indic_ocr_htr import IndicOcrHtrEngine
