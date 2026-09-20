@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -51,11 +51,19 @@ export function AdminPage() {
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftState, setDraftState] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
-  const formValues = useMemo(() => ({
-    name: draftName || project.data?.name || "",
-    description: draftDescription || project.data?.description || "",
-    state: draftState === "ACTIVE" && project.data?.state === "ARCHIVED" ? "ARCHIVED" : draftState,
-  }), [draftName, draftDescription, draftState, project.data]);
+
+  useEffect(() => {
+    if (!project.data) return;
+    setDraftName(project.data.name);
+    setDraftDescription(project.data.description ?? "");
+    setDraftState(project.data.state);
+  }, [project.data]);
+
+  const formValues = {
+    name: draftName,
+    description: draftDescription,
+    state: draftState,
+  };
 
   const saveProject = useMutation({
     mutationFn: () => updateProject(projectId!, {
