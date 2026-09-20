@@ -5,7 +5,7 @@ import rasterio
 from PIL import Image
 from rasterio.transform import from_origin
 
-from ai.geoai.runtime.imagery import inspect_and_render_preview
+from ai.geoai.runtime.imagery import _edge_connected_bright_background, inspect_and_render_preview
 from ai.geoai.parcels.acquisition import create_parcel
 
 
@@ -28,6 +28,20 @@ def _write_geotiff(path: Path, *, with_nodata_hole: bool = False) -> None:
             dataset.write(values, index)
 
 
+
+
+def test_preview_fallback_removes_only_edge_connected_white_background() -> None:
+    rgb = np.full((6, 8, 3), 90, dtype=np.uint8)
+    rgb[:3, :3] = 255
+    rgb[3:5, 4:6] = 255
+    valid = np.ones((6, 8), dtype=bool)
+
+    removed = _edge_connected_bright_background(rgb, valid)
+
+    assert removed[:3, :3].all()
+    assert not removed[3:5, 4:6].any()
+
+
 def test_private_preview_preserves_inspected_georeferencing_without_copying_source(tmp_path: Path) -> None:
     source = tmp_path / "registered.tif"
     _write_geotiff(source)
@@ -39,6 +53,7 @@ def test_private_preview_preserves_inspected_georeferencing_without_copying_sour
     assert metadata["transform"]["c"] == 500_000
     assert metadata["preview_crs"] == "EPSG:3857"
     assert metadata["preview_has_alpha"] is True
+    assert metadata["preview_edge_background_removed"] is False
     assert metadata["preview_width"] > 0 and metadata["preview_height"] > 0
     assert max(metadata["preview_width"], metadata["preview_height"]) <= 2048
     assert len(corners) == 4
