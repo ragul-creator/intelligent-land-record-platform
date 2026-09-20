@@ -1,0 +1,7 @@
+# Optional dependencies for pretrained English handwriting recognition with TrOCR.
+# Kept separate from the default backend image because PyTorch/model weights are large.
+torch>=2.2,<3
+transformers>=4.53,<5
+sentencepiece>=0.2,<1
+protobuf>=5,<7
+safetensors>=0.4,<1
