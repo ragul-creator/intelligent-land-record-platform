@@ -96,3 +96,13 @@ def mark_job_cancelled(session: Session, job: ProcessingJob) -> None:
         raise InvalidJobTransition(f"Cannot cancel a {job.status} job.")
     job.status = "CANCELLED"
     job.progress = 0
+
+
+def requeue_failed_job(job: ProcessingJob) -> None:
+    """Explicitly recover one failed job while preserving the same immutable workflow identity."""
+    if job.status != "FAILED":
+        raise InvalidJobTransition(f"Cannot recover a {job.status} job.")
+    job.status = "QUEUED"
+    job.progress = 0
+    job.retry_count = (job.retry_count or 0) + 1
+    job.error_json = None
