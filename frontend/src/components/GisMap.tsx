@@ -35,6 +35,7 @@ export function applyBasemapVisibility(map: BasemapMap, basemapStyle: BasemapSty
 export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, visibility, basemapStyle, selectedParcelId, onParcelSelect, onFeatureSelect, editOverlay, drawOverlay, imageryPreview, imageryZoomRequest = 0 }: { parcels: Parcel[]; buildings: Building[]; roads: Road[]; landUse: LandUseFeature[]; topologyParcelIds: string[]; visibility: LayerVisibility; basemapStyle: BasemapStyle; selectedParcelId: string | null; onParcelSelect: (id: string) => void; onFeatureSelect: (kind: MapFeatureKind, id: string) => void; editOverlay: EditOverlay | null; drawOverlay?: DrawOverlay | null; imageryPreview?: ImageryPreviewLayer | null; imageryZoomRequest?: number; }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const overlayRef = useRef<EditOverlay | null>(null); const drawRef = useRef<DrawOverlay | null>(null); const draggingVertexRef = useRef<number | null>(null); overlayRef.current = editOverlay; drawRef.current = drawOverlay ?? null;
   const basemapRef = useRef({ style: basemapStyle, enabled: visibility.basemap });
   basemapRef.current = { style: basemapStyle, enabled: visibility.basemap };
@@ -45,6 +46,8 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
     if (!container.current || mapRef.current) return;
     const map = new maplibregl.Map({ container: container.current, center: [78.9629, 20.5937], zoom: 4, style: { version: 8, sources: { street: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" }, satellite: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "© Esri" } }, layers: [{ id: "street-basemap", type: "raster", source: "street", layout: { visibility: basemapStyle === "STREET" ? "visible" : "none" } }, { id: "satellite-basemap", type: "raster", source: "satellite", layout: { visibility: basemapStyle === "SATELLITE" ? "visible" : "none" } }] } });
     mapRef.current = map;
+    resizeObserverRef.current = new ResizeObserver(() => map.resize());
+    resizeObserverRef.current.observe(container.current);
     map.on("load", () => {
       applyBasemapVisibility(map, basemapRef.current.style, basemapRef.current.enabled);
       for (const [name, sourceData] of Object.entries({ ...data, ...editData })) map.addSource(name, { type: "geojson", data: sourceData as Parameters<maplibregl.GeoJSONSource["setData"]>[0] });
@@ -78,7 +81,7 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
       map.on("mouseenter", "parcels-fill", () => { map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", "parcels-fill", () => { map.getCanvas().style.cursor = ""; });
     });
-    return () => { map.remove(); mapRef.current = null; };
+    return () => { resizeObserverRef.current?.disconnect(); resizeObserverRef.current = null; map.remove(); mapRef.current = null; };
   }, []);
 
   useEffect(() => {
