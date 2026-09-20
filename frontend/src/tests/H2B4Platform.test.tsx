@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -8,7 +9,7 @@ import { AuditPage } from "../pages/AuditPage";
 import { JobsPage } from "../pages/JobsPage";
 import { SearchPage } from "../pages/SearchPage";
 
-function renderRoute(path: string, route: string, element: React.ReactNode) {
+function renderRoute(path: string, route: string, element: ReactNode) {
   sessionStorage.setItem("access_token", "access");
   sessionStorage.setItem("refresh_token", "refresh");
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
