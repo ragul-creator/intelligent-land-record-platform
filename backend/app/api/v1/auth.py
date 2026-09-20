@@ -50,7 +50,7 @@ def _identity_hash(identifier: str) -> str:
 def _token_response(user_id: uuid.UUID, session_id: uuid.UUID) -> TokenResponse:
     settings = get_settings()
     return TokenResponse(
-        access_token=create_access_token(user_id),
+        access_token=create_access_token(user_id, session_id),
         refresh_token=create_refresh_token(user_id, session_id),
         access_expires_in_seconds=settings.auth_access_token_lifetime_seconds,
         refresh_expires_in_seconds=settings.auth_refresh_token_lifetime_seconds,
