@@ -19,6 +19,8 @@ class ProcessingJobResponse(BaseModel):
     progress: int
     retry_count: int
     has_error: bool
+    retryable: bool = False
+    recovery_hint: str | None = None
     created_at: datetime
     updated_at: datetime
 
