@@ -106,7 +106,7 @@ describe("DocumentsPage", () => {
     expect(screen.getByText("Survey No. 123/4")).toBeInTheDocument();
     expect(screen.getByText("LOW CONFIDENCE")).toBeInTheDocument();
     expect(screen.getByText("rules-v1")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Low-confidence tokens")).toBeInTheDocument();
   });
 
   it("integrates validated record evidence with parcel candidates and GIS navigation", async () => {
