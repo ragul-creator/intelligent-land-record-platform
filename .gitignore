@@ -34,6 +34,7 @@ data/raw/imagery/*
 !data/raw/imagery/.gitkeep
 data/processed/geoai/
 data/processed/document_ai/
+data/benchmarks/
 ai/geoai/artifacts/
 ai/geoai/checkpoints/
 *.ckpt
