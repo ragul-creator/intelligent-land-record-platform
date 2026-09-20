@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { searchProject } from "../api/platform";
