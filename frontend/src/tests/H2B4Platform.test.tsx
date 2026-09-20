@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminPage } from "../pages/AdminPage";
 import { AuditPage } from "../pages/AuditPage";
 import { JobsPage } from "../pages/JobsPage";
+import { HomePage } from "../pages/HomePage";
 import { SearchPage } from "../pages/SearchPage";
 
 function renderRoute(path: string, route: string, element: ReactNode) {
@@ -28,6 +29,63 @@ afterEach(() => {
 });
 
 describe("H.2B.4 platform workspaces", () => {
+  it("creates a new isolated project from the signed-in landing page", async () => {
+    let created = false;
+    let createBody: Record<string, unknown> | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/users/me")) {
+        return new Response(JSON.stringify({
+          id: "officer",
+          login_id: "OFF-TN-000001",
+          email: "officer@example.invalid",
+          full_name: "Officer",
+          roles: ["OFFICER"],
+          permissions: ["project:read", "project:create"],
+          project_memberships: created ? [{ project_id: "project-new", role: "OFFICER" }] : [],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.includes("/projects?state=ACTIVE")) {
+        return new Response(JSON.stringify({
+          items: created ? [{
+            id: "project-new",
+            name: "New cadastral pilot",
+            description: "H.2B.4 fixture",
+            state: "ACTIVE",
+            owner_id: "officer",
+            created_at: "2026-09-20T00:00:00Z",
+            updated_at: "2026-09-20T00:00:00Z",
+          }] : [],
+          page: { limit: 100, offset: 0, total: created ? 1 : 0 },
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.endsWith("/projects") && init?.method === "POST") {
+        createBody = JSON.parse(String(init.body));
+        created = true;
+        return new Response(JSON.stringify({
+          id: "project-new",
+          name: "New cadastral pilot",
+          description: "H.2B.4 fixture",
+          state: "ACTIVE",
+          owner_id: "officer",
+          created_at: "2026-09-20T00:00:00Z",
+          updated_at: "2026-09-20T00:00:00Z",
+        }), { status: 201, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response("{}", { status: 404 });
+    }));
+
+    renderRoute("/", "/", <HomePage />);
+    expect(await screen.findByRole("heading", { name: "Create a project" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Project name"), { target: { value: "New cadastral pilot" } });
+    fireEvent.change(screen.getByLabelText("Project description"), { target: { value: "H.2B.4 fixture" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => expect(createBody).not.toBeNull());
+    expect(createBody).toEqual({ name: "New cadastral pilot", description: "H.2B.4 fixture" });
+    expect(await screen.findByText("New cadastral pilot")).toBeInTheDocument();
+  });
+
   it("searches evidence and preserves preliminary labels", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
