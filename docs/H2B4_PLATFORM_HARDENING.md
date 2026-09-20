@@ -125,9 +125,9 @@ The current MVP search covers:
 
 - source document filenames;
 - parcel external identifiers;
-- persisted extracted field values.
+- persisted extracted field values and latest human-corrected values when the caller also has `field:read`.
 
-Results include the workflow status and a `preliminary` flag. Search is evidence discovery only and does not infer identity, ownership, or cadastral boundaries.
+Results include the workflow status and a `preliminary` flag. Viewer accounts therefore do not gain field-level access merely by using project search. Search is evidence discovery only and does not infer identity, ownership, or cadastral boundaries.
 
 ## Exports
 
@@ -139,7 +139,7 @@ Two evidence-preserving exports are provided:
 
 `GET /api/v1/projects/{project_id}/exports/records.csv`
 
-The CSV includes document/workflow status, latest validation status, selected record fields, and the latest human correction where one exists. It carries an evidence note stating that exported values are not statutory ownership proof.
+The CSV includes document/workflow status and latest validation status. Selected record fields and the latest human correction are included only when the caller already has `field:read`, or when the document is VALIDATED and the caller has `record:read`. This prevents `export:read` from becoming a shortcut around field-level RBAC. The CSV carries an evidence note stating that exported values are not statutory ownership proof.
 
 ### Parcel GeoJSON
 
