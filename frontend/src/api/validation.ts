@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session";
 import {
   ReviewApiError,
   type ReviewSeverity,
@@ -28,21 +29,10 @@ interface Page<T> {
   page: { limit: number; offset: number; total: number };
 }
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = sessionStorage.getItem("access_token");
-  const response = await fetch(`${baseUrl}/api/v1${path}`, {
-    ...init,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  });
+  const response = await sessionFetch(path, init);
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as {
-      error?: { code?: string; message?: string };
-    } | null;
+    const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
     throw new ReviewApiError(
       response.status,
       body?.error?.code ?? "REQUEST_FAILED",

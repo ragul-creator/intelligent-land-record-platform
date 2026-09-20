@@ -93,3 +93,11 @@ def test_h1_role_permission_matrix_has_no_privilege_drift() -> None:
         }),
     }
     assert ROLE_PERMISSION_CODES == expected
+
+
+def test_access_token_can_be_bound_to_auth_session() -> None:
+    user_id = uuid.uuid4()
+    session_id = uuid.uuid4()
+    claims = decode_token(create_access_token(user_id, session_id), "access")
+    assert claims["sub"] == str(user_id)
+    assert claims["sid"] == str(session_id)

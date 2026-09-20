@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session";
 export type Position = number[];
 export interface Geometry { type: string; coordinates: Position | Position[] | Position[][] | Position[][][]; }
 export interface ParcelGeometryVersion { id: string; version: number; geometry: Geometry | null; source: string; source_reference: string | null; coordinate_space: string; source_crs: string | null; area_m2: number | null; area_sqft: number | null; change_reason: string | null; validation_status: string | null; created_by_user_id: string | null; created_by_type: "SYSTEM" | "AI" | "HUMAN" | "IMPORT"; processed_at: string | null; created_at: string; }
@@ -15,11 +16,8 @@ export interface ParcelVersionSaveResult { version: ParcelGeometryVersion; statu
 interface Page<T> { items: T[]; page: { limit: number; offset: number; total: number }; }
 
 export class ApiError extends Error { constructor(public status: number, public code: string, message: string) { super(message); } }
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = sessionStorage.getItem("access_token");
-  const response = await fetch(`${baseUrl}/api/v1${path}`, { ...init, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers } });
+  const response = await sessionFetch(path, init);
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
     throw new ApiError(response.status, body?.error?.code ?? "REQUEST_FAILED", body?.error?.message ?? "Unable to load GIS data.");

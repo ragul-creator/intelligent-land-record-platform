@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { login, logout, loadProjects, hasSession } from "../api/auth";
+import { createProject } from "../api/admin";
 import { loadCurrentUser } from "../api/gis";
 
 export function HomePage() {
@@ -9,7 +10,18 @@ export function HomePage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [sessionVersion, setSessionVersion] = useState(0);
+  const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
   const session = hasSession();
+
+  useEffect(() => {
+    const onSessionExpired = () => {
+      client.clear();
+      setSessionVersion((value) => value + 1);
+    };
+    window.addEventListener("session-expired", onSessionExpired);
+    return () => window.removeEventListener("session-expired", onSessionExpired);
+  }, [client]);
 
   const currentUser = useQuery({
     queryKey: ["current-user", sessionVersion],
@@ -38,9 +50,19 @@ export function HomePage() {
       setSessionVersion((value) => value + 1);
     },
   });
+  const create = useMutation({
+    mutationFn: () => createProject({ name: projectName.trim(), description: projectDescription.trim() || null }),
+    onSuccess: async () => {
+      setProjectName("");
+      setProjectDescription("");
+      await client.invalidateQueries({ queryKey: ["projects"] });
+      await client.invalidateQueries({ queryKey: ["current-user"] });
+    },
+  });
 
   const staleSession = session && currentUser.isError;
   const loggedIn = Boolean(session && currentUser.data);
+  const canCreateProject = currentUser.data?.permissions.includes("project:create") ?? false;
 
   return <main className="home-shell">
     <header className="home-hero">
@@ -68,6 +90,16 @@ export function HomePage() {
         <div><span>Signed in as</span><strong>{currentUser.data!.full_name}</strong><small>{currentUser.data!.login_id} · {currentUser.data!.roles.join(", ")}</small></div>
         <button type="button" onClick={() => signOut.mutate()} disabled={signOut.isPending}>{signOut.isPending ? "Signing out…" : "Sign out"}</button>
       </section>
+
+      {canCreateProject && <section className="project-create-card" aria-label="Create project">
+        <div><p className="eyebrow">H.2B.4 project setup</p><h2>Create a project</h2><p>Creates an isolated ACTIVE project and adds you as its owner/member using your current application role.</p></div>
+        <form onSubmit={(event) => { event.preventDefault(); if (projectName.trim()) create.mutate(); }}>
+          <label>Project name<input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} maxLength={255} /></label>
+          <label>Description<textarea aria-label="Project description" value={projectDescription} onChange={(event) => setProjectDescription(event.target.value)} maxLength={10000} /></label>
+          <button type="submit" disabled={!projectName.trim() || create.isPending}>{create.isPending ? "Creating…" : "Create project"}</button>
+          {create.isError && <p className="error-copy" role="alert">The project could not be created.</p>}
+        </form>
+      </section>}
 
       <section className="project-launcher">
         <div className="project-launcher-heading"><div><p className="eyebrow">Available projects</p><h2>Choose a project workspace</h2></div><span>{projects.data?.items.length ?? 0} active</span></div>

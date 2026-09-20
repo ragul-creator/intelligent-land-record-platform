@@ -348,17 +348,27 @@ def get_project_workflow(
 @router.get("/{project_id}/audit", response_model=AuditLogListResponse)
 def list_project_audit_logs(
     project_id: uuid.UUID,
+    action: str | None = Query(default=None, min_length=1, max_length=100),
+    target_type: str | None = Query(default=None, min_length=1, max_length=100),
+    actor_id: uuid.UUID | None = None,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ) -> AuditLogListResponse:
     project = get_project_for_user(session, user, project_id, "audit:read")
-    total = session.scalar(select(func.count(AuditLog.id)).where(AuditLog.project_id == project.id)) or 0
+    filters = [AuditLog.project_id == project.id]
+    if action:
+        filters.append(AuditLog.action == action.strip())
+    if target_type:
+        filters.append(AuditLog.target_type == target_type.strip())
+    if actor_id is not None:
+        filters.append(AuditLog.actor_id == actor_id)
+    total = session.scalar(select(func.count(AuditLog.id)).where(*filters)) or 0
     audit_logs = list(
         session.scalars(
             select(AuditLog)
-            .where(AuditLog.project_id == project.id)
+            .where(*filters)
             .order_by(AuditLog.created_at.desc(), AuditLog.id)
             .limit(limit)
             .offset(offset)

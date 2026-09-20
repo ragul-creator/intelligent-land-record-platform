@@ -27,7 +27,7 @@ def process_file_registration(self, job_id: str) -> None:
         if job is None or job.status != "QUEUED":
             return
         try:
-            job.retry_count = self.request.retries
+            job.retry_count = max(job.retry_count or 0, self.request.retries)
             mark_job_processing(session, job)
             record_audit(session, "processing_job.started", "processing_job", job.id, project_id=job.project_id)
             session.commit()
@@ -40,7 +40,7 @@ def process_file_registration(self, job_id: str) -> None:
             job = session.get(ProcessingJob, uuid.UUID(job_id))
             if job is not None and job.status == "PROCESSING":
                 if self.request.retries < self.max_retries:
-                    mark_job_retry_queued(session, job, self.request.retries + 1)
+                    mark_job_retry_queued(session, job, max((job.retry_count or 0) + 1, self.request.retries + 1))
                     record_audit(session, "processing_job.retry_queued", "processing_job", job.id, project_id=job.project_id, metadata={"retry_count": job.retry_count})
                 else:
                     mark_job_failed(session, job, str(error))
@@ -59,7 +59,7 @@ def process_geoai_parcel_import(self, geoai_job_id: str) -> None:
         if geoai_job is None or processing_job is None or processing_job.status != "QUEUED":
             return
         try:
-            processing_job.retry_count = self.request.retries
+            processing_job.retry_count = max(processing_job.retry_count or 0, self.request.retries)
             mark_job_processing(session, processing_job)
             record_audit(session, "geoai.job_processing", "geoai_job", geoai_job.id, project_id=geoai_job.project_id)
             session.commit()
@@ -82,7 +82,7 @@ def process_geoai_parcel_import(self, geoai_job_id: str) -> None:
                     if geoai_job is not None:
                         record_audit(session, "geoai.job_failed", "geoai_job", geoai_job.id, project_id=geoai_job.project_id)
                 else:
-                    mark_job_retry_queued(session, processing_job, self.request.retries + 1)
+                    mark_job_retry_queued(session, processing_job, max((processing_job.retry_count or 0) + 1, self.request.retries + 1))
                     if geoai_job is not None:
                         record_audit(session, "geoai.job_retry_queued", "geoai_job", geoai_job.id, project_id=geoai_job.project_id, metadata={"retry_count": processing_job.retry_count})
                 session.commit()
@@ -278,7 +278,7 @@ def process_document_ai(self, job_id: str) -> None:
             document = session.get(Document, detail.document_id) if detail else None
             if job is not None and job.status == "PROCESSING":
                 if self.request.retries < self.max_retries:
-                    mark_job_retry_queued(session, job, self.request.retries + 1)
+                    mark_job_retry_queued(session, job, max((job.retry_count or 0) + 1, self.request.retries + 1))
                     if document is not None:
                         document.status = "QUEUED"
                         record_audit(session, "document.processing_retry_queued", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id), "retry_count": job.retry_count})
@@ -334,7 +334,7 @@ def revalidate_document(self, job_id: str) -> None:
             if job is not None and job.status == "PROCESSING":
                 document = session.get(Document, detail.document_id)
                 if self.request.retries < self.max_retries:
-                    mark_job_retry_queued(session, job, self.request.retries + 1)
+                    mark_job_retry_queued(session, job, max((job.retry_count or 0) + 1, self.request.retries + 1))
                     if document is not None:
                         document.status = "VALIDATING"
                         record_audit(session, "document.revalidation_retry_queued", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id), "retry_count": job.retry_count})

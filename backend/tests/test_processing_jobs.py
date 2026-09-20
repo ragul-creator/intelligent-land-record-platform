@@ -10,6 +10,7 @@ from app.services.processing_jobs import (
     mark_job_processing,
     mark_job_cancelled,
     mark_job_retry_queued,
+    requeue_failed_job,
 )
 
 
@@ -69,3 +70,21 @@ def test_processing_job_retry_transition_is_monotonic_and_retriable() -> None:
     assert job.status == "FAILED"
     assert job.retry_count == 2
     assert job.error_json == {"message": "Processing failed."}
+
+
+def test_failed_job_can_be_explicitly_recovered_with_monotonic_retry_count() -> None:
+    job = ProcessingJob(
+        project_id=uuid.uuid4(),
+        job_type="DOCUMENT_AI_PROCESS",
+        idempotency_key="document:test:manual-recovery",
+        status="FAILED",
+        progress=47,
+        retry_count=2,
+        error_json={"message": "Processing failed."},
+    )
+
+    requeue_failed_job(job)
+    assert (job.status, job.progress, job.retry_count, job.error_json) == ("QUEUED", 0, 3, None)
+
+    with pytest.raises(InvalidJobTransition):
+        requeue_failed_job(job)

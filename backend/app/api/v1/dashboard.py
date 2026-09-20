@@ -16,7 +16,7 @@ from app.models import (
 from app.schemas.dashboard import (
     DashboardAttentionMetrics, DashboardDocumentMetrics, DashboardGeoMetrics,
     DashboardJobMetrics, DashboardLinkMetrics, DashboardReviewMetrics,
-    ProjectDashboardResponse,
+    DashboardVisibilityPolicy, ProjectDashboardResponse,
 )
 from app.schemas.projects import ProjectResponse, StatusCount
 from app.services.project_access import get_project_for_user
@@ -56,7 +56,8 @@ def get_project_dashboard(
     open_filters = (ReviewTask.project_id == project.id, ReviewTask.status == "OPEN")
     open_reviews = session.scalar(select(func.count(ReviewTask.id)).where(*open_filters)) or 0
     document_reviews = session.scalar(select(func.count(ReviewTask.id)).where(
-        *open_filters, ReviewTask.queue_type == "DOCUMENT", ReviewTask.target_type != "RECORD_PARCEL_LINK"
+        *open_filters, ReviewTask.queue_type == "DOCUMENT",
+        ReviewTask.target_type.notin_(("RECORD_PARCEL_LINK", "VALIDATION_ISSUE")),
     )) or 0
     gis_reviews = session.scalar(select(func.count(ReviewTask.id)).where(*open_filters, ReviewTask.queue_type == "GIS")) or 0
     link_reviews = session.scalar(select(func.count(ReviewTask.id)).where(
@@ -66,6 +67,9 @@ def get_project_dashboard(
     medium_reviews = session.scalar(select(func.count(ReviewTask.id)).where(*open_filters, ReviewTask.severity == "MEDIUM")) or 0
     assigned_reviews = session.scalar(select(func.count(ReviewTask.id)).where(
         *open_filters, ReviewTask.assignee_user_id == user.id
+    )) or 0
+    validation_issues = session.scalar(select(func.count(ReviewTask.id)).where(
+        *open_filters, ReviewTask.target_type == "VALIDATION_ISSUE"
     )) or 0
 
     parcel_statuses = [StatusCount(status=s, count=c) for s, c in session.execute(
@@ -93,6 +97,7 @@ def get_project_dashboard(
         reviews=DashboardReviewMetrics(
             open=open_reviews, document=document_reviews, gis=gis_reviews, record_parcel_link=link_reviews,
             high=high_reviews, medium=medium_reviews, assigned_to_me=assigned_reviews,
+            validation_issues=validation_issues,
         ),
         geo=DashboardGeoMetrics(
             imagery_assets=session.scalar(select(func.count(ImageryAsset.id)).where(ImageryAsset.project_id == project.id)) or 0,
@@ -109,12 +114,39 @@ def get_project_dashboard(
                 RecordParcelLink.project_id == project.id, RecordParcelLink.link_status == "CONFIRMED"
             )) or 0,
         ),
-        jobs=DashboardJobMetrics(total=sum(i.count for i in job_statuses), by_status=job_statuses),
+        jobs=DashboardJobMetrics(
+            total=sum(i.count for i in job_statuses),
+            by_status=job_statuses,
+            active=job_map.get("QUEUED", 0) + job_map.get("PROCESSING", 0),
+            failed=job_map.get("FAILED", 0),
+            retryable_failed=session.scalar(
+                select(func.count(ProcessingJob.id)).where(
+                    ProcessingJob.project_id == project.id,
+                    ProcessingJob.status == "FAILED",
+                    ProcessingJob.job_type.in_((
+                        "DOCUMENT_AI_PROCESS", "DOCUMENT_REVALIDATE", "PARCEL_IMPORT",
+                        "BUILDING_VECTORIZE", "IMAGERY_REGISTER",
+                    )),
+                )
+            ) or 0,
+        ),
         attention=DashboardAttentionMetrics(
             failed_jobs=job_map.get("FAILED", 0),
             review_required_documents=document_map.get("REVIEW_REQUIRED", 0),
             high_open_reviews=high_reviews,
             ambiguous_record_parcel_links=link_map.get("REVIEW_REQUIRED", 0),
             parcels_needing_review=parcel_map.get("REVIEW_REQUIRED", 0),
+            open_validation_issues=validation_issues,
+        ),
+        visibility=DashboardVisibilityPolicy(
+            project_role=membership.role,
+            draft_data_visible=True,
+            viewer_read_only=membership.role == "VIEWER",
+            notice=(
+                "Viewer members may inspect draft and unverified evidence in read-only mode; "
+                "verification labels remain visible and backend permissions block mutations."
+                if membership.role == "VIEWER"
+                else "Draft and unverified evidence remains explicitly labelled throughout the project workspace."
+            ),
         ),
     )

@@ -25,6 +25,7 @@ class DashboardReviewMetrics(BaseModel):
     high: int
     medium: int
     assigned_to_me: int
+    validation_issues: int
 
 
 class DashboardGeoMetrics(BaseModel):
@@ -46,6 +47,9 @@ class DashboardLinkMetrics(BaseModel):
 class DashboardJobMetrics(BaseModel):
     total: int
     by_status: list[StatusCount]
+    active: int
+    failed: int
+    retryable_failed: int
 
 
 class DashboardAttentionMetrics(BaseModel):
@@ -54,6 +58,14 @@ class DashboardAttentionMetrics(BaseModel):
     high_open_reviews: int
     ambiguous_record_parcel_links: int
     parcels_needing_review: int
+    open_validation_issues: int
+
+
+class DashboardVisibilityPolicy(BaseModel):
+    project_role: ApplicationRole
+    draft_data_visible: bool
+    viewer_read_only: bool
+    notice: str
 
 
 class ProjectDashboardResponse(BaseModel):
@@ -65,3 +77,4 @@ class ProjectDashboardResponse(BaseModel):
     record_parcel_links: DashboardLinkMetrics
     jobs: DashboardJobMetrics
     attention: DashboardAttentionMetrics
+    visibility: DashboardVisibilityPolicy

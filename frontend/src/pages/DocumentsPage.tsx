@@ -32,7 +32,9 @@ export function DocumentsPage() {
   const links = useQuery({ queryKey: ["record-parcel-links", projectId, selected], queryFn: () => loadDocumentRecordLinks(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
 
   const permissions = user.data?.permissions ?? [];
-  const membership = user.data?.project_memberships.some((item) => item.project_id === projectId);
+  const projectMembership = user.data?.project_memberships.find((item) => item.project_id === projectId);
+  const membership = Boolean(projectMembership);
+  const viewerReadOnly = projectMembership?.role === "VIEWER";
   const can = (permission: string) => Boolean(membership && permissions.includes(permission));
   const refreshDocuments = () => client.invalidateQueries({ queryKey: ["documents", projectId] });
   const refreshLinks = async () => {
@@ -60,6 +62,8 @@ export function DocumentsPage() {
       <div><p className="eyebrow">SIH18 · Document AI</p><h1>Project documents</h1><p>OCR and extracted fields are preliminary evidence, not verified land records.</p></div>
       <nav className="documents-nav"><Link to={`/projects/${projectId}`}>Dashboard</Link><Link to={`/projects/${projectId}/gis`}>Web-GIS</Link><Link to={`/projects/${projectId}/review`}>Review workspace</Link></nav>
     </header>
+
+    {viewerReadOnly && <p className="viewer-visibility-note" role="status">Viewer policy: preliminary document/OCR evidence is visible in read-only mode. Upload, processing, corrections, validation actions, and review changes remain permission-gated.</p>}
 
     {can("document:upload") && <section className="document-upload"><input aria-label="Choose document" type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" onChange={(event) => setFile(event.target.files?.[0])} /><button disabled={!file || upload.isPending} onClick={() => upload.mutate()}>{upload.isPending ? "Uploading…" : "Upload document"}</button>{upload.error && <p role="alert">Upload failed.</p>}</section>}
 

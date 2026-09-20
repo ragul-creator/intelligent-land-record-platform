@@ -1,6 +1,5 @@
+import { sessionFetch } from "./session";
 import { ApiError } from "./gis";
-
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export interface DocumentSummary {
   id: string;
@@ -83,14 +82,7 @@ export interface DocumentSourceUrl {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = sessionStorage.getItem("access_token");
-  const response = await fetch(`${baseUrl}/api/v1${path}`, {
-    ...init,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  });
+  const response = await sessionFetch(path, init);
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
     throw new ApiError(

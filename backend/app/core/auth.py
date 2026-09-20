@@ -58,8 +58,13 @@ def _encode_token(subject: uuid.UUID, token_type: str, expires_in_seconds: int, 
     return jwt.encode(claims, _require_signing_secret(), algorithm=get_settings().auth_jwt_algorithm)
 
 
-def create_access_token(user_id: uuid.UUID) -> str:
-    return _encode_token(user_id, "access", get_settings().auth_access_token_lifetime_seconds)
+def create_access_token(user_id: uuid.UUID, session_id: uuid.UUID | None = None) -> str:
+    return _encode_token(
+        user_id,
+        "access",
+        get_settings().auth_access_token_lifetime_seconds,
+        session_id,
+    )
 
 
 def create_refresh_token(user_id: uuid.UUID, session_id: uuid.UUID) -> str:
@@ -106,6 +111,24 @@ def get_current_user(
     user = session.get(User, user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token.")
+
+    # Access tokens issued by the login/refresh API carry the refresh-session ID.
+    # This makes logout and refresh rotation revoke the associated access token
+    # immediately instead of waiting for its short JWT expiry.
+    session_claim = claims.get("sid")
+    if session_claim is not None:
+        try:
+            auth_session_id = uuid.UUID(str(session_claim))
+        except ValueError as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token.") from error
+        auth_session = session.get(AuthSession, auth_session_id)
+        if (
+            auth_session is None
+            or auth_session.user_id != user.id
+            or auth_session.revoked_at is not None
+            or auth_session.expires_at <= utc_now()
+        ):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token.")
     return user
 
 
