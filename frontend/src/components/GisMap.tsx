@@ -15,6 +15,7 @@ export interface DrawOverlay { points: Position[]; onAddPoint: (position: Positi
 export interface ImageryPreviewLayer { url: string; corners: [[number, number], [number, number], [number, number], [number, number]]; }
 
 type BasemapMap = Pick<maplibregl.Map, "getLayer" | "setLayoutProperty">;
+type OverlayMap = Pick<maplibregl.Map, "getLayer" | "setLayoutProperty">;
 
 const collection = (features: MapFeature[]): MapData => ({ type: "FeatureCollection", features });
 const feature = (item: MapItem): MapFeature => ({ type: "Feature", id: item.id, geometry: item.geometry, properties: { ...item, ...item.properties } });
@@ -29,6 +30,21 @@ export function applyBasemapVisibility(map: BasemapMap, basemapStyle: BasemapSty
   const layers: Array<[string, BasemapStyle]> = [["street-basemap", "STREET"], ["satellite-basemap", "SATELLITE"]];
   for (const [layerId, style] of layers) {
     if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visibility(style));
+  }
+}
+
+export function applyOverlayVisibility(map: OverlayMap, visibility: LayerVisibility): void {
+  const states: Record<string, boolean> = {
+    "parcels-fill": visibility.parcels,
+    "parcels-line": visibility.parcels,
+    "parcel-labels": visibility.parcels,
+    "buildings-fill": visibility.buildings,
+    "roads-line": visibility.roads,
+    "land-use-fill": visibility.landUse,
+    "topology-outline": visibility.topology,
+  };
+  for (const [layerId, shown] of Object.entries(states)) {
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", shown ? "visible" : "none");
   }
 }
 
@@ -70,6 +86,7 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
       map.addLayer({ id: "edit-working-fill", type: "fill", source: "working", paint: { "fill-color": "#e86832", "fill-opacity": 0.18 } });
       map.addLayer({ id: "edit-working-line", type: "line", source: "working", paint: { "line-color": "#e86832", "line-width": 4 } });
       map.addLayer({ id: "edit-vertices", type: "circle", source: "vertices", paint: { "circle-radius": ["case", ["get", "selected"], 8, 6], "circle-color": ["case", ["get", "selected"], "#fff6db", "#173b47"], "circle-stroke-width": 2, "circle-stroke-color": "#e86832" } });
+      applyOverlayVisibility(map, visibility);
       map.on("click", "parcels-fill", (event) => { const id = event.features?.[0]?.properties?.id; if (typeof id === "string") onParcelSelect(id); });
       for (const [layerId, kind] of [["buildings-fill", "BUILDING"], ["roads-line", "ROAD"], ["land-use-fill", "LAND_USE"]] as const) map.on("click", layerId, (event) => { const id = event.features?.[0]?.properties?.id; if (typeof id === "string") onFeatureSelect(kind, id); });
       map.on("click", "edit-vertices", (event) => { event.preventDefault(); const index = event.features?.[0]?.properties?.index; if (typeof index === "number") overlayRef.current?.onSelectVertex(index); });
@@ -90,7 +107,18 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
     map.setPaintProperty("parcels-line", "line-color", ["case", ["==", ["get", "id"], selectedParcelId ?? ""], "#f7f3da", "#8f632f"]);
   }, [parcels, buildings, roads, landUse, topologyParcelIds, selectedParcelId, editOverlay, drawOverlay]);
   useEffect(() => { const map = mapRef.current; if (!map) return; applyBasemapVisibility(map, basemapStyle, visibility.basemap); }, [basemapStyle, visibility.basemap]);
-  useEffect(() => { const map = mapRef.current; if (!map?.isStyleLoaded()) return; const states: Record<string, boolean> = { "parcels-fill": visibility.parcels, "parcels-line": visibility.parcels, "parcel-labels": visibility.parcels, "buildings-fill": visibility.buildings, "roads-line": visibility.roads, "land-use-fill": visibility.landUse, "topology-outline": visibility.topology }; Object.entries(states).forEach(([id, shown]) => map.setLayoutProperty(id, "visibility", shown ? "visible" : "none")); }, [visibility]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => applyOverlayVisibility(map, visibility);
+    if (map.isStyleLoaded()) apply();
+    map.on("load", apply);
+    map.on("styledata", apply);
+    return () => {
+      map.off("load", apply);
+      map.off("styledata", apply);
+    };
+  }, [visibility]);
 
   useEffect(() => {
     const map = mapRef.current;
