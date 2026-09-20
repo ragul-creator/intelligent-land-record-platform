@@ -152,7 +152,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 function structuredValue(field: DocumentField) {
-  const corrected = field.corrections.at(-1)?.corrected_value;
+  const corrected = field.corrections[field.corrections.length - 1]?.corrected_value;
   if (corrected) return corrected;
   if (typeof field.normalized_value === "string") return field.normalized_value;
   if (field.normalized_value && typeof field.normalized_value === "object") {
