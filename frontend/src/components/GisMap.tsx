@@ -110,14 +110,7 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const apply = () => applyOverlayVisibility(map, visibility);
-    if (map.isStyleLoaded()) apply();
-    map.on("load", apply);
-    map.on("styledata", apply);
-    return () => {
-      map.off("load", apply);
-      map.off("styledata", apply);
-    };
+    applyOverlayVisibility(map, visibility);
   }, [visibility]);
 
   useEffect(() => {
