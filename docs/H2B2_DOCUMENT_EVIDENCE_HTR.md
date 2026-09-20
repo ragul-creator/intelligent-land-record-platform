@@ -106,6 +106,29 @@ The benchmark report, not the model card, is the source of truth for this projec
 
 The earlier `IndicOcrHtrEngine` remains an experimental optional adapter for a separately prepared gated IndicOCR checkout. It is not the primary H.2B.2 benchmark path because it requires separate upstream access/model preparation. It may still be evaluated later for Tamil handwriting, but Tamil HTR must not be claimed until a real labeled Tamil sample is run and measured.
 
+### Recorded TrOCR benchmark result
+
+A real local inference run was completed with:
+
+- engine: `trocr-htr`
+- engine version: `transformers 4.57.6`
+- model: `microsoft/trocr-small-handwritten`
+- category: `handwritten`
+- language: English
+- sample count: 1
+- completed: 1
+- failed: 0
+- CER: `0.0`
+- WER: `0.0`
+- structured-field exact-match accuracy: `1.0`
+- expected survey number: `123/4`
+- observed survey number: `123/4`
+- OCR confidence: `null` by design; no fabricated calibrated confidence is reported
+
+The tested image was a synthetic handwritten-looking line image with ground truth `Survey No. 123/4`. This is valid as a real model-execution smoke benchmark because the pretrained model actually processed the image and the metrics were computed by the benchmark harness, but it is **not** evidence of human-handwritten field-record accuracy. Add at least one genuinely human-written sample before presenting handwriting quality as representative.
+
+Do not generalize this result to Tamil handwriting. The configured TrOCR checkpoint is English-only in this adapter, and Tamil HTR remains unbenchmarked.
+
 ## Remaining H.2B.2 closure
 
 1. Run the new TrOCR unit tests plus the full Document AI suite.\n2. Run the pretrained TrOCR adapter on at least one labeled handwritten English sample and record the actual CER/WER.\n3. Add representative labeled Tamil + English benchmark samples (printed/degraded/mixed-language, plus the handwritten demo).\n4. Evaluate a credible Tamil handwriting model separately before claiming Tamil HTR support.\n5. Decide whether page-derivative/image endpoints are needed beyond the signed immutable-source viewer for the final demo contract.
