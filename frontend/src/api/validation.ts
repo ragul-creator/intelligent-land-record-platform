@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session";
 import {
   ReviewApiError,
   type ReviewSeverity,
@@ -27,8 +28,6 @@ interface Page<T> {
   items: T[];
   page: { limit: number; offset: number; total: number };
 }
-
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem("access_token");
