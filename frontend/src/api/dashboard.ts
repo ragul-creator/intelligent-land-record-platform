@@ -1,6 +1,5 @@
+import { sessionFetch } from "./session";
 import { ApiError } from "./gis";
-
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export interface StatusCount { status: string; count: number; }
 export interface ProjectDashboard {
@@ -15,10 +14,7 @@ export interface ProjectDashboard {
 }
 
 export async function loadProjectDashboard(projectId: string): Promise<ProjectDashboard> {
-  const token = sessionStorage.getItem("access_token");
-  const response = await fetch(`${baseUrl}/api/v1/projects/${projectId}/dashboard`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const response = await sessionFetch(`/projects/${projectId}/dashboard`);
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
     throw new ApiError(response.status, body?.error?.code ?? "DASHBOARD_REQUEST_FAILED", body?.error?.message ?? "Unable to load the project dashboard.");
