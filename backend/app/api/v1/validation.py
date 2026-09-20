@@ -17,7 +17,6 @@ from app.schemas.validation import ValidationRunResponse
 from app.services.project_access import get_project_for_user
 from app.services.validation import (
     VALIDATION_ISSUE_TARGET_TYPE,
-    VALIDATION_ISSUE_TYPES,
     run_validation_checks,
 )
 
