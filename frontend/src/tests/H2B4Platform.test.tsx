@@ -8,6 +8,7 @@ import { AdminPage } from "../pages/AdminPage";
 import { AuditPage } from "../pages/AuditPage";
 import { JobsPage } from "../pages/JobsPage";
 import { HomePage } from "../pages/HomePage";
+import { ExportsPage } from "../pages/ExportsPage";
 import { SearchPage } from "../pages/SearchPage";
 
 function renderRoute(path: string, route: string, element: ReactNode) {
@@ -84,6 +85,29 @@ describe("H.2B.4 platform workspaces", () => {
     await waitFor(() => expect(createBody).not.toBeNull());
     expect(createBody).toEqual({ name: "New cadastral pilot", description: "H.2B.4 fixture" });
     expect(await screen.findByText("New cadastral pilot")).toBeInTheDocument();
+  });
+
+  it("loads evidence-preserving export options", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/projects/project-1/exports")) {
+        return new Response(JSON.stringify({
+          project_id: "project-1",
+          disclaimer: "Draft or unverified data remains explicitly labelled and is not statutory boundary certification.",
+          items: [
+            { code: "RECORDS_CSV", label: "Land-record evidence CSV", path: "/api/v1/projects/project-1/exports/records.csv", media_type: "text/csv", description: "Record evidence." },
+            { code: "PARCELS_GEOJSON", label: "Parcel GeoJSON", path: "/api/v1/projects/project-1/exports/parcels.geojson", media_type: "application/geo+json", description: "Parcel evidence." },
+          ],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response("{}", { status: 404 });
+    }));
+
+    renderRoute("/projects/project-1/exports", "/projects/:projectId/exports", <ExportsPage />);
+    expect(await screen.findByRole("heading", { name: "Land-record evidence CSV" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Parcel GeoJSON" })).toBeInTheDocument();
+    expect(screen.getByText(/not statutory boundary certification/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(2);
   });
 
   it("searches evidence and preserves preliminary labels", async () => {
