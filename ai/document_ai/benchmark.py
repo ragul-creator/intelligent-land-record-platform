@@ -119,6 +119,7 @@ def evaluate_manifest(
             "error": None,
             "character_error_rate": None,
             "word_error_rate": None,
+            "recognized_text": None,
             "field_exact_match": None,
             "field_details": {},
         }
@@ -130,6 +131,7 @@ def evaluate_manifest(
                 allowed_root=root,
             )
             hypothesis = "\n".join(page.text for page in ocr.pages).strip()
+            row["recognized_text"] = hypothesis
             reference = sample.get("ground_truth_text")
             if isinstance(reference, str):
                 cer = character_error_rate(reference, hypothesis)
