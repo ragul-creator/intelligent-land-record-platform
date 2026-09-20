@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { loadCurrentUser } from "../api/gis";
-import { correctDocumentField, loadDocument, loadDocuments, loadFields, processDocument, uploadDocument } from "../api/documents";
+import { correctDocumentField, loadDocument, loadDocumentSourceUrl, loadDocuments, loadFields, processDocument, uploadDocument, type DocumentDetail, type DocumentField } from "../api/documents";
 import { loadDocumentRecordLinks, resolveRecordParcelLink, suggestDocumentRecordLinks, type RecordParcelLink } from "../api/recordLinks";
 
 export function DocumentsPage() {
@@ -28,6 +28,7 @@ export function DocumentsPage() {
   const documents = useQuery({ queryKey: ["documents", projectId], queryFn: () => loadDocuments(projectId!), enabled: Boolean(projectId), retry: false });
   const detail = useQuery({ queryKey: ["document", projectId, selected], queryFn: () => loadDocument(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
   const fields = useQuery({ queryKey: ["document-fields", projectId, selected], queryFn: () => loadFields(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
+  const source = useQuery({ queryKey: ["document-source", projectId, selected], queryFn: () => loadDocumentSourceUrl(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false, staleTime: 8 * 60_000 });
   const links = useQuery({ queryKey: ["record-parcel-links", projectId, selected], queryFn: () => loadDocumentRecordLinks(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
 
   const permissions = user.data?.permissions ?? [];
@@ -72,9 +73,9 @@ export function DocumentsPage() {
           {detail.data.filename.startsWith("tn_demo_") && <p className="demo-fixture-note">Synthetic H.2 evidence snapshot. Upload a new PDF/image when demonstrating live OCR; seeded evidence is kept stable for the judging walkthrough.</p>}
           {!detail.data.filename.startsWith("tn_demo_") && can(detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "document:process" : "document:reprocess") && <button onClick={() => process.mutate(detail.data.status !== "UPLOADED" && detail.data.status !== "FAILED")}>{process.isPending ? "Queuing…" : detail.data.status === "UPLOADED" || detail.data.status === "FAILED" ? "Process" : "Reprocess"}</button>}
 
-          {detail.data.latest_ocr && <section><h3>Preliminary OCR</h3><p>{detail.data.latest_ocr.engine} · {detail.data.latest_ocr.requested_languages.join("+")} · confidence {detail.data.latest_ocr.confidence ?? "unknown"}</p>{detail.data.latest_ocr.payload.pages?.slice(0, 2).map((page, index) => <pre key={index}>{page.text}</pre>)}</section>}
+          <DocumentEvidenceViewer detail={detail.data} sourceUrl={source.data?.source_url ?? null} sourceLoading={source.isLoading} sourceError={source.isError} />
 
-          <section><h3>Extracted fields</h3>{fields.data?.fields.map((field) => <Field key={field.id} field={field} canCorrect={can("field:correct")} onCorrect={(value, reason) => correctDocumentField(projectId, selected!, field.id, value, reason).then(() => client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] }))} />)}</section>
+          <section aria-label="Extracted field evidence"><h3>Extracted fields</h3><p className="panel-note">Every candidate remains linked to its OCR source page and provenance. Low confidence is review evidence, not a legal conclusion.</p>{fields.data?.fields.map((field) => <Field key={field.id} field={field} canCorrect={can("field:correct")} onCorrect={(value, reason) => correctDocumentField(projectId, selected!, field.id, value, reason).then(() => client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] }))} />)}</section>
 
           {detail.data.latest_validation && <section><h3>Validation: {detail.data.latest_validation.status}</h3><p>Persisted validation version {detail.data.latest_validation.version}</p><pre>{JSON.stringify(detail.data.latest_validation.confidence_summary, null, 2)}</pre>{detail.data.latest_validation.report.issues?.map((issue) => <p key={`${issue.code}-${issue.message}`}>{issue.severity}: {issue.message}</p>)}{detail.data.latest_validation.review_task_id && <Link to={`/projects/${projectId}/review`}>Open linked review case</Link>}</section>}
 
@@ -97,6 +98,64 @@ export function DocumentsPage() {
       </section>
     </section>
   </main>;
+}
+
+function formatConfidence(value: number | null) {
+  return value === null ? "unknown" : `${Math.round(value * 100)}%`;
+}
+
+function DocumentEvidenceViewer({ detail, sourceUrl, sourceLoading, sourceError }: {
+  detail: DocumentDetail;
+  sourceUrl: string | null;
+  sourceLoading: boolean;
+  sourceError: boolean;
+}) {
+  const pages = detail.latest_ocr?.payload.pages ?? [];
+  const [activePage, setActivePage] = useState(1);
+  const page = pages.find((item) => item.page_number === activePage) ?? pages[0] ?? null;
+
+  useEffect(() => {
+    setActivePage(pages[0]?.page_number ?? 1);
+  }, [detail.id, detail.latest_ocr?.id]);
+
+  const lowConfidenceRegions = page?.regions.filter((region) => region.confidence !== null && region.confidence < 0.75).length ?? 0;
+  const isPdf = detail.content_type === "application/pdf";
+
+  return <section className="document-evidence" aria-label="Document evidence viewer">
+    <div className="document-evidence-heading">
+      <div><p className="eyebrow">H.2B.2 evidence</p><h3>Source ↔ OCR evidence</h3></div>
+      {detail.latest_ocr && <span>{detail.latest_ocr.engine} · {detail.latest_ocr.requested_languages.join("+")} · {formatConfidence(detail.latest_ocr.confidence)}</span>}
+    </div>
+    <div className="document-evidence-grid">
+      <section className="document-source-pane" aria-label="Immutable source document">
+        <div className="evidence-pane-heading"><strong>Immutable source</strong>{sourceUrl && <a href={sourceUrl} target="_blank" rel="noreferrer">Open source</a>}</div>
+        {sourceLoading && <p>Loading signed source preview…</p>}
+        {sourceError && <p className="error-copy">The private source preview could not be loaded.</p>}
+        {sourceUrl && isPdf && <iframe title="Source document preview" src={sourceUrl} />}
+        {sourceUrl && !isPdf && <img src={sourceUrl} alt={`Source document ${detail.filename}`} />}
+        {!sourceLoading && !sourceError && !sourceUrl && <p>No source preview is available.</p>}
+        <p className="panel-note">The signed URL is temporary. The original object is not modified by OCR, extraction, or correction.</p>
+      </section>
+      <section className="document-ocr-pane" aria-label="OCR evidence">
+        {!detail.latest_ocr && <p>No OCR result is available yet.</p>}
+        {detail.latest_ocr && <>
+          <div className="ocr-page-tabs" aria-label="OCR pages">{pages.map((item) => <button type="button" key={item.page_number} aria-pressed={page?.page_number === item.page_number} onClick={() => setActivePage(item.page_number)}>Page {item.page_number}</button>)}</div>
+          {page && <>
+            <dl className="evidence-metadata">
+              <dt>Page confidence</dt><dd>{formatConfidence(page.confidence)}</dd>
+              <dt>Dimensions</dt><dd>{page.width} × {page.height} px</dd>
+              <dt>Low-confidence tokens</dt><dd>{lowConfidenceRegions}</dd>
+              <dt>Preprocessing</dt><dd>{page.preprocessing.operations.length ? page.preprocessing.operations.join(", ") : "none recorded"}</dd>
+              <dt>Model</dt><dd>{page.model_version ?? detail.latest_ocr.model_version ?? "engine default"}</dd>
+              <dt>Processed</dt><dd>{new Date(page.processed_at).toLocaleString()}</dd>
+            </dl>
+            <pre className="ocr-evidence-text">{page.text || "No text recognized on this page."}</pre>
+            {page.regions.length > 0 && <details><summary>Token evidence ({page.regions.length})</summary><div className="ocr-token-list">{page.regions.slice(0, 60).map((region, index) => <span key={index} className={region.confidence !== null && region.confidence < 0.75 ? "ocr-token low-confidence" : "ocr-token"} title={region.bounding_box ? `bbox ${region.bounding_box.left},${region.bounding_box.top},${region.bounding_box.width},${region.bounding_box.height}` : "No bounding box"}>{region.text} <small>{formatConfidence(region.confidence)}</small></span>)}</div></details>}
+          </>}
+        </>}
+      </section>
+    </div>
+  </section>;
 }
 
 function RecordParcelLinksPanel({ projectId, links, loading, canSuggest, canResolve, validationId, suggesting, resolving, reason, onReason, onSuggest, onResolve }: {
@@ -128,8 +187,23 @@ function RecordParcelLinksPanel({ projectId, links, loading, canSuggest, canReso
   </section>;
 }
 
-function Field({ field, canCorrect, onCorrect }: { field: { field_name: string; original_value: string; normalized_value: unknown; confidence: number | null; corrections: Array<{ corrected_value: string; reason: string }> }; canCorrect: boolean; onCorrect: (value: string, reason: string) => void }) {
+function Field({ field, canCorrect, onCorrect }: { field: DocumentField; canCorrect: boolean; onCorrect: (value: string, reason: string) => void }) {
   const [value, setValue] = useState(field.original_value);
   const [reason, setReason] = useState("");
-  return <article className="document-field"><strong>{field.field_name}</strong><p>Original evidence: {field.original_value}</p><p>Normalized: {typeof field.normalized_value === "string" ? field.normalized_value : JSON.stringify(field.normalized_value)} · confidence {field.confidence ?? "unknown"}</p>{field.corrections.map((item, index) => <p key={index}>Correction: {item.corrected_value} ({item.reason})</p>)}{canCorrect && <><input aria-label={`${field.field_name} corrected value`} value={value} onChange={(event) => setValue(event.target.value)} /><input aria-label={`${field.field_name} correction reason`} placeholder="Reason required" value={reason} onChange={(event) => setReason(event.target.value)} /><button disabled={!value.trim() || !reason.trim()} onClick={() => onCorrect(value, reason)}>Save correction</button></>}</article>;
+  const lowConfidence = field.confidence !== null && field.confidence < 0.75;
+  return <article className={lowConfidence ? "document-field low-confidence-field" : "document-field"}>
+    <div className="document-field-heading"><strong>{field.field_name}</strong>{lowConfidence && <span>LOW CONFIDENCE</span>}</div>
+    <p>Original evidence: {field.original_value}</p>
+    <p>Normalized: {typeof field.normalized_value === "string" ? field.normalized_value : JSON.stringify(field.normalized_value)} · confidence {formatConfidence(field.confidence)}</p>
+    <dl className="field-provenance">
+      <dt>Page</dt><dd>{field.page_number}</dd>
+      <dt>Source</dt><dd>{field.source_id}</dd>
+      <dt>Bounding box</dt><dd>{field.bounding_box ? `${field.bounding_box.left}, ${field.bounding_box.top}, ${field.bounding_box.width}, ${field.bounding_box.height}` : "not available"}</dd>
+      <dt>OCR model</dt><dd>{field.model_version ?? "not supplied"}</dd>
+      <dt>Extractor</dt><dd>{field.extractor_version}</dd>
+      <dt>Processed</dt><dd>{new Date(field.processed_at).toLocaleString()}</dd>
+    </dl>
+    {field.corrections.map((item, index) => <p key={index}>Correction: {item.corrected_value} ({item.reason})</p>)}
+    {canCorrect && <><input aria-label={`${field.field_name} corrected value`} value={value} onChange={(event) => setValue(event.target.value)} /><input aria-label={`${field.field_name} correction reason`} placeholder="Reason required" value={reason} onChange={(event) => setReason(event.target.value)} /><button disabled={!value.trim() || !reason.trim()} onClick={() => onCorrect(value, reason)}>Save correction</button></>}
+  </article>;
 }
