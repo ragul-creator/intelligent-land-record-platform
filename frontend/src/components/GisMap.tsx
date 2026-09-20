@@ -182,20 +182,19 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
     const map = mapRef.current;
     if (!map) return;
 
-    const longitude =
-      imageryPreview.corners.reduce((sum, corner) => sum + corner[0], 0) /
-      imageryPreview.corners.length;
-
-    const latitude =
-      imageryPreview.corners.reduce((sum, corner) => sum + corner[1], 0) /
-      imageryPreview.corners.length;
-
-    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return;
+    const bounds = imageryPreview.corners.reduce(
+      (result, corner) => result.extend(corner),
+      new maplibregl.LngLatBounds(
+        imageryPreview.corners[0],
+        imageryPreview.corners[0],
+      ),
+    );
 
     map.stop();
-    map.jumpTo({
-      center: [longitude, latitude],
-      zoom: 18,
+    map.fitBounds(bounds, {
+      padding: 48,
+      maxZoom: 17,
+      duration: 500,
     });
   }, [imageryZoomRequest, imageryPreview]);
   return <div className="gis-map" ref={container} aria-label="Project cadastral map" data-testid="gis-map" data-parcel-count={data.parcels.features.length} data-building-count={data.buildings.features.length} />;
