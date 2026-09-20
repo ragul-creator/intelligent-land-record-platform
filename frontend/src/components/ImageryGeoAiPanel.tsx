@@ -37,9 +37,23 @@ export function ImageryGeoAiPanel({
     assets.find((asset) => asset.metadata.registration_status === "READY") ??
     null;
 
+  useEffect(() => {
+    if (selectedId && assets.some((asset) => asset.id === selectedId)) return;
+    const fallback =
+      assets.find(
+        (asset) =>
+          Boolean(asset.file_id) &&
+          asset.metadata.registration_status === "READY",
+      ) ??
+      assets.find((asset) => Boolean(asset.file_id)) ??
+      null;
+    if (fallback?.id !== selectedId) setSelectedId(fallback?.id ?? null);
+  }, [assets, selectedId]);
+
   const upload = useMutation({
     mutationFn: (file: File) => uploadAndRegisterImagery(projectId, file),
-    onSuccess: async () => {
+    onSuccess: async (createdAsset) => {
+      setSelectedId(createdAsset.id);
       setMessage("GeoTIFF uploaded privately and queued for registration.");
       await onChanged();
     },
@@ -97,8 +111,23 @@ export function ImageryGeoAiPanel({
   });
 
   useEffect(() => {
-    onPreview(preview.data ?? null);
-  }, [onPreview, preview.data]);
+    if (preview.data) {
+      onPreview(preview.data);
+      return;
+    }
+    if (
+      !selected ||
+      !hasPrivateFile ||
+      selected.metadata.registration_status !== "READY"
+    ) {
+      onPreview(null);
+    }
+  }, [
+    hasPrivateFile,
+    onPreview,
+    preview.data,
+    selected,
+  ]);
 
   useEffect(() => {
     if (!job.data) return;
@@ -114,10 +143,15 @@ export function ImageryGeoAiPanel({
     }
 
     if (job.data.status === "COMPLETED") {
-      setMessage("Building processing completed. Map layers refreshed.");
+      setMessage("Building processing completed. Refreshing imagery and map layers...");
       setActiveJobId(null);
-      onZoomToImagery();
-      void onChanged();
+      void (async () => {
+        await onChanged();
+        const refreshedPreview = await preview.refetch();
+        if (refreshedPreview.data) onPreview(refreshedPreview.data);
+        setMessage("Building processing completed. Imagery and map layers refreshed.");
+        onZoomToImagery();
+      })();
       return;
     }
 
@@ -125,7 +159,7 @@ export function ImageryGeoAiPanel({
       setMessage("Building processing failed.");
       setActiveJobId(null);
     }
-  }, [job.data, onChanged, onZoomToImagery]);
+  }, [job.data, onChanged, onPreview, onZoomToImagery, preview]);
 
   return (
     <section className="imagery-panel" aria-label="Imagery and GeoAI controls">
