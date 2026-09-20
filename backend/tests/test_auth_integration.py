@@ -94,6 +94,10 @@ def test_authentication_refresh_rotation_logout_and_inactive_denial() -> None:
     assert client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {rotated.json()['refresh_token']}"}).status_code == 401
     assert client.post("/api/v1/auth/logout", json={"refresh_token": rotated.json()["refresh_token"]}).status_code == 204
     assert client.post("/api/v1/auth/refresh", json={"refresh_token": rotated.json()["refresh_token"]}).status_code == 401
+    assert client.get(
+        "/api/v1/users/me",
+        headers={"Authorization": f"Bearer {rotated.json()['access_token']}"},
+    ).status_code == 401
     with SessionLocal() as session:
         actions = set(session.scalars(select(AuditLog.action)))
         assert {"auth.login_success", "auth.login_failure", "auth.refresh_rotated", "auth.logout"} <= actions
