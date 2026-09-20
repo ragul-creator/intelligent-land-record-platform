@@ -285,6 +285,6 @@ describe("H.2B.4 platform workspaces", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save project" }));
 
     await waitFor(() => expect(patchBody).not.toBeNull());
-    expect(patchBody?.state).toBe("ACTIVE");
+    expect((patchBody as { state?: string } | null)?.state).toBe("ACTIVE");
   });
 });
