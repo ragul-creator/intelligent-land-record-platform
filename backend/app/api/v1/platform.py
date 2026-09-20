@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, user_permissions
 from app.core.database import get_db_session
 from app.models import (
     Document,
@@ -71,6 +71,7 @@ def search_project(
     user: User = Depends(get_current_user),
 ) -> ProjectSearchResponse:
     project = get_project_for_user(session, user, project_id, "project:read")
+    permissions = user_permissions(session, user.id)
     query = q.strip()
     pattern = f"%{query}%"
     items: list[ProjectSearchItem] = []
@@ -121,7 +122,7 @@ def search_project(
                 )
             )
 
-    if len(items) < limit:
+    if len(items) < limit and "field:read" in permissions:
         field_rows = session.execute(
             select(DocumentExtractedField, Document, File)
             .join(Document, Document.id == DocumentExtractedField.document_id)
@@ -154,7 +155,7 @@ def search_project(
             if len(items) >= limit:
                 break
 
-    if len(items) < limit:
+    if len(items) < limit and "field:read" in permissions:
         correction_rows = session.execute(
             select(DocumentFieldCorrection, DocumentExtractedField, Document, File)
             .join(
@@ -228,6 +229,7 @@ def export_records_csv(
     user: User = Depends(get_current_user),
 ) -> Response:
     project = get_project_for_user(session, user, project_id, "export:read")
+    permissions = user_permissions(session, user.id)
     output = io.StringIO(newline="")
     columns = [
         "document_id",
@@ -255,7 +257,10 @@ def export_records_csv(
         ocr = _latest_ocr(session, document.id)
         validation = _latest_validation(session, document.id)
         values: dict[str, str] = {}
-        if ocr is not None:
+        can_export_field_values = "field:read" in permissions or (
+            document.status == "VALIDATED" and "record:read" in permissions
+        )
+        if ocr is not None and can_export_field_values:
             fields = list(
                 session.scalars(
                     select(DocumentExtractedField)
