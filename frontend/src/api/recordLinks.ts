@@ -1,6 +1,5 @@
+import { sessionFetch } from "./session";
 import { ApiError } from "./gis";
-
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export type RecordParcelLinkStatus = "SUGGESTED" | "REVIEW_REQUIRED" | "CONFIRMED" | "REJECTED";
 export type RecordParcelLinkMethod = "EXACT_SURVEY_IDENTIFIER" | "ATTRIBUTE_MATCH" | "SPATIAL_CONTEXT" | "MANUAL";
