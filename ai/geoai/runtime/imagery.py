@@ -10,6 +10,7 @@ import rasterio
 from affine import Affine
 from PIL import Image
 from pyproj import CRS, Transformer
+from rasterio.features import bounds as feature_bounds, rasterize, shapes
 from rasterio.transform import array_bounds
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
@@ -63,12 +64,55 @@ def _wgs84_corners_from_preview(transform: Affine, width: int, height: int) -> l
     return [list(transformer.transform(x, y)) for x, y in projected_corners]
 
 
+def _edge_connected_bright_background(rgb: np.ndarray, valid: np.ndarray) -> np.ndarray:
+    """Detect bright, neutral preview pixels connected to the raster border.
+
+    Some orthomosaics encode areas outside the flown footprint as ordinary white pixels
+    instead of GeoTIFF NoData. Restrict the fallback to near-white, low-chroma regions
+    connected to an image edge so isolated bright roofs/objects remain visible.
+    """
+    if rgb.ndim != 3 or rgb.shape[2] < 3:
+        return np.zeros(valid.shape, dtype=bool)
+
+    minimum = rgb[:, :, :3].min(axis=2)
+    maximum = rgb[:, :, :3].max(axis=2)
+    candidate = valid & (minimum >= 248) & ((maximum - minimum) <= 6)
+    if not candidate.any():
+        return np.zeros(valid.shape, dtype=bool)
+
+    height, width = candidate.shape
+    edge_geometries: list[dict[str, object]] = []
+    for geometry, value in shapes(
+        candidate.astype(np.uint8),
+        mask=candidate,
+        connectivity=8,
+        transform=Affine.identity(),
+    ):
+        if int(value) != 1:
+            continue
+        left, bottom, right, top = feature_bounds(geometry)
+        if left <= 0 or bottom <= 0 or right >= width or top >= height:
+            edge_geometries.append(geometry)
+
+    if not edge_geometries:
+        return np.zeros(valid.shape, dtype=bool)
+
+    return rasterize(
+        edge_geometries,
+        out_shape=candidate.shape,
+        transform=Affine.identity(),
+        fill=0,
+        default_value=1,
+        dtype="uint8",
+    ).astype(bool)
+
+
 def _preview_png(
     path: Path,
     *,
     maximum_dimension: int = 2048,
-) -> tuple[bytes, list[list[float]], int, int]:
-    """Warp a GeoTIFF to Web Mercator and render an RGBA PNG with transparent NoData."""
+) -> tuple[bytes, list[list[float]], int, int, bool]:
+    """Warp a GeoTIFF to Web Mercator and render an RGBA PNG with transparent background."""
     with rasterio.open(path) as dataset:
         transform, out_width, out_height = _preview_geometry(
             dataset,
@@ -110,12 +154,17 @@ def _preview_png(
         while len(channels) < 3:
             channels.append(channels[-1])
 
-        rgba = np.dstack([*channels[:3], alpha])
+        rgb = np.dstack(channels[:3])
+        edge_background = _edge_connected_bright_background(rgb, valid)
+        if edge_background.any():
+            alpha[edge_background] = 0
+
+        rgba = np.dstack([rgb, alpha])
         image = Image.fromarray(rgba, mode="RGBA")
         output = BytesIO()
         image.save(output, format="PNG", optimize=True)
         corners = _wgs84_corners_from_preview(transform, out_width, out_height)
-        return output.getvalue(), corners, out_width, out_height
+        return output.getvalue(), corners, out_width, out_height, bool(edge_background.any())
 
 
 def inspect_and_render_preview(path: str | Path) -> tuple[dict[str, object], bytes, list[list[float]]]:
@@ -126,13 +175,14 @@ def inspect_and_render_preview(path: str | Path) -> tuple[dict[str, object], byt
         crs = CRS.from_user_input(dataset.crs)
         metadata["source_crs"] = f"EPSG:{crs.to_epsg()}" if crs.to_epsg() else crs.to_wkt()
 
-    preview, corners, preview_width, preview_height = _preview_png(source)
+    preview, corners, preview_width, preview_height, edge_background_removed = _preview_png(source)
     metadata.update(
         {
             "preview_crs": WEB_MERCATOR,
             "preview_width": preview_width,
             "preview_height": preview_height,
             "preview_has_alpha": True,
+            "preview_edge_background_removed": edge_background_removed,
         }
     )
     return metadata, preview, corners
