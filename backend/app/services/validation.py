@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from app.audit.service import record_audit
 from app.models import (
     Document,
-    DocumentExtractedField,
     DocumentValidationResultRecord,
     Parcel,
     ParcelGeometryVersion,
