@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.audit.service import record_audit
 from app.core.auth import get_current_user, user_permissions
 from app.core.database import get_db_session
 from app.models import (
@@ -289,6 +290,16 @@ def export_records_csv(
                 ),
             }
         )
+    record_audit(
+        session,
+        "project.export_records_csv",
+        "project",
+        project.id,
+        actor_id=user.id,
+        project_id=project.id,
+        metadata={"document_count": len(documents)},
+    )
+    session.commit()
     return Response(
         content=output.getvalue(),
         media_type="text/csv; charset=utf-8",
@@ -335,6 +346,16 @@ def export_parcels_geojson(
                 },
             }
         )
+    record_audit(
+        session,
+        "project.export_parcels_geojson",
+        "project",
+        project.id,
+        actor_id=user.id,
+        project_id=project.id,
+        metadata={"feature_count": len(features)},
+    )
+    session.commit()
     return JSONResponse(
         content={
             "type": "FeatureCollection",
