@@ -1,6 +1,12 @@
 import { ApiError, type CurrentUser } from "./gis";
-
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+import {
+  apiBaseUrl,
+  clearSessionTokens,
+  hasStoredSession,
+  sessionFetch,
+  storeSessionTokens,
+  type SessionTokens,
+} from "./session";
 
 export interface ProjectSummary {
   id: string;
@@ -12,63 +18,48 @@ export interface ProjectSummary {
   updated_at: string;
 }
 
-interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  access_expires_in_seconds: number;
-  refresh_expires_in_seconds: number;
-}
-
-async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = sessionStorage.getItem("access_token");
-  const response = await fetch(`${baseUrl}/api/v1${path}`, {
-    ...init,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
-    throw new ApiError(response.status, body?.error?.code ?? "REQUEST_FAILED", body?.error?.message ?? "Request failed.");
-  }
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+async function parseError(response: Response): Promise<ApiError> {
+  const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
+  return new ApiError(
+    response.status,
+    body?.error?.code ?? "REQUEST_FAILED",
+    body?.error?.message ?? "Request failed.",
+  );
 }
 
 export async function login(identifier: string, password: string): Promise<void> {
-  const tokens = await jsonRequest<TokenResponse>("/auth/login", {
+  const response = await fetch(`${apiBaseUrl()}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ identifier, password }),
   });
-  sessionStorage.setItem("access_token", tokens.access_token);
-  sessionStorage.setItem("refresh_token", tokens.refresh_token);
+  if (!response.ok) throw await parseError(response);
+  storeSessionTokens(await response.json() as SessionTokens);
 }
 
 export async function logout(): Promise<void> {
   const refreshToken = sessionStorage.getItem("refresh_token");
   try {
     if (refreshToken) {
-      await jsonRequest<void>("/auth/logout", {
+      await fetch(`${apiBaseUrl()}/api/v1/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
     }
   } finally {
-    sessionStorage.removeItem("access_token");
-    sessionStorage.removeItem("refresh_token");
+    clearSessionTokens();
   }
 }
 
-export function loadProjects(): Promise<{ items: ProjectSummary[] }> {
-  return jsonRequest<{ items: ProjectSummary[] }>("/projects?state=ACTIVE&limit=100");
+export async function loadProjects(): Promise<{ items: ProjectSummary[] }> {
+  const response = await sessionFetch("/projects?state=ACTIVE&limit=100");
+  if (!response.ok) throw await parseError(response);
+  return response.json() as Promise<{ items: ProjectSummary[] }>;
 }
 
 export function hasSession(): boolean {
-  return Boolean(sessionStorage.getItem("access_token"));
+  return hasStoredSession();
 }
 
 export type { CurrentUser };
