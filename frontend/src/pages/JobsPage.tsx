@@ -8,7 +8,8 @@ const statuses: Array<ProcessingJobStatus | "ALL"> = ["ALL", "QUEUED", "PROCESSI
 
 function canRetryJob(job: ProcessingJob, permissions: string[]): boolean {
   if (!job.retryable) return false;
-  if (job.job_type.startsWith("DOCUMENT_")) return permissions.includes("document:reprocess");
+  if (job.job_type === "DOCUMENT_REVALIDATE") return permissions.includes("field:correct");
+  if (job.job_type === "DOCUMENT_AI_PROCESS") return permissions.includes("document:reprocess");
   if (job.job_type === "IMAGERY_REGISTER") return permissions.includes("imagery:upload");
   return permissions.includes("geoai:process");
 }
