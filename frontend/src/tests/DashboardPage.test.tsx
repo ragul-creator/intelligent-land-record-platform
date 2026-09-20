@@ -41,7 +41,7 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("link", { name: "Search" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Jobs" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Exports" })).toBeInTheDocument();
-    expect(screen.getByText("Validation issues")).toBeInTheDocument();
+    expect(screen.getAllByText("Validation issues").length).toBeGreaterThan(0);
   });
 
   it("keeps viewer navigation read-only and hides review workspace", async () => {
