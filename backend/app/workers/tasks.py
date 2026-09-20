@@ -27,7 +27,7 @@ def process_file_registration(self, job_id: str) -> None:
         if job is None or job.status != "QUEUED":
             return
         try:
-            job.retry_count = self.request.retries
+            job.retry_count = max(job.retry_count or 0, self.request.retries)
             mark_job_processing(session, job)
             record_audit(session, "processing_job.started", "processing_job", job.id, project_id=job.project_id)
             session.commit()
@@ -59,7 +59,7 @@ def process_geoai_parcel_import(self, geoai_job_id: str) -> None:
         if geoai_job is None or processing_job is None or processing_job.status != "QUEUED":
             return
         try:
-            processing_job.retry_count = self.request.retries
+            processing_job.retry_count = max(processing_job.retry_count or 0, self.request.retries)
             mark_job_processing(session, processing_job)
             record_audit(session, "geoai.job_processing", "geoai_job", geoai_job.id, project_id=geoai_job.project_id)
             session.commit()
