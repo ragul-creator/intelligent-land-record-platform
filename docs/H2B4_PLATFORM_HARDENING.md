@@ -53,7 +53,7 @@ Owner membership remains protected from role change/removal. User discovery is e
 
 ## Session hardening
 
-The backend already used revocable, rotating refresh sessions. H.2B.4 completes the browser-side workflow.
+The backend already used revocable, rotating refresh sessions. H.2B.4 completes the browser-side workflow and binds newly issued access tokens to the same persisted auth session, so refresh rotation or logout invalidates the associated access token immediately rather than waiting only for JWT expiry.
 
 The frontend now:
 
