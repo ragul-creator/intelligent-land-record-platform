@@ -108,26 +108,29 @@ The earlier `IndicOcrHtrEngine` remains an experimental optional adapter for a s
 
 ### Recorded TrOCR benchmark result
 
-A real local inference run was completed with:
+A real local two-sample inference run was completed with:
 
 - engine: `trocr-htr`
 - engine version: `transformers 4.57.6`
 - model: `microsoft/trocr-small-handwritten`
 - category: `handwritten`
 - language: English
-- sample count: 1
-- completed: 1
+- sample count: 2
+- completed: 2
 - failed: 0
-- CER: `0.0`
-- WER: `0.0`
-- structured-field exact-match accuracy: `1.0`
-- expected survey number: `123/4`
-- observed survey number: `123/4`
+- mean CER: `0.3`
+- mean WER: `0.5`
+- structured-field exact-match accuracy: `1.0` across one labeled structured field
 - OCR confidence: `null` by design; no fabricated calibrated confidence is reported
 
-The tested image was a synthetic handwritten-looking line image with ground truth `Survey No. 123/4`. This is valid as a real model-execution smoke benchmark because the pretrained model actually processed the image and the metrics were computed by the benchmark harness, but it is **not** evidence of human-handwritten field-record accuracy. Add at least one genuinely human-written sample before presenting handwriting quality as representative.
+Per-sample results:
 
-Do not generalize this result to Tamil handwriting. The configured TrOCR checkpoint is English-only in this adapter, and Tamil HTR remains unbenchmarked.
+- Synthetic handwritten-looking line, ground truth `Survey No. 123/4`: CER `0.0`, WER `0.0`, survey-number exact match `1.0`.
+- Genuine human-written line, ground truth `Ragul`: CER `0.6`, WER `1.0`. This is a recorded failure case and shows that the pretrained checkpoint does not reliably recognize this handwriting style.
+
+The synthetic sample demonstrates that the adapter and structured-field path execute end to end. The human-written sample is stronger evidence of actual handwriting behavior and must not be hidden by the perfect synthetic result. These two samples are still too small to claim representative handwriting accuracy.
+
+Do not generalize these results to Tamil handwriting. The configured TrOCR checkpoint is English-only in this adapter, and Tamil HTR remains unbenchmarked.
 
 ## Remaining H.2B.2 closure
 
