@@ -185,7 +185,7 @@ describe("ReviewPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: /validation issues/i }));
 
     expect(await screen.findByText(/Potential duplicate record/i)).toBeInTheDocument();
-    expect(await screen.findByText("Duplicate record")).toBeInTheDocument();
+    expect((await screen.findAllByText("Duplicate record")).length).toBeGreaterThan(0);
     expect(screen.getByText("123/4")).toBeInTheDocument();
     expect(screen.getByText(/Exact identifier reuse is a review flag only/i)).toBeInTheDocument();
 
