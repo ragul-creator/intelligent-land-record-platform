@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { applyBasemapVisibility } from "../components/GisMap";
+import { applyBasemapVisibility, applyOverlayVisibility } from "../components/GisMap";
 
 function mapWithBasemapLayers() {
   return {
@@ -38,5 +38,27 @@ describe("applyBasemapVisibility", () => {
 
     expect(map.setLayoutProperty).toHaveBeenCalledWith("street-basemap", "visibility", "none");
     expect(map.setLayoutProperty).toHaveBeenCalledWith("satellite-basemap", "visibility", "none");
+  });
+
+  it("hides unchecked GIS overlay layers", () => {
+    const map = {
+      getLayer: vi.fn(() => ({})),
+      setLayoutProperty: vi.fn(),
+    };
+
+    applyOverlayVisibility(map as never, {
+      basemap: true,
+      parcels: true,
+      buildings: false,
+      roads: false,
+      landUse: false,
+      topology: false,
+    });
+
+    expect(map.setLayoutProperty).toHaveBeenCalledWith("buildings-fill", "visibility", "none");
+    expect(map.setLayoutProperty).toHaveBeenCalledWith("roads-line", "visibility", "none");
+    expect(map.setLayoutProperty).toHaveBeenCalledWith("land-use-fill", "visibility", "none");
+    expect(map.setLayoutProperty).toHaveBeenCalledWith("topology-outline", "visibility", "none");
+    expect(map.setLayoutProperty).toHaveBeenCalledWith("parcels-fill", "visibility", "visible");
   });
 });
