@@ -52,14 +52,29 @@ Do not commit private land records, benchmark source images, or generated report
 
 ## HTR status
 
-The current default runtime remains pretrained Tesseract for printed Tamil + English. The benchmark harness accepts any engine implementing the existing `OcrEngine` protocol, so a pretrained handwriting engine can be evaluated without changing the evidence or extraction contracts.
+The default asynchronous runtime remains pretrained Tesseract for printed Tamil + English. An optional `IndicOcrHtrEngine` adapter now targets a separately prepared local checkout of Bodhan AI / AI4Bharat IndicOCR. The upstream model card documents printed recognition for English plus 22 Indian languages and handwriting recognition for English plus 12 Indian languages, including Tamil. Its handwriting quality is explicitly described upstream as work in progress.
 
-A real handwriting model is **not yet wired into the asynchronous backend worker** in this slice. Until that integration is completed and benchmarked, handwritten pages must not be presented as production-quality HTR. Low/unknown-confidence handwriting should remain review-required.
+The adapter is deliberately lazy:
+- it does not download gated weights;
+- it does not add heavyweight model dependencies to the default backend image;
+- it refuses requested handwriting languages outside the upstream documented set instead of silently falling back;
+- upstream block `conf` is layout-detection confidence, so this platform does **not** relabel it as OCR/transcription confidence. HTR recognition confidence remains `null` unless the recognizer exposes a genuine transcription confidence.
+
+The real model is **not yet the default asynchronous backend engine**. Until the model is locally installed, a labeled handwritten sample is run through it, and the resulting CER/WER is recorded, handwritten pages must not be presented as benchmarked production-quality HTR.
+
+After accepting the upstream model access/license terms separately and preparing its local checkout, benchmark with:
+
+```powershell
+python -m ai.document_ai.benchmark data\benchmarks\document_ai\manifest.json `
+  --engine indic-ocr `
+  --model-path "<LOCAL_INDIC_OCR_CHECKOUT>" `
+  --output data\processed\document_ai\indic-ocr-benchmark.json
+```
 
 ## Remaining H.2B.2 closure
 
 1. Run the new frontend and Document AI tests.
-2. Add a real pretrained HTR adapter and benchmark it on at least one labeled handwritten demo sample.
-3. Add representative labeled Tamil + English benchmark samples (printed/degraded/mixed-language, plus the handwritten demo where the chosen model supports it).
+2. Prepare the optional IndicOCR model locally and benchmark it on at least one labeled handwritten Tamil or English demo sample.
+3. Add representative labeled Tamil + English benchmark samples (printed/degraded/mixed-language, plus the handwritten demo).
 4. Record actual CER/WER and field exact-match numbers; do not invent benchmark results.
 5. Decide whether page-derivative/image endpoints are needed beyond the signed immutable-source viewer for the final demo contract.
