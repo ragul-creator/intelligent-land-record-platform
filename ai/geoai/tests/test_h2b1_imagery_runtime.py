@@ -9,7 +9,7 @@ from ai.geoai.runtime.imagery import inspect_and_render_preview
 from ai.geoai.parcels.acquisition import create_parcel
 
 
-def _write_geotiff(path: Path) -> None:
+def _write_geotiff(path: Path, *, with_nodata_hole: bool = False) -> None:
     profile = {
         "driver": "GTiff",
         "width": 8,
@@ -22,7 +22,10 @@ def _write_geotiff(path: Path) -> None:
     }
     with rasterio.open(path, "w", **profile) as dataset:
         for index in range(1, 4):
-            dataset.write(np.full((6, 8), 25 * index, dtype=np.uint8), index)
+            values = np.full((6, 8), 25 * index, dtype=np.uint8)
+            if with_nodata_hole:
+                values[:2, :3] = 0
+            dataset.write(values, index)
 
 
 def test_private_preview_preserves_inspected_georeferencing_without_copying_source(tmp_path: Path) -> None:
@@ -34,16 +37,35 @@ def test_private_preview_preserves_inspected_georeferencing_without_copying_sour
     assert metadata["source_crs"] == "EPSG:32643"
     assert metadata["width"] == 8 and metadata["height"] == 6
     assert metadata["transform"]["c"] == 500_000
+    assert metadata["preview_crs"] == "EPSG:3857"
+    assert metadata["preview_has_alpha"] is True
+    assert metadata["preview_width"] > 0 and metadata["preview_height"] > 0
+    assert max(metadata["preview_width"], metadata["preview_height"]) <= 2048
     assert len(corners) == 4
     assert all(-180 <= longitude <= 180 and -90 <= latitude <= 90 for longitude, latitude in corners)
     preview_path = tmp_path / "preview.png"
     preview_path.write_bytes(preview)
     with Image.open(preview_path) as image:
-        assert image.mode == "RGB"
-        assert image.size == (8, 6)
+        assert image.mode == "RGBA"
+        assert image.size == (metadata["preview_width"], metadata["preview_height"])
+        assert image.getchannel("A").getextrema() == (255, 255)
     with rasterio.open(source) as dataset:
         assert dataset.crs.to_epsg() == 32643
         assert dataset.transform.c == 500_000
+
+
+def test_private_preview_makes_source_nodata_transparent(tmp_path: Path) -> None:
+    source = tmp_path / "masked.tif"
+    _write_geotiff(source, with_nodata_hole=True)
+
+    _, preview, _ = inspect_and_render_preview(source)
+
+    preview_path = tmp_path / "masked-preview.png"
+    preview_path.write_bytes(preview)
+    with Image.open(preview_path) as image:
+        alpha_min, alpha_max = image.getchannel("A").getextrema()
+        assert alpha_min == 0
+        assert alpha_max == 255
 
 
 def test_human_drawn_parcel_stays_a_draft_without_a_source_identifier() -> None:
