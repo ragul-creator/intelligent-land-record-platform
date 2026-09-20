@@ -133,7 +133,7 @@ Results include the workflow status and a `preliminary` flag. Viewer accounts th
 
 `GET /api/v1/projects/{project_id}/exports` returns the export manifest for users with `export:read`.
 
-Two evidence-preserving exports are provided:
+Two evidence-preserving exports are provided. Export generation is recorded in the project audit trail with only sanitized count metadata:
 
 ### Land-record evidence CSV
 
