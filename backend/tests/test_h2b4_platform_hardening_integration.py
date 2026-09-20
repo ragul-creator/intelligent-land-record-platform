@@ -18,6 +18,7 @@ from app.models import (
     AuditLog,
     Document,
     DocumentExtractedField,
+    DocumentFieldCorrection,
     DocumentOcrResultRecord,
     DocumentProcessingJob,
     File,
@@ -128,19 +129,29 @@ def _seed_project(session):
     )
     session.add(ocr)
     session.flush()
+    field = DocumentExtractedField(
+        document_id=document.id,
+        ocr_result_id=ocr.id,
+        candidate_index=0,
+        field_name="survey_number",
+        original_value="123/4",
+        normalized_value_json="123/4",
+        confidence=0.91,
+        page_number=1,
+        source_id=str(document.id),
+        extractor_version="h2b4-fixture",
+        processed_at=datetime.now(UTC),
+    )
+    session.add(field)
+    session.flush()
     session.add(
-        DocumentExtractedField(
+        DocumentFieldCorrection(
             document_id=document.id,
-            ocr_result_id=ocr.id,
-            candidate_index=0,
-            field_name="survey_number",
-            original_value="123/4",
-            normalized_value_json="123/4",
-            confidence=0.91,
-            page_number=1,
-            source_id=str(document.id),
-            extractor_version="h2b4-fixture",
-            processed_at=datetime.now(UTC),
+            extracted_field_id=field.id,
+            version=1,
+            corrected_value="123/4A",
+            reason="Verified against source evidence",
+            created_by_user_id=officer.id,
         )
     )
 
@@ -238,6 +249,16 @@ def test_h2b4_search_exports_dashboard_viewer_policy_and_job_recovery(monkeypatc
     assert {item["kind"] for item in search_items} >= {"DOCUMENT", "PARCEL", "FIELD"}
     assert all(item["preliminary"] for item in search_items)
 
+    corrected_search = client.get(
+        f"/api/v1/projects/{ids['project_id']}/search?q=123%2F4A",
+        headers=viewer_headers,
+    )
+    assert corrected_search.status_code == 200
+    assert any(
+        item["kind"] == "FIELD" and item["matched_value"] == "123/4A"
+        for item in corrected_search.json()["items"]
+    )
+
     dashboard = client.get(
         f"/api/v1/projects/{ids['project_id']}/dashboard",
         headers=viewer_headers,
@@ -254,7 +275,7 @@ def test_h2b4_search_exports_dashboard_viewer_policy_and_job_recovery(monkeypatc
         headers=viewer_headers,
     )
     assert records.status_code == 200
-    assert "123/4" in records.text
+    assert "123/4A" in records.text
     assert "not statutory ownership proof" in records.text
 
     parcels = client.get(
