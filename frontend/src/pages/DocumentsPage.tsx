@@ -26,7 +26,16 @@ export function DocumentsPage() {
 
   const user = useQuery({ queryKey: ["current-user"], queryFn: loadCurrentUser, retry: false });
   const documents = useQuery({ queryKey: ["documents", projectId], queryFn: () => loadDocuments(projectId!), enabled: Boolean(projectId), retry: false });
-  const detail = useQuery({ queryKey: ["document", projectId, selected], queryFn: () => loadDocument(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
+  const detail = useQuery({
+    queryKey: ["document", projectId, selected],
+    queryFn: () => loadDocument(projectId!, selected!),
+    enabled: Boolean(projectId && selected),
+    retry: false,
+    refetchInterval: (query) => {
+      const status = (query.state.data as DocumentDetail | undefined)?.status;
+      return status && ["QUEUED", "PROCESSING", "EXTRACTED", "VALIDATING"].includes(status) ? 1200 : false;
+    },
+  });
   const fields = useQuery({ queryKey: ["document-fields", projectId, selected], queryFn: () => loadFields(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
   const source = useQuery({ queryKey: ["document-source", projectId, selected], queryFn: () => loadDocumentSourceUrl(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false, staleTime: 8 * 60_000 });
   const links = useQuery({ queryKey: ["record-parcel-links", projectId, selected], queryFn: () => loadDocumentRecordLinks(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
@@ -37,6 +46,14 @@ export function DocumentsPage() {
   const viewerReadOnly = projectMembership?.role === "VIEWER";
   const can = (permission: string) => Boolean(membership && permissions.includes(permission));
   const refreshDocuments = () => client.invalidateQueries({ queryKey: ["documents", projectId] });
+  const refreshDocumentEvidence = async () => {
+    await Promise.all([
+      refreshDocuments(),
+      client.invalidateQueries({ queryKey: ["document", projectId, selected] }),
+      client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] }),
+      client.invalidateQueries({ queryKey: ["project-dashboard", projectId] }),
+    ]);
+  };
   const refreshLinks = async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["record-parcel-links", projectId, selected] }),
@@ -45,7 +62,7 @@ export function DocumentsPage() {
   };
 
   const upload = useMutation({ mutationFn: () => uploadDocument(projectId!, file!), onSuccess: async (item) => { chooseDocument(item.id); setFile(undefined); await refreshDocuments(); } });
-  const process = useMutation({ mutationFn: (reprocess: boolean) => processDocument(projectId!, selected!, reprocess), onSuccess: refreshDocuments });
+  const process = useMutation({ mutationFn: (reprocess: boolean) => processDocument(projectId!, selected!, reprocess), onSuccess: refreshDocumentEvidence });
   const suggest = useMutation({
     mutationFn: () => suggestDocumentRecordLinks(projectId!, selected!, detail.data!.latest_validation!.id),
     onSuccess: refreshLinks,
@@ -54,6 +71,11 @@ export function DocumentsPage() {
     mutationFn: ({ link, action }: { link: RecordParcelLink; action: "confirm" | "reject" }) => resolveRecordParcelLink(projectId!, link.id, action, resolutionReason),
     onSuccess: async () => { setResolutionReason(""); await refreshLinks(); },
   });
+
+  useEffect(() => {
+    if (!detail.data?.latest_ocr?.id || !projectId || !selected) return;
+    void client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] });
+  }, [client, detail.data?.latest_ocr?.id, projectId, selected]);
 
   if (!projectId) return <main className="app-shell"><h1>Documents route unavailable</h1></main>;
 
@@ -79,7 +101,14 @@ export function DocumentsPage() {
 
           <DocumentEvidenceViewer detail={detail.data} sourceUrl={source.data?.source_url ?? null} sourceLoading={source.isLoading} sourceError={source.isError} />
 
-          <section aria-label="Extracted field evidence"><h3>Extracted fields</h3><p className="panel-note">Every candidate remains linked to its OCR source page and provenance. Low confidence is review evidence, not a legal conclusion.</p>{fields.data?.fields.map((field) => <Field key={field.id} field={field} canCorrect={can("field:correct")} onCorrect={(value, reason) => correctDocumentField(projectId, selected!, field.id, value, reason).then(() => client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] }))} />)}</section>
+          <section aria-label="Extracted field evidence">
+            <h3>Structured land-record fields</h3>
+            <p className="panel-note">The system extracts labelled values from OCR into structured fields while keeping every value linked to the source evidence. These values remain preliminary until human review/validation.</p>
+            {fields.isLoading && <p>Extracting structured fields…</p>}
+            {!fields.isLoading && (fields.data?.fields.length ?? 0) === 0 && <p className="structured-empty">{["QUEUED", "PROCESSING", "EXTRACTED", "VALIDATING"].includes(detail.data.status) ? "OCR/extraction is still running. This section updates automatically." : "No label-grounded structured fields were extracted from this OCR result. Review the OCR evidence or reprocess the document."}</p>}
+            {(fields.data?.fields.length ?? 0) > 0 && <StructuredRecord fields={fields.data!.fields} />}
+            {fields.data?.fields.map((field) => <Field key={field.id} field={field} canCorrect={can("field:correct")} onCorrect={(value, reason) => correctDocumentField(projectId, selected!, field.id, value, reason).then(() => client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] }))} />)}
+          </section>
 
           {detail.data.latest_validation && <section><h3>Validation: {detail.data.latest_validation.status}</h3><p>Persisted validation version {detail.data.latest_validation.version}</p><pre>{JSON.stringify(detail.data.latest_validation.confidence_summary, null, 2)}</pre>{detail.data.latest_validation.report.issues?.map((issue) => <p key={`${issue.code}-${issue.message}`}>{issue.severity}: {issue.message}</p>)}{detail.data.latest_validation.review_task_id && <Link to={`/projects/${projectId}/review`}>Open linked review case</Link>}</section>}
 
@@ -106,6 +135,46 @@ export function DocumentsPage() {
 
 function formatConfidence(value: number | null) {
   return value === null ? "unknown" : `${Math.round(value * 100)}%`;
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  survey_number: "Survey number",
+  khasra_number: "Khasra number",
+  khata_number: "Khata number",
+  owner_details: "Owner",
+  plot_area: "Plot area",
+  village: "Village",
+  tehsil: "Tehsil / Taluk",
+  district: "District",
+  land_classification: "Land classification",
+  mutation_records: "Mutation records",
+  registration_information: "Registration information",
+};
+
+function structuredValue(field: DocumentField) {
+  const corrected = field.corrections.at(-1)?.corrected_value;
+  if (corrected) return corrected;
+  if (typeof field.normalized_value === "string") return field.normalized_value;
+  if (field.normalized_value && typeof field.normalized_value === "object") {
+    const area = field.normalized_value as { value?: number | string; unit?: string };
+    if (area.value !== undefined && area.unit) return `${area.value} ${area.unit.replaceAll("_", " ")}`;
+    return JSON.stringify(field.normalized_value);
+  }
+  return field.original_value;
+}
+
+function StructuredRecord({ fields }: { fields: DocumentField[] }) {
+  return <div className="structured-record" aria-label="Structured record summary">
+    <table>
+      <thead><tr><th>Field</th><th>Extracted value</th><th>Confidence</th><th>Evidence</th></tr></thead>
+      <tbody>{fields.map((field) => <tr key={field.id} className={field.confidence !== null && field.confidence < 0.75 ? "structured-low-confidence" : undefined}>
+        <th scope="row">{FIELD_LABELS[field.field_name] ?? field.field_name.replaceAll("_", " ")}</th>
+        <td>{structuredValue(field)}</td>
+        <td>{formatConfidence(field.confidence)}</td>
+        <td>Page {field.page_number}</td>
+      </tr>)}</tbody>
+    </table>
+  </div>;
 }
 
 function DocumentEvidenceViewer({ detail, sourceUrl, sourceLoading, sourceError }: {
