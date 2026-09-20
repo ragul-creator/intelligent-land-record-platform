@@ -12,7 +12,6 @@ import sys
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
-from statistics import fmean
 from typing import Any, Callable, Protocol
 
 from PIL import Image
@@ -85,22 +84,20 @@ class IndicOcrHtrEngine:
             text = str(block.get("text") or "").strip()
             if not text:
                 continue
-            confidence = _normalise_confidence(block.get("conf"))
             bbox = _bounding_box(block.get("bbox_xyxy"))
             regions.append(
                 OcrRegion(
                     text=text,
-                    confidence=confidence,
+                    confidence=None,
                     bounding_box=bbox,
                     kind=str(block.get("type") or block.get("label") or "block"),
                 )
             )
             text_parts.append(text)
 
-        confidences = [region.confidence for region in regions if region.confidence is not None]
         return EnginePageResult(
             text="\n".join(text_parts),
-            confidence=fmean(confidences) if confidences else None,
+            confidence=None,
             regions=tuple(regions),
             engine=self.name,
             engine_version=_package_version(),
@@ -132,16 +129,6 @@ class IndicOcrHtrEngine:
                 "inside an isolated environment and point this adapter at the prepared model checkout."
             ) from error
         return self._parser
-
-
-def _normalise_confidence(value: object) -> float | None:
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError):
-        return None
-    if not 0.0 <= numeric <= 1.0:
-        return None
-    return numeric
 
 
 def _bounding_box(value: object) -> BoundingBox | None:
