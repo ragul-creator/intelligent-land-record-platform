@@ -135,7 +135,8 @@ def retry_processing_job(
     geoai_job = session.get(GeoAIJob, job.id)
 
     if document_job is not None:
-        get_project_for_user(session, user, job.project_id, "document:reprocess")
+        recovery_permission = "field:correct" if document_job.job_type == "DOCUMENT_REVALIDATE" else "document:reprocess"
+        get_project_for_user(session, user, job.project_id, recovery_permission)
         document = session.get(Document, document_job.document_id)
         if document is None or document.project_id != job.project_id:
             raise not_found("DOCUMENT_NOT_FOUND", "The document for this processing job was not found.")
