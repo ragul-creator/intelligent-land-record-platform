@@ -246,12 +246,13 @@ def test_h2b4_search_exports_dashboard_viewer_policy_and_job_recovery(monkeypatc
     )
     assert search_response.status_code == 200
     search_items = search_response.json()["items"]
-    assert {item["kind"] for item in search_items} >= {"DOCUMENT", "PARCEL", "FIELD"}
+    assert {item["kind"] for item in search_items} >= {"DOCUMENT", "PARCEL"}
+    assert "FIELD" not in {item["kind"] for item in search_items}
     assert all(item["preliminary"] for item in search_items)
 
     corrected_search = client.get(
         f"/api/v1/projects/{ids['project_id']}/search?q=123%2F4A",
-        headers=viewer_headers,
+        headers=officer_headers,
     )
     assert corrected_search.status_code == 200
     assert any(
@@ -275,8 +276,15 @@ def test_h2b4_search_exports_dashboard_viewer_policy_and_job_recovery(monkeypatc
         headers=viewer_headers,
     )
     assert records.status_code == 200
-    assert "123/4A" in records.text
+    assert "123/4A" not in records.text
     assert "not statutory ownership proof" in records.text
+
+    officer_records = client.get(
+        f"/api/v1/projects/{ids['project_id']}/exports/records.csv",
+        headers=officer_headers,
+    )
+    assert officer_records.status_code == 200
+    assert "123/4A" in officer_records.text
 
     parcels = client.get(
         f"/api/v1/projects/{ids['project_id']}/exports/parcels.geojson",
