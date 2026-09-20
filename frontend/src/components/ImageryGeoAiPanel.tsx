@@ -159,7 +159,7 @@ export function ImageryGeoAiPanel({
       setMessage("Building processing failed.");
       setActiveJobId(null);
     }
-  }, [job.data, onChanged, onPreview, onZoomToImagery, preview]);
+  }, [job.data, onChanged, onPreview, onZoomToImagery, preview.refetch]);
 
   return (
     <section className="imagery-panel" aria-label="Imagery and GeoAI controls">
