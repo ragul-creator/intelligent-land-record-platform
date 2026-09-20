@@ -132,6 +132,29 @@ The synthetic sample demonstrates that the adapter and structured-field path exe
 
 Do not generalize these results to Tamil handwriting. The configured TrOCR checkpoint is English-only in this adapter, and Tamil HTR remains unbenchmarked.
 
+### Recorded Tesseract benchmark coverage
+
+A Docker-based benchmark run completed all five remaining labeled synthetic categories with no runtime failures. The container includes both English and Tamil Tesseract traineddata, so the mixed Tamil + English sample was evaluated with `tam+eng` instead of falling back to English.
+
+Aggregate results for these five samples:
+
+- sample count: `5`
+- completed: `5`
+- failed: `0`
+- mean CER: `0.32221191472798993`
+- mean WER: `0.30166666666666664`
+- structured-field exact-match accuracy: `0.6666666666666666` across three labeled fields
+
+Per-category results:
+
+- Printed clean: CER `0.04838709677419355`, WER `0.0`, survey-number exact match `1.0`.
+- Faded/degraded: CER `0.04597701149425287`, WER `0.0`.
+- Mixed Tamil + English: CER `0.38596491228070173`, WER `0.3`, survey-number exact match `1.0`. Tamil text quality was visibly poor even though the structured survey number survived.
+- Tabular: CER `0.8843537414965986`, WER `0.875`, survey-number exact match `0.0`. Plain page-level Tesseract recognized only the title, so this is an explicit table-layout failure case.
+- Damaged/noisy: CER `0.2463768115942029`, WER `0.3333333333333333`. The sample lost part of the content and misread punctuation in `Owner Name:`.
+
+These fixtures are synthetic labeled benchmark images created specifically to exercise the required categories. They are useful for deterministic MVP regression evidence, but they are not a substitute for a broader representative real-world document benchmark.
+
 ## Remaining H.2B.2 closure
 
 1. Run the new TrOCR unit tests plus the full Document AI suite.\n2. Run the pretrained TrOCR adapter on at least one labeled handwritten English sample and record the actual CER/WER.\n3. Add representative labeled Tamil + English benchmark samples (printed/degraded/mixed-language, plus the handwritten demo).\n4. Evaluate a credible Tamil handwriting model separately before claiming Tamil HTR support.\n5. Decide whether page-derivative/image endpoints are needed beyond the signed immutable-source viewer for the final demo contract.
