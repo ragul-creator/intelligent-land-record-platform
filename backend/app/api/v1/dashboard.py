@@ -56,7 +56,8 @@ def get_project_dashboard(
     open_filters = (ReviewTask.project_id == project.id, ReviewTask.status == "OPEN")
     open_reviews = session.scalar(select(func.count(ReviewTask.id)).where(*open_filters)) or 0
     document_reviews = session.scalar(select(func.count(ReviewTask.id)).where(
-        *open_filters, ReviewTask.queue_type == "DOCUMENT", ReviewTask.target_type != "RECORD_PARCEL_LINK"
+        *open_filters, ReviewTask.queue_type == "DOCUMENT",
+        ReviewTask.target_type.notin_(("RECORD_PARCEL_LINK", "VALIDATION_ISSUE")),
     )) or 0
     gis_reviews = session.scalar(select(func.count(ReviewTask.id)).where(*open_filters, ReviewTask.queue_type == "GIS")) or 0
     link_reviews = session.scalar(select(func.count(ReviewTask.id)).where(
