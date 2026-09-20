@@ -126,7 +126,7 @@ A real local two-sample inference run was completed with:
 Per-sample results:
 
 - Synthetic handwritten-looking line, ground truth `Survey No. 123/4`: CER `0.0`, WER `0.0`, survey-number exact match `1.0`.
-- Genuine human-written line, ground truth `Ragul`: CER `0.6`, WER `1.0`. This is a recorded failure case and shows that the pretrained checkpoint does not reliably recognize this handwriting style.
+- Genuine human-written line, ground truth `Ragul`, recognized as `Royal`: CER `0.6`, WER `1.0`. This is a recorded failure case and shows that the pretrained checkpoint does not reliably recognize this handwriting style.
 
 The synthetic sample demonstrates that the adapter and structured-field path execute end to end. The human-written sample is stronger evidence of actual handwriting behavior and must not be hidden by the perfect synthetic result. These two samples are still too small to claim representative handwriting accuracy.
 
