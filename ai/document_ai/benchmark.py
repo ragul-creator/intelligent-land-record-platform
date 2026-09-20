@@ -184,8 +184,28 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate labeled Document AI OCR/HTR samples.")
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--engine",
+        choices=("tesseract", "indic-ocr"),
+        default="tesseract",
+        help="Recognition engine. IndicOCR requires a prepared local gated-model checkout.",
+    )
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        help="Local IndicOCR checkout/model path after separately accepting the upstream access terms.",
+    )
     args = parser.parse_args()
-    report = evaluate_manifest(args.manifest)
+
+    engine = None
+    if args.engine == "indic-ocr":
+        if args.model_path is None:
+            parser.error("--model-path is required when --engine indic-ocr is selected.")
+        from ai.document_ai.ocr.indic_ocr_htr import IndicOcrHtrEngine
+
+        engine = IndicOcrHtrEngine(model_path=args.model_path)
+
+    report = evaluate_manifest(args.manifest, engine=engine)
     serialized = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
