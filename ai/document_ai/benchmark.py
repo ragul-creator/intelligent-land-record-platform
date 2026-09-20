@@ -77,7 +77,7 @@ def evaluate_manifest(
 
     manifest_path = Path(manifest_path).expanduser().resolve()
     root = manifest_path.parent
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     if isinstance(payload, list):
         samples = payload
     elif isinstance(payload, dict):
