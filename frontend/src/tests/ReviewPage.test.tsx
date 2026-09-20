@@ -11,7 +11,7 @@ const currentUser = {
   email: "reviewer@example.invalid",
   full_name: "Reviewer",
   roles: ["REVIEWER"],
-  permissions: ["project:read", "review:read", "review:act", "geo:read"],
+  permissions: ["project:read", "review:read", "review:act", "validation:run", "geo:read"],
   project_memberships: [{ project_id: "project-1", role: "REVIEWER" }],
 };
 
@@ -50,6 +50,25 @@ const gisTask = {
   blocking_issue_count: 1,
 };
 
+const validationTask = {
+  ...documentTask,
+  id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+  target_type: "VALIDATION_ISSUE",
+  target_id: "ffffffff-ffff-ffff-ffff-ffffffffffff",
+  severity: "HIGH",
+  summary: "Potential duplicate record: 2 validated documents share identifier 123/4.",
+  source_refs: [
+    "document:doc-1:field:field-1:page:1",
+    "document:doc-2:field:field-2:page:1",
+  ],
+  metadata: {
+    validation_issue_type: "DUPLICATE_RECORD",
+    normalized_identifier: "123/4",
+    document_count: 2,
+    interpretation: "Exact identifier reuse is a review flag only.",
+  },
+};
+
 const detail = {
   ...documentTask,
   history: [
@@ -68,6 +87,22 @@ function installFetch(user = currentUser) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/users/me")) return new Response(JSON.stringify(user), { status: 200 });
+
+
+    if (init?.method === "POST" && url.includes("/validation/run")) {
+      return new Response(JSON.stringify({
+        created_count: 1,
+        refreshed_count: 0,
+        open_issue_count: 1,
+        duplicate_record_issue_count: 1,
+        area_mismatch_issue_count: 0,
+        items: [validationTask],
+      }), { status: 201 });
+    }
+
+    if (url.includes("/validation/issues?")) {
+      return new Response(JSON.stringify(page([validationTask])), { status: 200 });
+    }
 
     if (init?.method === "PATCH" && url.includes("/review/tasks/")) {
       const body = JSON.parse(String(init.body)) as { action?: string; reason?: string; assignee_user_id?: string };
@@ -91,6 +126,10 @@ function installFetch(user = currentUser) {
       return new Response(JSON.stringify({ ...gisTask, history: detail.history }), { status: 200 });
     }
 
+
+    if (url.includes(`/review/tasks/${validationTask.id}`)) {
+      return new Response(JSON.stringify({ ...validationTask, history: detail.history }), { status: 200 });
+    }
     if (url.includes(`/review/tasks/${documentTask.id}`)) {
       return new Response(JSON.stringify(detail), { status: 200 });
     }
@@ -136,6 +175,28 @@ describe("ReviewPage", () => {
     expect(await screen.findByText("parcel-version:2")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /inspect project gis evidence/i })).toHaveAttribute("href", "/projects/project-1/gis");
     expect(screen.getByText(/approval is blocked/i)).toBeInTheDocument();
+  });
+
+  it("shows validation issues and can run the H.2B.3 checks", async () => {
+    installFetch();
+    renderPage();
+    await screen.findByText("Survey number requires verification");
+
+    fireEvent.click(screen.getByRole("tab", { name: /validation issues/i }));
+
+    expect(await screen.findByText(/Potential duplicate record/i)).toBeInTheDocument();
+    expect((await screen.findAllByText("Duplicate record")).length).toBeGreaterThan(0);
+    expect(screen.getByText("123/4")).toBeInTheDocument();
+    expect((await screen.findAllByText(/Exact identifier reuse is a review flag only/i)).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /run validation checks/i }));
+
+    expect(await screen.findByText(/Validation completed: 1 new, 0 refreshed, 1 open/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(vi.mocked(fetch).mock.calls.some(([input, init]) =>
+        String(input).includes("/validation/run") && init?.method === "POST",
+      )).toBe(true);
+    });
   });
 
   it("applies a reviewer comment and refreshes audit/status data", async () => {

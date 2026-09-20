@@ -14,9 +14,15 @@ import {
   type ReviewTask,
   type ReviewTaskStatus,
 } from "../api/review";
+import {
+  loadValidationIssues,
+  runValidationChecks,
+  type ValidationIssueType,
+} from "../api/validation";
 
 const severityOrder: ReviewSeverity[] = ["INFO", "LOW", "MEDIUM", "HIGH"];
 const actionOptions: ReviewAction[] = ["APPROVE", "CORRECT", "REJECT", "REPROCESS", "COMMENT", "ESCALATE"];
+type WorkspaceMode = ReviewQueueType | "VALIDATION";
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Not available";
@@ -24,6 +30,12 @@ function formatDate(value: string | null) {
 
 function metadataEntries(metadata: Record<string, unknown>) {
   return Object.entries(metadata).filter(([, value]) => value !== null && value !== undefined);
+}
+
+function validationIssueLabel(metadata: Record<string, unknown>) {
+  if (metadata.validation_issue_type === "DUPLICATE_RECORD") return "Duplicate record";
+  if (metadata.validation_issue_type === "AREA_MISMATCH") return "Area mismatch";
+  return "Validation issue";
 }
 
 function TaskListItem({ task, selected, onSelect }: { task: ReviewTask; selected: boolean; onSelect: () => void }) {
@@ -34,7 +46,9 @@ function TaskListItem({ task, selected, onSelect }: { task: ReviewTask; selected
         <span>{task.status}</span>
       </span>
       <span className="review-task-summary">{task.summary}</span>
-      <span className="review-task-meta">{task.target_type} · {task.target_id}</span>
+      <span className="review-task-meta">
+        {task.target_type === "VALIDATION_ISSUE" ? validationIssueLabel(task.metadata) : task.target_type} · {task.target_id}
+      </span>
       <span className="review-task-meta">{task.assignee_user_id ? "Assigned" : "Unassigned"}{task.escalated ? " · Escalated" : ""}</span>
     </button>
   );
@@ -58,9 +72,10 @@ function History({ history }: { history: Array<{ action: string; actor_id: strin
 export function ReviewPage() {
   const { projectId } = useParams();
   const queryClient = useQueryClient();
-  const [queueType, setQueueType] = useState<ReviewQueueType>("DOCUMENT");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("DOCUMENT");
   const [taskStatus, setTaskStatus] = useState<ReviewTaskStatus | "ALL">("OPEN");
   const [severity, setSeverity] = useState<ReviewSeverity | "ALL">("ALL");
+  const [issueType, setIssueType] = useState<ValidationIssueType | "ALL">("ALL");
   const [assignedToMe, setAssignedToMe] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [action, setAction] = useState<ReviewAction>("COMMENT");
@@ -69,6 +84,7 @@ export function ReviewPage() {
   const [reprocessJobId, setReprocessJobId] = useState("");
   const [assigneeUserId, setAssigneeUserId] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [validationMessage, setValidationMessage] = useState("");
 
   const currentUser = useQuery({
     queryKey: ["current-user"],
@@ -82,23 +98,44 @@ export function ReviewPage() {
   );
   const canRead = Boolean(currentUser.data?.permissions?.includes("review:read") && membership);
   const canAct = Boolean(currentUser.data?.permissions?.includes("review:act") && membership);
+  const canRunValidation = Boolean(currentUser.data?.permissions?.includes("validation:run") && membership);
 
-  const filters = useMemo(() => ({
-    queueType,
+  const assigneeUserIdFilter = assignedToMe ? currentUser.data?.id : undefined;
+  const reviewFilters = useMemo(() => ({
+    queueType: (workspaceMode === "GIS" ? "GIS" : "DOCUMENT") as ReviewQueueType,
     status: taskStatus,
     severity,
-    assigneeUserId: assignedToMe ? currentUser.data?.id : undefined,
-  }), [queueType, taskStatus, severity, assignedToMe, currentUser.data?.id]);
+    assigneeUserId: assigneeUserIdFilter,
+  }), [workspaceMode, taskStatus, severity, assigneeUserIdFilter]);
 
-  const tasks = useQuery({
-    queryKey: ["review-tasks", projectId, filters],
-    queryFn: () => loadReviewTasks(projectId!, filters),
-    enabled: Boolean(projectId && currentUser.data && canRead),
+  const validationFilters = useMemo(() => ({
+    status: taskStatus,
+    severity,
+    issueType,
+    assigneeUserId: assigneeUserIdFilter,
+  }), [taskStatus, severity, issueType, assigneeUserIdFilter]);
+
+  const reviewTasks = useQuery({
+    queryKey: ["review-tasks", projectId, reviewFilters],
+    queryFn: () => loadReviewTasks(projectId!, reviewFilters),
+    enabled: Boolean(projectId && currentUser.data && canRead && workspaceMode !== "VALIDATION"),
     retry: false,
   });
 
+  const validationIssues = useQuery({
+    queryKey: ["validation-issues", projectId, validationFilters],
+    queryFn: () => loadValidationIssues(projectId!, validationFilters),
+    enabled: Boolean(projectId && currentUser.data && canRead && workspaceMode === "VALIDATION"),
+    retry: false,
+  });
+
+  const activeData = workspaceMode === "VALIDATION" ? validationIssues.data : reviewTasks.data;
+  const activeLoading = workspaceMode === "VALIDATION" ? validationIssues.isLoading : reviewTasks.isLoading;
+  const activeFetching = workspaceMode === "VALIDATION" ? validationIssues.isFetching : reviewTasks.isFetching;
+  const activeError = (workspaceMode === "VALIDATION" ? validationIssues.error : reviewTasks.error) as ReviewApiError | null;
+
   useEffect(() => {
-    const items = tasks.data?.items ?? [];
+    const items = activeData?.items ?? [];
     if (!items.length) {
       setSelectedTaskId(null);
       return;
@@ -106,7 +143,7 @@ export function ReviewPage() {
     if (!selectedTaskId || !items.some((item) => item.id === selectedTaskId)) {
       setSelectedTaskId(items[0].id);
     }
-  }, [tasks.data, selectedTaskId]);
+  }, [activeData, selectedTaskId]);
 
   const detail = useQuery({
     queryKey: ["review-task", selectedTaskId],
@@ -123,25 +160,45 @@ export function ReviewPage() {
     setSuccessMessage("");
   }, [selectedTaskId, action]);
 
+  useEffect(() => {
+    setValidationMessage("");
+  }, [workspaceMode]);
+
   const mutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateReviewTask>[1]) => updateReviewTask(selectedTaskId!, payload),
     onSuccess: async (updated, payload) => {
       queryClient.setQueryData(["review-task", updated.id], updated);
       setSuccessMessage(payload.action ? `${payload.action} recorded successfully.` : "Assignment updated successfully.");
-      await queryClient.invalidateQueries({ queryKey: ["review-tasks", projectId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["review-tasks", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["validation-issues", projectId] }),
+      ]);
+    },
+  });
+
+  const validationRun = useMutation({
+    mutationFn: () => runValidationChecks(projectId!),
+    onSuccess: async (result) => {
+      setValidationMessage(
+        `Validation completed: ${result.created_count} new, ${result.refreshed_count} refreshed, ${result.open_issue_count} open.`,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["validation-issues", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["review-tasks", projectId] }),
+      ]);
     },
   });
 
   if (!projectId) return <main className="review-state"><h1>Review workspace unavailable</h1></main>;
 
   if (currentUser.isLoading) {
-    return <main className="review-state"><p className="eyebrow">Human verification · E.3</p><h1>Loading reviewer access…</h1></main>;
+    return <main className="review-state"><p className="eyebrow">Human verification · H.2B.3</p><h1>Loading reviewer access…</h1></main>;
   }
 
   if (currentUser.isError || !canRead) {
     return (
       <main className="review-state">
-        <p className="eyebrow">Human verification · E.3</p>
+        <p className="eyebrow">Human verification · H.2B.3</p>
         <h1>Review workspace unavailable</h1>
         <p>You need project membership and the <code>review:read</code> permission to open this workspace.</p>
         <Link to="/">Return to platform</Link>
@@ -151,7 +208,7 @@ export function ReviewPage() {
 
   const selected = detail.data;
   const mutationError = mutation.error as ReviewApiError | null;
-  const listError = tasks.error as ReviewApiError | null;
+  const validationRunError = validationRun.error as ReviewApiError | null;
   const detailError = detail.error as ReviewApiError | null;
 
   const submitAction = () => {
@@ -171,6 +228,14 @@ export function ReviewPage() {
     mutation.mutate({ assignee_user_id: currentUser.data.id });
   };
 
+  const refreshActive = () => {
+    if (workspaceMode === "VALIDATION") {
+      validationIssues.refetch();
+    } else {
+      reviewTasks.refetch();
+    }
+  };
+
   const actionNeedsReason = ["CORRECT", "REJECT", "REPROCESS", "COMMENT", "ESCALATE"].includes(action);
   const actionReady =
     action === "APPROVE"
@@ -183,11 +248,14 @@ export function ReviewPage() {
             ? Boolean(reason.trim() && assigneeUserId.trim())
             : Boolean(reason.trim());
 
+  const panelTitle = workspaceMode === "VALIDATION" ? "Validation issues" : "Cases";
+  const panelEyebrow = workspaceMode === "VALIDATION" ? "Cross-record checks" : `${workspaceMode} queue`;
+
   return (
     <main className="review-shell">
       <header className="review-header">
         <div>
-          <p className="eyebrow">Human verification · E.3</p>
+          <p className="eyebrow">Human verification · H.2B.3</p>
           <h1>Review workspace</h1>
           <p>Project: {projectId}</p>
         </div>
@@ -201,9 +269,20 @@ export function ReviewPage() {
 
       <section className="review-toolbar" aria-label="Review filters">
         <div className="review-tabs" role="tablist" aria-label="Review queue">
-          {(["DOCUMENT", "GIS"] as ReviewQueueType[]).map((item) => (
-            <button key={item} type="button" role="tab" aria-selected={queueType === item} className={queueType === item ? "active" : ""} onClick={() => setQueueType(item)}>
-              {item === "DOCUMENT" ? "Document review" : "GIS review"}
+          {([
+            ["DOCUMENT", "Document review"],
+            ["GIS", "GIS review"],
+            ["VALIDATION", "Validation issues"],
+          ] as Array<[WorkspaceMode, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={workspaceMode === value}
+              className={workspaceMode === value ? "active" : ""}
+              onClick={() => setWorkspaceMode(value)}
+            >
+              {label}
             </button>
           ))}
         </div>
@@ -220,21 +299,46 @@ export function ReviewPage() {
             {severityOrder.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
+        {workspaceMode === "VALIDATION" && <label>Issue type
+          <select value={issueType} onChange={(event) => setIssueType(event.target.value as ValidationIssueType | "ALL")}>
+            <option value="ALL">All</option>
+            <option value="DUPLICATE_RECORD">Duplicate record</option>
+            <option value="AREA_MISMATCH">Area mismatch</option>
+          </select>
+        </label>}
         <label className="review-checkbox"><input type="checkbox" checked={assignedToMe} onChange={(event) => setAssignedToMe(event.target.checked)} /> Assigned to me</label>
-        <button type="button" onClick={() => tasks.refetch()} disabled={tasks.isFetching}>{tasks.isFetching ? "Refreshing…" : "Refresh queue"}</button>
+        {workspaceMode === "VALIDATION" && canRunValidation && (
+          <button
+            type="button"
+            className="primary-action"
+            onClick={() => validationRun.mutate()}
+            disabled={validationRun.isPending}
+          >
+            {validationRun.isPending ? "Running checks…" : "Run validation checks"}
+          </button>
+        )}
+        <button type="button" onClick={refreshActive} disabled={activeFetching}>{activeFetching ? "Refreshing…" : "Refresh queue"}</button>
       </section>
+
+      {workspaceMode === "VALIDATION" && (
+        <section aria-live="polite">
+          {validationMessage && <div className="review-success">{validationMessage}</div>}
+          {validationRunError && <div className="review-error" role="alert">{validationRunError.message}</div>}
+          {!canRunValidation && <p className="review-muted">You can review existing validation issues, but running checks requires <code>validation:run</code>.</p>}
+        </section>
+      )}
 
       <section className="review-workspace">
         <aside className="review-list-panel" aria-label="Review tasks">
           <div className="review-panel-heading">
-            <div><p className="eyebrow">{queueType} queue</p><h2>Cases</h2></div>
-            <span>{tasks.data?.page.total ?? 0}</span>
+            <div><p className="eyebrow">{panelEyebrow}</p><h2>{panelTitle}</h2></div>
+            <span>{activeData?.page.total ?? 0}</span>
           </div>
-          {tasks.isLoading && <p className="review-muted">Loading review cases…</p>}
-          {listError && <div className="review-error" role="alert">{listError.message}</div>}
-          {tasks.data?.items.length === 0 && <p className="review-muted">No cases match the current filters.</p>}
+          {activeLoading && <p className="review-muted">Loading review cases…</p>}
+          {activeError && <div className="review-error" role="alert">{activeError.message}</div>}
+          {activeData?.items.length === 0 && <p className="review-muted">No cases match the current filters.</p>}
           <div className="review-task-list">
-            {tasks.data?.items.map((task) => <TaskListItem key={task.id} task={task} selected={task.id === selectedTaskId} onSelect={() => setSelectedTaskId(task.id)} />)}
+            {activeData?.items.map((task) => <TaskListItem key={task.id} task={task} selected={task.id === selectedTaskId} onSelect={() => setSelectedTaskId(task.id)} />)}
           </div>
         </aside>
 
@@ -245,7 +349,7 @@ export function ReviewPage() {
           {selected && <>
             <div className="review-detail-heading">
               <div>
-                <p className="eyebrow">{selected.queue_type} review case</p>
+                <p className="eyebrow">{selected.target_type === "VALIDATION_ISSUE" ? "Validation issue" : `${selected.queue_type} review case`}</p>
                 <h2>{selected.summary}</h2>
               </div>
               <div className="review-badges">
@@ -254,6 +358,17 @@ export function ReviewPage() {
                 {selected.escalated && <span>ESCALATED</span>}
               </div>
             </div>
+
+            {selected.target_type === "VALIDATION_ISSUE" && (
+              <div className="review-warning">
+                <strong>{validationIssueLabel(selected.metadata)}</strong>
+                <p>
+                  {typeof selected.metadata.interpretation === "string"
+                    ? selected.metadata.interpretation
+                    : "This automated check is a review flag, not a legal determination."}
+                </p>
+              </div>
+            )}
 
             <div className="review-columns">
               <section className="review-evidence">
@@ -268,6 +383,12 @@ export function ReviewPage() {
                 </dl>
 
                 {selected.queue_type === "GIS" && <p><Link to={`/projects/${projectId}/gis`}>Inspect project GIS evidence</Link></p>}
+                {selected.target_type === "VALIDATION_ISSUE" && (
+                  <p>
+                    <Link to={`/projects/${projectId}/documents`}>Inspect document evidence</Link>
+                    {selected.metadata.validation_issue_type === "AREA_MISMATCH" && <> · <Link to={`/projects/${projectId}/gis`}>Inspect parcel geometry</Link></>}
+                  </p>
+                )}
 
                 <h3>Source references</h3>
                 {selected.source_refs.length ? <ul className="review-source-list">{selected.source_refs.map((source) => <li key={source}>{source}</li>)}</ul> : <p className="review-muted">No source reference was attached to this case.</p>}
@@ -321,7 +442,7 @@ export function ReviewPage() {
           </>}
         </section>
       </section>
-      <p className="review-disclaimer">Verification in this workspace records the platform review decision. It does not by itself constitute statutory approval or a legal determination of ownership.</p>
+      <p className="review-disclaimer">Validation and verification in this workspace record platform review decisions. They do not by themselves constitute statutory approval, prove duplicate legal records, or determine ownership or parcel boundaries.</p>
     </main>
   );
 }
