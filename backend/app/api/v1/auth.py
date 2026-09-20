@@ -5,7 +5,7 @@ import hmac
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.core.auth import (
     create_refresh_token,
     decode_token,
     get_current_user,
+    require_permission,
     token_digest,
     user_permissions,
     user_roles,
@@ -23,7 +24,7 @@ from app.core.auth import (
 )
 from app.core.config import get_settings
 from app.core.database import get_db_session
-from app.models import AuthSession, ProjectMember, User
+from app.models import AuthSession, ProjectMember, Role, User, UserRole
 from app.schemas.auth import (
     CurrentUserResponse,
     LoginRequest,
@@ -31,6 +32,8 @@ from app.schemas.auth import (
     ProjectMembershipResponse,
     RefreshRequest,
     TokenResponse,
+    UserDirectoryItem,
+    UserDirectoryResponse,
 )
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -169,4 +172,61 @@ def get_current_user_profile(
             ProjectMembershipResponse(project_id=membership.project_id, role=membership.role)
             for membership in memberships
         ],
+    )
+
+
+@users_router.get("", response_model=UserDirectoryResponse)
+def list_users(
+    q: str | None = Query(default=None, min_length=2, max_length=255),
+    active: bool | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_db_session),
+    _: User = Depends(require_permission("user:manage")),
+) -> UserDirectoryResponse:
+    filters = []
+    if active is not None:
+        filters.append(User.is_active == active)
+    if q:
+        needle = f"%{q.strip().lower()}%"
+        filters.append(
+            or_(
+                func.lower(User.login_id).like(needle),
+                func.lower(User.email).like(needle),
+                func.lower(User.full_name).like(needle),
+            )
+        )
+    total = session.scalar(select(func.count(User.id)).where(*filters)) or 0
+    users = list(
+        session.scalars(
+            select(User)
+            .where(*filters)
+            .order_by(User.full_name, User.login_id)
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    items = []
+    for item in users:
+        roles = list(
+            session.scalars(
+                select(Role.name)
+                .join(UserRole, UserRole.role_id == Role.id)
+                .where(UserRole.user_id == item.id)
+                .order_by(Role.name)
+            )
+        )
+        items.append(
+            UserDirectoryItem(
+                id=item.id,
+                login_id=item.login_id,
+                email=item.email,
+                full_name=item.full_name,
+                is_active=item.is_active,
+                roles=roles,
+            )
+        )
+    return UserDirectoryResponse(
+        items=items,
+        page={"limit": limit, "offset": offset, "total": total},
     )
