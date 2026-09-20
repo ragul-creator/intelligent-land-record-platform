@@ -154,6 +154,42 @@ def search_project(
             if len(items) >= limit:
                 break
 
+    if len(items) < limit:
+        correction_rows = session.execute(
+            select(DocumentFieldCorrection, DocumentExtractedField, Document, File)
+            .join(
+                DocumentExtractedField,
+                DocumentExtractedField.id == DocumentFieldCorrection.extracted_field_id,
+            )
+            .join(Document, Document.id == DocumentFieldCorrection.document_id)
+            .join(File, File.id == Document.file_id)
+            .where(
+                Document.project_id == project.id,
+                DocumentFieldCorrection.corrected_value.ilike(pattern),
+            )
+            .order_by(Document.updated_at.desc(), DocumentFieldCorrection.version.desc())
+            .limit(limit - len(items))
+        ).all()
+        existing_evidence = {item.evidence_id for item in items if item.evidence_id is not None}
+        for correction, field, document, source in correction_rows:
+            if field.id in existing_evidence:
+                continue
+            items.append(
+                ProjectSearchItem(
+                    kind="FIELD",
+                    id=document.id,
+                    evidence_id=field.id,
+                    title=f"{field.field_name.replace('_', ' ').title()}: {correction.corrected_value}",
+                    subtitle=f"{source.original_name} · human correction v{correction.version}",
+                    status=document.status,
+                    matched_value=correction.corrected_value,
+                    preliminary=document.status != "VALIDATED",
+                )
+            )
+            existing_evidence.add(field.id)
+            if len(items) >= limit:
+                break
+
     return ProjectSearchResponse(query=query, items=items, total=len(items))
 
 
