@@ -1,0 +1,37 @@
+{
+  "name": "intelligent-land-record-blockchain",
+  "version": "1.0.0",
+  "description": "Standalone Blockchain Module for Land Record Integrity Verification with Ganache & Web3.js",
+  "main": "scripts/deploy-ganache.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:ganache": "node test/ganache-integration.test.js",
+    "node": "hardhat node",
+    "deploy": "hardhat run scripts/deploy.js",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:ganache": "node scripts/deploy-ganache.js",
+    "register": "node scripts/register-record.js",
+    "get-record": "node scripts/get-record.js",
+    "verify": "node scripts/verify-record.js"
+  },
+  "keywords": [
+    "solidity",
+    "hardhat",
+    "ganache",
+    "web3",
+    "blockchain",
+    "land-records",
+    "integrity",
+    "verification"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "web3": "^4.16.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.18"
+  }
+}
