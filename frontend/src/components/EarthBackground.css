@@ -1,0 +1,688 @@
+﻿.home-shell {
+  position: relative;
+  overflow-x: hidden;
+  isolation: isolate;
+}
+
+.home-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 640px;
+  z-index: -2;
+  pointer-events: none;
+
+  background:
+    radial-gradient(
+      circle at 78% 32%,
+      rgba(80, 149, 132, 0.13),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 92% 5%,
+      rgba(70, 131, 164, 0.08),
+      transparent 24rem
+    );
+}
+
+.earth-background {
+  position: absolute;
+  z-index: 0;
+
+  top: -70px;
+  right: -70px;
+
+  width: min(61vw, 800px);
+  height: 650px;
+
+  opacity: 0.78;
+
+  pointer-events: auto;
+
+  -webkit-mask-image:
+    radial-gradient(
+      ellipse 63% 63% at 56% 48%,
+      black 52%,
+      rgba(0, 0, 0, 0.82) 69%,
+      transparent 93%
+    );
+
+  mask-image:
+    radial-gradient(
+      ellipse 63% 63% at 56% 48%,
+      black 52%,
+      rgba(0, 0, 0, 0.82) 69%,
+      transparent 93%
+    );
+}
+
+.earth-background canvas {
+  cursor: grab;
+  outline: none;
+}
+
+.earth-background canvas:active {
+  cursor: grabbing;
+}
+
+.earth-halo {
+  position: absolute;
+  z-index: -1;
+
+  left: 50%;
+  top: 48%;
+
+  width: 500px;
+  height: 500px;
+
+  transform: translate(-50%, -50%);
+
+  border-radius: 50%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(87, 165, 142, 0.14),
+      rgba(109, 167, 180, 0.045) 49%,
+      transparent 72%
+    );
+
+  filter: blur(22px);
+
+  animation: earthHaloPulse 8s ease-in-out infinite;
+}
+
+.earth-interaction-hint {
+  position: absolute;
+  z-index: 5;
+
+  right: 90px;
+  bottom: 72px;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 7px 11px;
+
+  border: 1px solid rgba(60, 99, 90, 0.16);
+  border-radius: 999px;
+
+  color: #627b74;
+  background: rgba(255, 255, 255, 0.76);
+
+  backdrop-filter: blur(12px);
+
+  box-shadow: 0 8px 26px rgba(38, 59, 52, 0.07);
+
+  font-size: 0.67rem;
+  font-weight: 650;
+
+  pointer-events: none;
+}
+
+.earth-interaction-hint span {
+  color: #3d8f79;
+  animation: earthHintPulse 2.2s ease-in-out infinite;
+}
+
+.home-hero {
+  position: relative;
+  z-index: 2;
+  min-height: 360px;
+  align-items: center;
+}
+
+.home-hero > div:first-child {
+  position: relative;
+  z-index: 3;
+  max-width: 650px;
+}
+
+.home-hero h1,
+.home-hero p {
+  position: relative;
+}
+
+.home-shell::after {
+  content: "";
+
+  position: absolute;
+  z-index: -3;
+
+  top: 60px;
+  right: -80px;
+
+  width: 720px;
+  height: 520px;
+
+  pointer-events: none;
+
+  opacity: 0.22;
+
+  background-image:
+    linear-gradient(
+      rgba(39, 91, 78, 0.06) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(39, 91, 78, 0.06) 1px,
+      transparent 1px
+    );
+
+  background-size: 42px 42px;
+
+  transform:
+    perspective(700px)
+    rotateX(66deg)
+    rotateZ(-7deg);
+
+  transform-origin: center;
+
+  -webkit-mask-image:
+    radial-gradient(circle, black, transparent 71%);
+
+  mask-image:
+    radial-gradient(circle, black, transparent 71%);
+}
+
+@keyframes earthHaloPulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0.62;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes earthHintPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 920px) {
+  .earth-background {
+    width: 780px;
+    right: -310px;
+    opacity: 0.36;
+    pointer-events: none;
+  }
+
+  .earth-interaction-hint {
+    display: none;
+  }
+
+  .home-hero {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .earth-background {
+    width: 650px;
+    height: 540px;
+    right: -340px;
+    top: -90px;
+    opacity: 0.22;
+  }
+
+  .home-shell::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .earth-halo,
+  .earth-interaction-hint span {
+    animation: none;
+  }
+}
+
+/* Broader landing hero after removing demo-boundary card */
+.home-hero {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.home-hero > div:first-child {
+  max-width: 760px;
+}
+
+.home-hero .home-safety-note {
+  display: none;
+}
+
+/* =========================================================
+   Earth-left layout
+   ========================================================= */
+
+.earth-background {
+  left: -90px !important;
+  right: auto !important;
+  top: -55px !important;
+
+  width: min(58vw, 760px) !important;
+  height: 610px !important;
+
+  opacity: 0.88 !important;
+
+  /*
+   * Globe must sit above decorative page background,
+   * but below no invisible hero overlay.
+   */
+  z-index: 2 !important;
+}
+
+/*
+ * Make sure the actual canvas receives drag / wheel interaction.
+ */
+.earth-background canvas {
+  position: relative;
+  z-index: 4;
+  pointer-events: auto !important;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.earth-background canvas:active {
+  cursor: grabbing;
+}
+
+/*
+ * Hero becomes a two-column composition:
+ *
+ * EARTH | COPY
+ */
+.home-hero {
+  position: relative;
+  z-index: 1;
+
+  grid-template-columns: minmax(420px, 0.9fr) minmax(480px, 1.1fr) !important;
+
+  min-height: 390px !important;
+  align-items: center !important;
+}
+
+.home-hero > div:first-child {
+  grid-column: 2 !important;
+
+  max-width: 650px !important;
+
+  /*
+   * Only the actual text area gets pointer events.
+   * It no longer creates a giant invisible hit area
+   * over the globe.
+   */
+  position: relative;
+  z-index: 5;
+
+  pointer-events: auto;
+}
+
+/*
+ * Prevent decorative/empty hero space from blocking globe dragging.
+ */
+.home-hero {
+  pointer-events: none;
+}
+
+.home-hero > div:first-child,
+.home-hero a,
+.home-hero button {
+  pointer-events: auto;
+}
+
+/*
+ * Move sign-in panel right as well so the globe has clear space.
+ */
+.login-card {
+  width: min(720px, calc(100% - 2rem)) !important;
+
+  margin-left: auto !important;
+  margin-right: clamp(1rem, 7vw, 8rem) !important;
+}
+
+/*
+ * Keep the globe from visually colliding with the login form.
+ */
+.earth-background {
+  -webkit-mask-image:
+    radial-gradient(
+      ellipse 58% 60% at 43% 45%,
+      black 53%,
+      rgba(0,0,0,.9) 70%,
+      transparent 93%
+    ) !important;
+
+  mask-image:
+    radial-gradient(
+      ellipse 58% 60% at 43% 45%,
+      black 53%,
+      rgba(0,0,0,.9) 70%,
+      transparent 93%
+    ) !important;
+}
+
+/*
+ * Interaction label follows the globe.
+ */
+.earth-interaction-hint {
+  left: 110px !important;
+  right: auto !important;
+  bottom: 54px !important;
+}
+
+/* Tablet */
+@media (max-width: 980px) {
+  .home-hero {
+    grid-template-columns: 1fr !important;
+    padding-top: 330px;
+  }
+
+  .home-hero > div:first-child {
+    grid-column: 1 !important;
+  }
+
+  .earth-background {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+    top: -130px !important;
+
+    width: 680px !important;
+
+    pointer-events: none;
+    opacity: .42 !important;
+  }
+
+  .login-card {
+    width: auto !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 620px) {
+  .home-hero {
+    padding-top: 255px;
+  }
+
+  .earth-background {
+    width: 560px !important;
+    height: 470px !important;
+    top: -150px !important;
+    opacity: .28 !important;
+  }
+}
+
+/* =========================================================
+   FINAL HERO LAYOUT
+   Content LEFT / Interactive Earth RIGHT
+   ========================================================= */
+
+.earth-background {
+  left: auto !important;
+  right: -25px !important;
+
+  /*
+   * Vertically centered within the landing hero area.
+   */
+  top: 20px !important;
+
+  width: min(50vw, 700px) !important;
+  height: 560px !important;
+
+  opacity: 0.9 !important;
+
+  z-index: 2 !important;
+
+  pointer-events: auto !important;
+
+  transform: none !important;
+}
+
+/*
+ * Keep the interactive canvas fully draggable.
+ */
+.earth-background canvas {
+  position: relative;
+  z-index: 5;
+
+  pointer-events: auto !important;
+
+  cursor: grab;
+
+  user-select: none;
+  -webkit-user-select: none;
+
+  touch-action: none;
+}
+
+.earth-background canvas:active {
+  cursor: grabbing;
+}
+
+
+/* =========================================================
+   HERO
+   ========================================================= */
+
+.home-hero {
+  position: relative;
+
+  grid-template-columns:
+    minmax(470px, 1.15fr)
+    minmax(400px, 0.85fr) !important;
+
+  min-height: 430px !important;
+
+  align-items: center !important;
+
+  /*
+   * Empty hero space must not block the globe.
+   */
+  pointer-events: none;
+}
+
+
+/*
+ * Hero text goes back to LEFT column.
+ */
+.home-hero > div:first-child {
+  grid-column: 1 !important;
+
+  max-width: 660px !important;
+
+  position: relative;
+  z-index: 4;
+
+  pointer-events: auto;
+}
+
+.home-hero h1,
+.home-hero p,
+.home-hero a,
+.home-hero button {
+  pointer-events: auto;
+}
+
+
+/* =========================================================
+   SIGN-IN PANEL
+   Keep it toward the LEFT instead of beneath Earth.
+   ========================================================= */
+
+.login-card {
+  width: min(760px, calc(100% - 2rem)) !important;
+
+  margin-left: clamp(1rem, 6vw, 7rem) !important;
+  margin-right: auto !important;
+
+  position: relative;
+  z-index: 6;
+}
+
+
+/* Move interaction hint with globe */
+.earth-interaction-hint {
+  left: auto !important;
+  right: 55px !important;
+  bottom: 38px !important;
+}
+
+
+/* Slightly cleaner fade around the right-side Earth */
+.earth-background {
+  -webkit-mask-image:
+    radial-gradient(
+      ellipse 63% 64% at 53% 50%,
+      black 54%,
+      rgba(0,0,0,.92) 72%,
+      transparent 95%
+    ) !important;
+
+  mask-image:
+    radial-gradient(
+      ellipse 63% 64% at 53% 50%,
+      black 54%,
+      rgba(0,0,0,.92) 72%,
+      transparent 95%
+    ) !important;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 980px) {
+
+  .home-hero {
+    grid-template-columns: 1fr !important;
+    padding-right: 0;
+  }
+
+  .home-hero > div:first-child {
+    grid-column: 1 !important;
+    max-width: 620px !important;
+  }
+
+  .earth-background {
+    right: -240px !important;
+    top: -40px !important;
+
+    width: 650px !important;
+    height: 540px !important;
+
+    opacity: .34 !important;
+
+    pointer-events: none !important;
+  }
+
+  .login-card {
+    width: auto !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .earth-interaction-hint {
+    display: none;
+  }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 620px) {
+
+  .earth-background {
+    right: -300px !important;
+    top: -70px !important;
+
+    width: 570px !important;
+    height: 480px !important;
+
+    opacity: .22 !important;
+  }
+
+  .home-hero {
+    min-height: auto !important;
+  }
+}
+
+
+/* Increase default desktop globe size */
+.earth-background {
+  width: min(78vw, 1100px) !important;
+  height: 860px !important;
+}
+
+/* Final alignment tuning */
+.earth-background {
+  top: -25px !important;
+}
+
+/* Align sign-in card with the hero/title left edge */
+.login-card {
+  width: min(760px, calc(100% - 2rem)) !important;
+  margin-left: max(
+    1rem,
+    calc((100vw - 1180px) / 2)
+  ) !important;
+  margin-right: auto !important;
+}
+
+
+/* Fixed globe size - prevents resize jump after refresh */
+.earth-background {
+  width: 720px !important;
+  height: 620px !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+
+/* Final vertical alignment tuning */
+
+.home-hero {
+  margin-bottom: 0.65rem !important;
+}
+
+.login-card {
+  margin-top: 0 !important;
+  margin-left: max(
+    1rem,
+    calc((100vw - 1180px) / 2)
+  ) !important;
+  margin-right: auto !important;
+}
+
+/* Move Earth down so its top aligns visually with title block */
+.earth-background {
+  top: 62px !important;
+}
+
+
+/* Final title/sign-in vertical alignment */
+.home-hero {
+  margin-bottom: -2.25rem !important;
+}
+
+.login-card {
+  transform: translateY(-18px);
+}
+
