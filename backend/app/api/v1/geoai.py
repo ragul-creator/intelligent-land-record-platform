@@ -38,7 +38,7 @@ from app.schemas.geoai import (
 from app.services.geoai import ParcelVersionConflict, GeoAIServiceError, create_human_parcel_version, current_version, geometry_geojson
 from app.services.processing_jobs import InvalidJobTransition, create_or_get_job, mark_job_cancelled
 from app.services.project_access import get_project_for_user
-from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import, process_imagery_registration
+from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import, process_geoai_roads, process_imagery_registration
 
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["geoai"])
@@ -80,14 +80,14 @@ def _parcel_response(session: Session, parcel: Parcel) -> ParcelResponse:
 def create_geoai_job(project_id: uuid.UUID, request: GeoAIJobCreateRequest, session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> GeoAIJobResponse:
     project = get_project_for_user(session, user, project_id, "geoai:process")
     imagery_asset = None
-    if request.job_type == "BUILDING_VECTORIZE":
+    if request.job_type in {"BUILDING_VECTORIZE", "ROAD_VECTORIZE"}:
         if request.imagery_asset_id is None:
-            raise ApiError(status.HTTP_422_UNPROCESSABLE_CONTENT, "IMAGERY_ASSET_REQUIRED", "Building processing requires a registered imagery asset.")
+            raise ApiError(status.HTTP_422_UNPROCESSABLE_CONTENT, "IMAGERY_ASSET_REQUIRED", "Imagery GeoAI processing requires a registered imagery asset.")
         imagery_asset = session.get(ImageryAsset, request.imagery_asset_id)
         if imagery_asset is None or imagery_asset.project_id != project.id:
             raise not_found("IMAGERY_ASSET_NOT_FOUND", "The requested imagery asset was not found.")
         if imagery_asset.file_id is None:
-            raise ApiError(status.HTTP_409_CONFLICT, "IMAGERY_SOURCE_UNAVAILABLE", "Building processing requires imagery backed by a private uploaded file.")
+            raise ApiError(status.HTTP_409_CONFLICT, "IMAGERY_SOURCE_UNAVAILABLE", "Imagery GeoAI processing requires imagery backed by a private uploaded file.")
         if (imagery_asset.metadata_json or {}).get("registration_status") != "READY":
             raise ApiError(status.HTTP_409_CONFLICT, "IMAGERY_NOT_READY", "Imagery registration must complete before GeoAI processing.")
     key = request.idempotency_key or f"geoai:{request.job_type}:{uuid.uuid4()}"
@@ -102,6 +102,8 @@ def create_geoai_job(project_id: uuid.UUID, request: GeoAIJobCreateRequest, sess
             process_geoai_parcel_import.delay(str(geoai_job.id))
         elif request.job_type == "BUILDING_VECTORIZE":
             process_geoai_buildings.apply_async(args=[str(geoai_job.id)], queue="geoai")
+        elif request.job_type == "ROAD_VECTORIZE":
+            process_geoai_roads.apply_async(args=[str(geoai_job.id)], queue="geoai")
     elif geoai_job is None:
         raise ApiError(status.HTTP_409_CONFLICT, "GEOAI_IDEMPOTENCY_CONFLICT", "The idempotency key belongs to another processing workflow.")
     return _job_response(geoai_job, processing)

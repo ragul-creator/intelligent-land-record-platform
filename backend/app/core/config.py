@@ -36,7 +36,9 @@ class Settings(BaseSettings):
     bootstrap_admin_full_name: str = "Development Administrator"
     bootstrap_admin_login_id: str | None = None
     geoai_building_checkpoint: str | None = None
+    geoai_road_checkpoint: str | None = None
     geoai_device: str = "auto"
+    geoai_road_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
     @property
     def cors_origins(self) -> list[str]:

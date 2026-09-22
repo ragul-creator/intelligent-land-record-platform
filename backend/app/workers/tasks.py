@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.core.database import SessionLocal
 from app.core.storage import get_storage_service
 from app.audit.service import record_audit
-from app.models import Building, Document, DocumentProcessingJob, DocumentOcrResultRecord, File, GeoAIJob, ImageryAsset, ProcessingJob
+from app.models import Building, Document, DocumentProcessingJob, DocumentOcrResultRecord, File, GeoAIJob, ImageryAsset, ProcessingJob, Road
 from app.services.geoai import GeoAIServiceError, _to_wgs84, persist_parcel_import
 from app.core.config import get_settings
 from geoalchemy2.shape import from_shape
@@ -202,6 +202,67 @@ def process_geoai_buildings(self, geoai_job_id: str) -> None:
             job.progress = 100
             mark_job_completed(session, job)
             record_audit(session, "geoai.buildings_created", "geoai_job", geoai_job.id, project_id=geoai_job.project_id, metadata={"imagery_asset_id": str(asset.id), "feature_count": len(created_ids)})
+            session.commit()
+        except Exception as error:
+            session.rollback()
+            job, geoai_job = session.get(ProcessingJob, job_uuid), session.get(GeoAIJob, job_uuid)
+            if job is not None and job.status == "PROCESSING":
+                _fail_geoai_job(session, job, geoai_job, str(error))
+                session.commit()
+            return
+
+
+@celery_app.task(bind=True)
+def process_geoai_roads(self, geoai_job_id: str) -> None:
+    """Run H.2B.5 road inference; missing road model configuration is terminal and safe."""
+    job_uuid = uuid.UUID(geoai_job_id)
+    with SessionLocal() as session:
+        geoai_job, job = session.get(GeoAIJob, job_uuid), session.get(ProcessingJob, job_uuid)
+        if geoai_job is None or job is None or job.status != "QUEUED":
+            return
+        try:
+            mark_job_processing(session, job)
+            session.commit()
+            checkpoint = get_settings().geoai_road_checkpoint
+            if not checkpoint or not Path(checkpoint).is_file():
+                raise GeoAIServiceError("Road GeoAI is unavailable: GEOAI_ROAD_CHECKPOINT is not configured to a readable checkpoint.")
+            asset = session.get(ImageryAsset, geoai_job.imagery_asset_id)
+            source = session.get(File, asset.file_id) if asset else None
+            if asset is None or source is None or asset.project_id != geoai_job.project_id:
+                raise GeoAIServiceError("The requested imagery asset is unavailable in this project.")
+            source_bytes = get_storage_service().read_private_object(source.storage_key)
+            with tempfile.NamedTemporaryFile(suffix=Path(source.original_name).suffix or ".tif", delete=False) as temporary:
+                temporary.write(source_bytes)
+                source_path = Path(temporary.name)
+            try:
+                from ai.geoai.runtime.roads import infer_and_vectorize_geotiff
+
+                result = infer_and_vectorize_geotiff(source_path, checkpoint=checkpoint, device=get_settings().geoai_device, threshold=get_settings().geoai_road_threshold)
+            finally:
+                source_path.unlink(missing_ok=True)
+            created_ids: list[str] = []
+            for feature in result.features:
+                road = Road(
+                    project_id=geoai_job.project_id,
+                    geometry=from_shape(_to_wgs84(feature.geometry, result.source_crs), srid=4326),
+                    road_class="ROAD",
+                    source="AI_CANDIDATE",
+                    source_reference=f"imagery:{asset.id}",
+                    confidence=feature.confidence,
+                    model_version=feature.model_version,
+                    status="AI_PRELIMINARY",
+                    verification_status="UNVERIFIED",
+                    length_m=feature.length_m,
+                    processed_at=datetime.fromisoformat(feature.processed_at.replace("Z", "+00:00")),
+                )
+                session.add(road)
+                session.flush()
+                created_ids.append(str(road.id))
+            geoai_job.metrics_json = result.processing_parameters
+            geoai_job.output_refs_json = {"imagery_asset_id": str(asset.id), "road_ids": created_ids, "feature_count": len(created_ids), "model_version": result.features[0].model_version if result.features else None}
+            job.progress = 100
+            mark_job_completed(session, job)
+            record_audit(session, "geoai.roads_created", "geoai_job", geoai_job.id, project_id=geoai_job.project_id, metadata={"imagery_asset_id": str(asset.id), "feature_count": len(created_ids)})
             session.commit()
         except Exception as error:
             session.rollback()

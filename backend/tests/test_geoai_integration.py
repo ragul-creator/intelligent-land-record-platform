@@ -1,6 +1,8 @@
 """Live C.7 PostGIS, worker, version-history, and project-scope coverage."""
 
 import os
+import sys
+import types
 import uuid
 
 import pytest
@@ -12,7 +14,7 @@ from app.core.database import SessionLocal
 from app.core.storage import get_storage_service
 from app.models import Building, File, GeoAIJob, ImageryAsset, LandUseFeature, Parcel, ParcelGeometryVersion, ProcessingJob, Project, ProjectMember, Road, Role, TopologyError, User, UserRole
 from app.services.user_identities import generate_login_id
-from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import
+from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import, process_geoai_roads
 
 
 pytestmark = pytest.mark.skipif(
@@ -195,6 +197,110 @@ def test_building_job_without_checkpoint_fails_terminally(monkeypatch) -> None:
         get_settings.cache_clear()
 
 
+def test_road_job_without_checkpoint_fails_terminally(monkeypatch) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.delenv("GEOAI_ROAD_CHECKPOINT", raising=False)
+    get_settings.cache_clear()
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            processing = ProcessingJob(project_id=project.id, job_type="ROAD_VECTORIZE", idempotency_key=f"h2b5:{uuid.uuid4()}", status="QUEUED")
+            session.add(processing)
+            session.flush()
+            geoai = GeoAIJob(id=processing.id, project_id=project.id, requested_by_user_id=surveyor.id, job_type="ROAD_VECTORIZE", parameters_json={})
+            session.add(geoai)
+            session.commit()
+            job_id, project_id = geoai.id, project.id
+
+        process_geoai_roads.run(str(job_id))
+
+        with SessionLocal() as session:
+            job = session.get(ProcessingJob, job_id)
+            assert job is not None and job.status == "FAILED"
+            assert session.scalar(select(Road).where(Road.project_id == project_id)) is None
+    finally:
+        get_settings.cache_clear()
+
+
+def test_road_job_persists_preliminary_wgs84_features_from_mocked_runtime(monkeypatch, tmp_path) -> None:
+    """The worker persists only the road runtime's real-shaped result, never a placeholder."""
+    from shapely.geometry import LineString
+
+    from app.core.config import get_settings
+
+    checkpoint = tmp_path / "road-checkpoint.pt"
+    checkpoint.write_bytes(b"test checkpoint marker")
+    monkeypatch.setenv("GEOAI_ROAD_CHECKPOINT", str(checkpoint))
+    get_settings.cache_clear()
+
+    class Storage:
+        def read_private_object(self, _storage_key: str) -> bytes:
+            return b"GeoTIFF bytes supplied by the private storage boundary"
+
+    feature = types.SimpleNamespace(
+        geometry=LineString([(77.0, 13.0), (77.001, 13.001)]),
+        confidence=0.82,
+        length_m=155.0,
+        model_version="road-segmentation-h2b5-v1",
+        processed_at="2026-09-22T00:00:00Z",
+    )
+    result = types.SimpleNamespace(
+        features=(feature,),
+        source_crs="EPSG:4326",
+        processing_parameters={"threshold": 0.5},
+    )
+    runtime = types.ModuleType("ai.geoai.runtime.roads")
+    runtime.infer_and_vectorize_geotiff = lambda *_args, **_kwargs: result
+    monkeypatch.setitem(sys.modules, "ai.geoai.runtime.roads", runtime)
+    monkeypatch.setattr("app.workers.tasks.get_storage_service", lambda: Storage())
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            source_file = File(
+                project_id=project.id,
+                original_name="roads.tif",
+                category="IMAGERY",
+                mime_type="image/tiff",
+                size_bytes=4096,
+                storage_key=f"projects/{project.id}/originals/roads.tif",
+                status="UPLOADED",
+            )
+            session.add(source_file)
+            session.flush()
+            asset = ImageryAsset(project_id=project.id, file_id=source_file.id, source_crs="EPSG:4326", coordinate_space="WORLD", metadata_json={"registration_status": "READY"})
+            session.add(asset)
+            session.flush()
+            processing = ProcessingJob(project_id=project.id, job_type="ROAD_VECTORIZE", idempotency_key=f"h2b5:{uuid.uuid4()}", status="QUEUED")
+            session.add(processing)
+            session.flush()
+            geoai = GeoAIJob(id=processing.id, project_id=project.id, requested_by_user_id=surveyor.id, job_type="ROAD_VECTORIZE", imagery_asset_id=asset.id, parameters_json={})
+            session.add(geoai)
+            session.commit()
+            job_id, project_id, asset_id = geoai.id, project.id, asset.id
+
+        process_geoai_roads.run(str(job_id))
+
+        with SessionLocal() as session:
+            job = session.get(ProcessingJob, job_id)
+            persisted = session.scalar(select(Road).where(Road.project_id == project_id))
+            detail = session.get(GeoAIJob, job_id)
+            assert job is not None and job.status == "COMPLETED" and job.progress == 100
+            assert persisted is not None
+            assert persisted.source == "AI_CANDIDATE"
+            assert persisted.status == "AI_PRELIMINARY"
+            assert persisted.verification_status == "UNVERIFIED"
+            assert persisted.source_reference == f"imagery:{asset_id}"
+            assert persisted.model_version == "road-segmentation-h2b5-v1"
+            assert persisted.confidence == pytest.approx(0.82)
+            assert persisted.length_m == pytest.approx(155.0)
+            assert detail is not None and detail.output_refs_json["road_ids"] == [str(persisted.id)]
+    finally:
+        get_settings.cache_clear()
+
+
 def test_legacy_fileless_imagery_is_listed_but_cannot_preview_or_run(monkeypatch) -> None:
     """H.2 metadata-only imagery remains visible without claiming private source bytes exist."""
     from app.main import app
@@ -246,6 +352,7 @@ def test_legacy_fileless_imagery_is_listed_but_cannot_preview_or_run(monkeypatch
     headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
     app.dependency_overrides[get_storage_service] = lambda: PreviewStorage()
     monkeypatch.setattr("app.api.v1.geoai.process_geoai_buildings.apply_async", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.api.v1.geoai.process_geoai_roads.apply_async", lambda *args, **kwargs: None)
     try:
         listed = client.get(f"/api/v1/projects/{project_id}/imagery", headers=headers)
         assert listed.status_code == 200
@@ -259,8 +366,10 @@ def test_legacy_fileless_imagery_is_listed_but_cannot_preview_or_run(monkeypatch
         fileless_run = client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "BUILDING_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(legacy_id)})
         assert fileless_run.status_code == 409
         assert fileless_run.json()["error"]["code"] == "IMAGERY_SOURCE_UNAVAILABLE"
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "ROAD_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(legacy_id)}).status_code == 409
 
         assert client.get(f"/api/v1/projects/{project_id}/imagery/{registered_id}/preview-url", headers=headers).status_code == 200
         assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "BUILDING_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(registered_id), "idempotency_key": f"registered:{registered_id}"}).status_code == 202
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "ROAD_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(registered_id), "idempotency_key": f"roads:{registered_id}"}).status_code == 202
     finally:
         app.dependency_overrides.clear()

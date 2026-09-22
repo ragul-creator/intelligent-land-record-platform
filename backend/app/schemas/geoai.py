@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.schemas.common import PageMetadata
 
 
-GeoAIJobType = Literal["PARCEL_IMPORT", "BUILDING_VECTORIZE", "ROAD_IMPORT", "LAND_USE_IMPORT", "TOPOLOGY_VALIDATE"]
+GeoAIJobType = Literal["PARCEL_IMPORT", "BUILDING_VECTORIZE", "ROAD_VECTORIZE", "ROAD_IMPORT", "LAND_USE_IMPORT", "TOPOLOGY_VALIDATE"]
 GeoAIJobStatus = Literal["QUEUED", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"]
 
 

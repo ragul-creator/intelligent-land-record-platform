@@ -21,5 +21,6 @@ celery_app.conf.update(
     task_routes={
         "app.workers.tasks.process_imagery_registration": {"queue": "geoai"},
         "app.workers.tasks.process_geoai_buildings": {"queue": "geoai"},
+        "app.workers.tasks.process_geoai_roads": {"queue": "geoai"},
     },
 )

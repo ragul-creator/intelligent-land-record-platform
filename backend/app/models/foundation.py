@@ -221,7 +221,7 @@ class GeoAIJob(TimestampedModel, Base):
     __tablename__ = "geoai_jobs"
     __table_args__ = (
         CheckConstraint(
-            "job_type IN ('PARCEL_IMPORT', 'BUILDING_VECTORIZE', 'ROAD_IMPORT', 'LAND_USE_IMPORT', 'TOPOLOGY_VALIDATE')",
+            "job_type IN ('PARCEL_IMPORT', 'BUILDING_VECTORIZE', 'ROAD_VECTORIZE', 'ROAD_IMPORT', 'LAND_USE_IMPORT', 'TOPOLOGY_VALIDATE')",
             name="ck_geoai_jobs_type",
         ),
         Index("ix_geoai_jobs_project_created", "project_id", "created_at"),
