@@ -9,6 +9,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -36,8 +37,51 @@ from app.services.geoai import current_version, geometry_geojson
 from app.services.gis_interchange import cleanup_temp_file, generate_project_geopackage
 from app.services.project_access import get_project_for_user
 from app.services.record_exports import build_records_xlsx
+from app.integrations.adapters import capabilities, get_adapter
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["platform hardening"])
+
+
+class IntegrationAction(BaseModel):
+    adapter: str
+
+
+def _integration_payload(session: Session, project_id: uuid.UUID) -> dict[str, object]:
+    features = []
+    for parcel in session.scalars(select(Parcel).where(Parcel.project_id == project_id).order_by(Parcel.id)):
+        version = current_version(session, parcel)
+        geometry = geometry_geojson(version.geometry)
+        if geometry is not None:
+            features.append({"type": "parcel", "id": str(parcel.id), "geometry": geometry, "status": parcel.status, "verification_status": parcel.verification_status, "source": parcel.source, "source_reference": parcel.source_reference, "geometry_version": version.version, "preliminary": parcel.verification_status != "VERIFIED", "legal_boundary_asserted": False})
+    return {"project_id": str(project_id), "schema_version": "h2b5-demo-v1", "features": features, "disclaimer": "Demo representation only. Draft or unverified geometry is preliminary and is not certified or published."}
+
+
+@router.get("/integrations")
+def integration_capabilities(project_id: uuid.UUID, session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+    get_project_for_user(session, user, project_id, "export:read")
+    return {"project_id": str(project_id), "items": [{"name": item.name, "state": item.state, "supports_acknowledgement": item.supports_acknowledgement, "network_enabled": item.network_enabled} for item in capabilities()]}
+
+
+@router.post("/integrations/preview")
+def preview_integration(project_id: uuid.UUID, action: IntegrationAction, session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+    project = get_project_for_user(session, user, project_id, "export:read")
+    adapter = get_adapter(action.adapter)
+    payload = _integration_payload(session, project.id)
+    adapter.validate(payload)
+    record_audit(session, "integration.preview", "project", project.id, actor_id=user.id, project_id=project.id, metadata={"adapter": adapter.name, "feature_count": len(payload["features"]), "outcome": "PREVIEW"})
+    session.commit()
+    return {"adapter": adapter.name, "state": adapter.capability().state, "payload": payload}
+
+
+@router.post("/integrations/execute")
+def execute_demo_integration(project_id: uuid.UUID, action: IntegrationAction, session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+    project = get_project_for_user(session, user, project_id, "export:read")
+    adapter = get_adapter(action.adapter)
+    payload = _integration_payload(session, project.id)
+    result = adapter.execute(payload)
+    record_audit(session, "integration.demo_execute", "project", project.id, actor_id=user.id, project_id=project.id, metadata={"adapter": adapter.name, "action": "demo_export", "feature_count": len(payload["features"]), "outcome": result["outcome"], "acknowledgement_id": result["acknowledgement_id"]})
+    session.commit()
+    return result
 
 
 def _latest_ocr(session: Session, document_id: uuid.UUID) -> DocumentOcrResultRecord | None:
