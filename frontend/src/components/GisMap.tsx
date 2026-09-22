@@ -60,7 +60,7 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
-    const map = new maplibregl.Map({ container: container.current, center: [78.9629, 20.5937], zoom: 4, style: { version: 8, sources: { street: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" }, satellite: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "© Esri" } }, layers: [{ id: "street-basemap", type: "raster", source: "street", layout: { visibility: basemapStyle === "STREET" ? "visible" : "none" } }, { id: "satellite-basemap", type: "raster", source: "satellite", layout: { visibility: basemapStyle === "SATELLITE" ? "visible" : "none" } }] } });
+    const map = new maplibregl.Map({ container: container.current, center: [78.9629, 20.5937], zoom: 4, style: { version: 8, sources: { street: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "Â© OpenStreetMap contributors" }, satellite: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "Â© Esri" } }, layers: [{ id: "street-basemap", type: "raster", source: "street", layout: { visibility: basemapStyle === "STREET" ? "visible" : "none" } }, { id: "satellite-basemap", type: "raster", source: "satellite", layout: { visibility: basemapStyle === "SATELLITE" ? "visible" : "none" } }] } });
     mapRef.current = map;
     resizeObserverRef.current = new ResizeObserver(() => map.resize());
     resizeObserverRef.current.observe(container.current);
@@ -106,7 +106,11 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
     for (const [name, sourceData] of Object.entries({ ...data, ...editData })) (map.getSource(name) as maplibregl.GeoJSONSource | undefined)?.setData(sourceData as Parameters<maplibregl.GeoJSONSource["setData"]>[0]);
     map.setPaintProperty("parcels-line", "line-color", ["case", ["==", ["get", "id"], selectedParcelId ?? ""], "#f7f3da", "#8f632f"]);
   }, [parcels, buildings, roads, landUse, topologyParcelIds, selectedParcelId, editOverlay, drawOverlay]);
-  useEffect(() => { const map = mapRef.current; if (!map) return; applyBasemapVisibility(map, basemapStyle, visibility.basemap); }, [basemapStyle, visibility.basemap]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    applyBasemapVisibility(map, basemapStyle, visibility.basemap);
+  }, [basemapStyle, visibility.basemap]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -121,6 +125,54 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
       const source = map.getSource("imagery-preview") as maplibregl.ImageSource | undefined;
 
       if (imageryPreview) {
+        const maskData = {
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: {
+                type: "Polygon",
+                coordinates: [[
+                  imageryPreview.corners[0],
+                  imageryPreview.corners[1],
+                  imageryPreview.corners[2],
+                  imageryPreview.corners[3],
+                  imageryPreview.corners[0],
+                ]],
+              },
+            },
+          ],
+        };
+
+        const maskSource = map.getSource(
+          "imagery-background-mask",
+        ) as maplibregl.GeoJSONSource | undefined;
+
+        if (maskSource) {
+          maskSource.setData(
+            maskData as Parameters<maplibregl.GeoJSONSource["setData"]>[0],
+          );
+        } else {
+          map.addSource("imagery-background-mask", {
+            type: "geojson",
+            data: maskData as Parameters<maplibregl.GeoJSONSource["setData"]>[0],
+          });
+
+          map.addLayer(
+            {
+              id: "imagery-background-mask",
+              type: "fill",
+              source: "imagery-background-mask",
+              paint: {
+                "fill-color": "#ffffff",
+                "fill-opacity": 1,
+              },
+            },
+            "land-use-fill",
+          );
+        }
+
         if (source) {
           source.updateImage({
             url: imageryPreview.url,
@@ -138,7 +190,7 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
               id: "imagery-preview",
               type: "raster",
               source: "imagery-preview",
-              paint: { "raster-opacity": 0.72 },
+              paint: { "raster-opacity": 1.0 },
             },
             "land-use-fill",
           );
@@ -157,11 +209,20 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
           maxZoom: 19,
           duration: 700,
         });
-      } else if (source) {
+      } else {
         if (map.getLayer("imagery-preview")) {
           map.removeLayer("imagery-preview");
         }
-        map.removeSource("imagery-preview");
+        if (map.getSource("imagery-preview")) {
+          map.removeSource("imagery-preview");
+        }
+
+        if (map.getLayer("imagery-background-mask")) {
+          map.removeLayer("imagery-background-mask");
+        }
+        if (map.getSource("imagery-background-mask")) {
+          map.removeSource("imagery-background-mask");
+        }
       }
     };
 
@@ -199,3 +260,4 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
   }, [imageryZoomRequest, imageryPreview]);
   return <div className="gis-map" ref={container} aria-label="Project cadastral map" data-testid="gis-map" data-parcel-count={data.parcels.features.length} data-building-count={data.buildings.features.length} />;
 }
+
