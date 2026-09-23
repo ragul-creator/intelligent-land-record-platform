@@ -95,6 +95,36 @@ def _parser() -> argparse.ArgumentParser:
     landuse_command.add_argument("--source-reference")
     landuse_command.add_argument("--allow-multipolygon", action="store_true")
     landuse_command.add_argument("--model-version")
+    road_dataset_command = commands.add_parser("road-dataset-check", help="Validate a portable SpaceNet-style road dataset split.")
+    road_dataset_command.add_argument("--dataset-root", type=Path, required=True)
+    road_dataset_command.add_argument("--split", choices=["train", "val", "test"], required=True)
+    road_train_command = commands.add_parser("road-train", help="Train the separate binary road model on a portable paired dataset.")
+    road_train_command.add_argument("--dataset-root", type=Path, required=True)
+    road_train_command.add_argument("--epochs", type=int, default=1)
+    road_train_command.add_argument("--batch-size", type=int, default=2)
+    road_train_command.add_argument("--learning-rate", type=float, default=1e-4)
+    road_train_command.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
+    road_train_command.add_argument("--num-workers", type=int)
+    road_train_command.add_argument("--limit", type=int)
+    road_train_command.add_argument("--image-size", type=int)
+    road_train_command.add_argument("--checkpoint-directory", type=Path, default=Path("data/models/roads"))
+    road_train_command.add_argument("--resume", type=Path)
+    road_infer_command = commands.add_parser("road-infer", help="Run a local road checkpoint against one georeferenced GeoTIFF.")
+    road_infer_command.add_argument("--checkpoint", type=Path, required=True)
+    road_infer_command.add_argument("--source", type=Path, required=True)
+    road_infer_command.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
+    road_infer_command.add_argument("--threshold", type=float, default=0.5)
+    road_infer_command.add_argument("--min-component-pixels", type=int, default=16)
+    road_infer_command.add_argument("--simplify-tolerance", type=float, default=0.0)
+    road_evaluate_command = commands.add_parser("road-evaluate", help="Evaluate a local road checkpoint with IoU, Dice, precision, and recall.")
+    road_evaluate_command.add_argument("--dataset-root", type=Path, required=True)
+    road_evaluate_command.add_argument("--split", choices=["train", "val", "test"], default="val")
+    road_evaluate_command.add_argument("--checkpoint", type=Path, required=True)
+    road_evaluate_command.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
+    road_evaluate_command.add_argument("--batch-size", type=int, default=2)
+    road_evaluate_command.add_argument("--num-workers", type=int)
+    road_evaluate_command.add_argument("--limit", type=int)
+    road_evaluate_command.add_argument("--image-size", type=int)
     return parser
 
 
@@ -242,6 +272,27 @@ def main(argv: list[str] | None = None) -> int:
             )
             output = write_feature_geojson(feature, arguments.output)
             print(json.dumps({"output": str(output), "feature_id": feature.feature_id, "area_m2": feature.area_m2, "status": feature.status}, indent=2, sort_keys=True))
+            return 0
+        if arguments.command == "road-dataset-check":
+            from ai.geoai.roads.dataset import validate_road_dataset
+
+            print(json.dumps(validate_road_dataset(arguments.dataset_root, arguments.split).to_dict(), indent=2, sort_keys=True))
+            return 0
+        if arguments.command == "road-train":
+            from ai.geoai.roads.pipeline import RoadTrainingConfig, train
+
+            print(json.dumps(train(RoadTrainingConfig(dataset_root=arguments.dataset_root, epochs=arguments.epochs, batch_size=arguments.batch_size, learning_rate=arguments.learning_rate, device=arguments.device, num_workers=arguments.num_workers, limit=arguments.limit, image_size=arguments.image_size, checkpoint_directory=arguments.checkpoint_directory, resume=arguments.resume)), indent=2, default=str, sort_keys=True))
+            return 0
+        if arguments.command == "road-infer":
+            from ai.geoai.runtime.roads import infer_and_vectorize_geotiff
+
+            result = infer_and_vectorize_geotiff(arguments.source, checkpoint=arguments.checkpoint, device=arguments.device, threshold=arguments.threshold, min_component_pixels=arguments.min_component_pixels, simplify_tolerance=arguments.simplify_tolerance)
+            print(json.dumps({"feature_count": len(result.features), "source_crs": result.source_crs, "model_version": result.features[0].model_version if result.features else None, "processing_parameters": result.processing_parameters}, indent=2, sort_keys=True))
+            return 0
+        if arguments.command == "road-evaluate":
+            from ai.geoai.roads.pipeline import evaluate
+
+            print(json.dumps(evaluate(arguments.dataset_root, arguments.split, arguments.checkpoint, device_request=arguments.device, batch_size=arguments.batch_size, num_workers=arguments.num_workers, limit=arguments.limit, image_size=arguments.image_size), indent=2, sort_keys=True))
             return 0
         from ai.geoai.segmentation.pipeline import evaluate
 

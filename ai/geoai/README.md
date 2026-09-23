@@ -75,6 +75,19 @@ python -m ai.geoai.cli landuse-create --source-type AI_CANDIDATE --land-use-clas
 
 Roads accept `LineString` and, with `road_surface: true` in the JSON input, a polygon road surface. `MultiLineString` and `MultiPolygon` require their explicit CLI opt-in flags. Geographic road length uses PyProj geodesics; projected values use declared CRS units. Geographic land-use area uses a geodesic calculation, never degree-squared. `PIXEL`, `LOCAL`, and `UNKNOWN` coordinate spaces deliberately return null real-world measurements. Road/land-use features are preliminary GIS context, not cadastral boundaries or legal land-use determinations.
 
+## Road GeoAI (H.2B.5)
+
+H.2B.5 adds a separate binary road-segmentation checkpoint and deterministic centerline extraction for registered, CRS-bearing GeoTIFF imagery. It does not reuse the building checkpoint or invent output when `GEOAI_ROAD_CHECKPOINT` is absent. Set that path locally, optionally set `GEOAI_ROAD_THRESHOLD` (default `0.5`), then request `ROAD_VECTORIZE` through the project GeoAI API or Web-GIS imagery panel.
+
+```bash
+python -m ai.geoai.cli road-dataset-check --dataset-root <road-dataset-root> --split train
+python -m ai.geoai.cli road-train --dataset-root <road-dataset-root> --epochs 1 --device auto --checkpoint-directory data/models/roads
+python -m ai.geoai.cli road-evaluate --dataset-root <road-dataset-root> --split val --checkpoint data/models/roads/<run>/best.pt --device auto
+python -m ai.geoai.cli road-infer --checkpoint data/models/roads/best.pt --source <georeferenced.tif> --device auto --threshold 0.5
+```
+
+The portable training-data layout is `<root>/<split>/images/` and `<root>/<split>/labels/`, using paired raster masks or GeoJSON centerlines. GeoJSON labels are rasterized onto the paired imagery grid. Long training is intentionally never started by this repository workflow. Runtime features are persisted as `AI_CANDIDATE`, `AI_PRELIMINARY`, and `UNVERIFIED`; they have no legal road name, statutory right-of-way, or cadastral authority. The MVP centerline derivation is deterministic but can split/merge complex junctions, so human GIS review remains required.
+
 ## Parcel Topology and Edit Validation (Phase C.6)
 
 C.6 adds reusable library validation under `ai.geoai.topology`. It conservatively repairs polygonal geometry, detects parcel overlaps, checks optional project-boundary coverage gaps/outside areas, compares a draft parcel with an existing GIS reference, and validates future human-edited parcel geometry from Phase D.
