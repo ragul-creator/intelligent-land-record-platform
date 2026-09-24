@@ -169,10 +169,14 @@ def _augment_pair(
     mask: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply orientation-safe aerial augmentation to image and mask together."""
-    turns = random.randrange(4)
-    if turns:
-        bands = np.rot90(bands, turns, axes=(1, 2))
-        mask = np.rot90(mask, turns, axes=(0, 1))
+    if bands.shape[1] == bands.shape[2]:
+        turns = random.randrange(4)
+        if turns:
+            bands = np.rot90(bands, turns, axes=(1, 2))
+            mask = np.rot90(mask, turns, axes=(0, 1))
+    elif random.random() < 0.5:
+        bands = np.rot90(bands, 2, axes=(1, 2))
+        mask = np.rot90(mask, 2, axes=(0, 1))
     if random.random() < 0.5:
         bands = np.flip(bands, axis=2)
         mask = np.flip(mask, axis=1)
