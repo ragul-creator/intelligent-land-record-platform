@@ -126,6 +126,7 @@ def _parser() -> argparse.ArgumentParser:
     road_evaluate_command.add_argument("--num-workers", type=int)
     road_evaluate_command.add_argument("--limit", type=int)
     road_evaluate_command.add_argument("--image-size", type=int)
+    road_evaluate_command.add_argument("--threshold", type=float)
     return parser
 
 
@@ -314,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         if arguments.command == "road-evaluate":
             from ai.geoai.roads.pipeline import evaluate
 
-            print(json.dumps(evaluate(arguments.dataset_root, arguments.split, arguments.checkpoint, device_request=arguments.device, batch_size=arguments.batch_size, num_workers=arguments.num_workers, limit=arguments.limit, image_size=arguments.image_size), indent=2, sort_keys=True))
+            print(json.dumps(evaluate(arguments.dataset_root, arguments.split, arguments.checkpoint, device_request=arguments.device, batch_size=arguments.batch_size, num_workers=arguments.num_workers, limit=arguments.limit, image_size=arguments.image_size, threshold=arguments.threshold), indent=2, sort_keys=True))
             return 0
         from ai.geoai.segmentation.pipeline import evaluate
 
