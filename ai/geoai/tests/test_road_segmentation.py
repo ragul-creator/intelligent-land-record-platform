@@ -6,6 +6,7 @@ import rasterio
 import torch
 from affine import Affine
 from rasterio.crs import CRS
+from pyproj import Transformer
 
 from ai.geoai.roads.dataset import (
     RoadSegmentationDataset,
@@ -49,7 +50,28 @@ def test_spacenet_style_vector_labels_are_rasterized(tmp_path) -> None:
     with rasterio.open(image_path, "w", driver="GTiff", width=8, height=8, count=3, dtype="uint8", crs=CRS.from_epsg(3857), transform=Affine.identity()) as dataset:
         dataset.write(np.zeros((3, 8, 8), dtype=np.uint8))
     label_path = label_dir / "tile-1.geojson"
-    label_path.write_text(json.dumps({"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[1, 1], [6, 6]]}, "properties": {}}]}), encoding="utf-8")
+    label_path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {
+                    "type": "name",
+                    "properties": {"name": "EPSG:3857"},
+                },
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "LineString",
+                            "coordinates": [[1, 1], [6, 6]],
+                        },
+                        "properties": {},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     check = validate_road_dataset(tmp_path, "train")
 
@@ -99,6 +121,10 @@ def test_projected_road_labels_choose_metric_buffer_from_wgs84_centre(tmp_path) 
         json.dumps(
             {
                 "type": "FeatureCollection",
+                "crs": {
+                    "type": "name",
+                    "properties": {"name": "EPSG:32644"},
+                },
                 "features": [
                     {
                         "type": "Feature",
@@ -108,6 +134,63 @@ def test_projected_road_labels_choose_metric_buffer_from_wgs84_centre(tmp_path) 
                                 [400010, 1449990],
                                 [400050, 1449950],
                             ],
+                        },
+                        "properties": {},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    mask = rasterize_vector_label(image_path, label_path)
+
+    assert mask.any()
+
+
+def test_crs84_spacenet_label_rasterizes_into_projected_image(tmp_path) -> None:
+    image_crs = CRS.from_epsg(32643)
+    to_image = Transformer.from_crs(
+        "EPSG:4326", image_crs, always_xy=True
+    )
+    start = (72.82, 18.95)
+    end = (72.8203, 18.9497)
+    start_x, start_y = to_image.transform(*start)
+    image_path = tmp_path / "mumbai.tif"
+    transform = (
+        Affine.translation(start_x - 10, start_y + 10)
+        * Affine.scale(1, -1)
+    )
+    with rasterio.open(
+        image_path,
+        "w",
+        driver="GTiff",
+        width=80,
+        height=80,
+        count=3,
+        dtype="uint8",
+        crs=image_crs,
+        transform=transform,
+    ) as dataset:
+        dataset.write(np.zeros((3, 80, 80), dtype=np.uint8))
+
+    label_path = tmp_path / "mumbai.geojson"
+    label_path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {
+                    "type": "name",
+                    "properties": {
+                        "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+                    },
+                },
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "LineString",
+                            "coordinates": [list(start), list(end)],
                         },
                         "properties": {},
                     }
