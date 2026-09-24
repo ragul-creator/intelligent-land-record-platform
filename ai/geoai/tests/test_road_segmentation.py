@@ -7,9 +7,16 @@ import torch
 from affine import Affine
 from rasterio.crs import CRS
 
-from ai.geoai.roads.dataset import RoadSegmentationDataset, rasterize_vector_label, validate_road_dataset
+from ai.geoai.roads.dataset import (
+    RoadSegmentationDataset,
+    _normalize_rgb_bands,
+    rasterize_vector_label,
+    validate_road_dataset,
+)
 from ai.geoai.roads.model import load_checkpoint
+from ai.geoai.roads.pipeline import _best_threshold
 from ai.geoai.roads.vectorization import RoadVectorizationConfig, vectorize_roads
+from ai.geoai.segmentation.metrics import SegmentationMetrics
 
 
 def test_road_mask_vectorizes_to_a_confident_projected_centerline() -> None:
@@ -56,3 +63,73 @@ def test_spacenet_style_vector_labels_are_rasterized(tmp_path) -> None:
 def test_missing_road_checkpoint_fails_without_building_model_fallback(tmp_path) -> None:
     with pytest.raises(RuntimeError, match="GEOAI_ROAD_CHECKPOINT"):
         load_checkpoint(tmp_path / "missing-road.pt", device=torch.device("cpu"))
+
+
+def test_road_training_preprocessing_matches_percentile_runtime_scaling() -> None:
+    base = np.arange(100, dtype=np.float32).reshape(10, 10)
+    bands = np.stack((base, base + 25, base + 50))
+
+    normalized = _normalize_rgb_bands(bands)
+
+    assert normalized.shape == (3, 10, 10)
+    assert np.all(normalized >= 0.0)
+    assert np.all(normalized <= 1.0)
+    assert normalized[:, 0, 0].max() == pytest.approx(0.0)
+    assert normalized[:, -1, -1].min() == pytest.approx(1.0)
+
+
+def test_projected_road_labels_choose_metric_buffer_from_wgs84_centre(tmp_path) -> None:
+    image_path = tmp_path / "utm.tif"
+    transform = Affine.translation(400000, 1450000) * Affine.scale(1, -1)
+    with rasterio.open(
+        image_path,
+        "w",
+        driver="GTiff",
+        width=64,
+        height=64,
+        count=3,
+        dtype="uint8",
+        crs=CRS.from_epsg(32644),
+        transform=transform,
+    ) as dataset:
+        dataset.write(np.zeros((3, 64, 64), dtype=np.uint8))
+
+    label_path = tmp_path / "utm.geojson"
+    label_path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "LineString",
+                            "coordinates": [
+                                [400010, 1449990],
+                                [400050, 1449950],
+                            ],
+                        },
+                        "properties": {},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    mask = rasterize_vector_label(image_path, label_path)
+
+    assert mask.any()
+
+
+def test_road_threshold_selection_prefers_best_validation_iou() -> None:
+    sweep = {
+        0.3: SegmentationMetrics(0.61, 0.76, 0.70, 0.83),
+        0.4: SegmentationMetrics(0.68, 0.81, 0.78, 0.85),
+        0.5: SegmentationMetrics(0.64, 0.78, 0.86, 0.72),
+    }
+
+    threshold, metrics = _best_threshold(sweep)
+
+    assert threshold == 0.4
+    assert metrics.iou == pytest.approx(0.68)
