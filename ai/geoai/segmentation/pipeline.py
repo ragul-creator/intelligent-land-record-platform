@@ -6,7 +6,7 @@ import json
 import logging
 import random
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -138,7 +138,7 @@ def train(config: TrainingConfig) -> dict[str, object]:
         optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
     bce = nn.BCEWithLogitsLoss()
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     checkpoint_dir = config.checkpoint_directory / run_id
     best_iou = -1.0
     best_checkpoint: Path | None = None
