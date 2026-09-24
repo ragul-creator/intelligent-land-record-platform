@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -150,7 +150,7 @@ def train(config: RoadTrainingConfig) -> dict[str, object]:
         start_epoch = int(payload.get("epoch", -1)) + 1
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
     bce = nn.BCEWithLogitsLoss()
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_dir = config.checkpoint_directory / run_id
     best_iou, best_checkpoint, history = -1.0, None, []
     try:
