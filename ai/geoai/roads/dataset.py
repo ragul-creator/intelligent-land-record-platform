@@ -62,6 +62,20 @@ def validate_road_dataset(root: str | Path, split: str) -> RoadDatasetCheck:
 
 
 
+def _geojson_crs(payload: dict[str, object]) -> CRS:
+    """Resolve legacy GeoJSON CRS metadata; standard GeoJSON defaults to WGS84."""
+    crs_payload = payload.get("crs")
+    if isinstance(crs_payload, dict):
+        properties = crs_payload.get("properties")
+        if isinstance(properties, dict):
+            name = properties.get("name")
+            if isinstance(name, str) and name:
+                if "CRS84" in name.upper():
+                    return CRS.from_user_input("OGC:CRS84")
+                return CRS.from_user_input(name)
+    return CRS.from_epsg(4326)
+
+
 def rasterize_vector_label(
     image_path: str | Path,
     label_path: str | Path,
@@ -91,40 +105,42 @@ def rasterize_vector_label(
         if not geometries:
             return np.zeros((image.height, image.width), dtype=np.uint8)
 
-        source_crs = CRS.from_user_input(image.crs)
+        image_crs = CRS.from_user_input(image.crs)
+        label_crs = _geojson_crs(payload)
 
         centre_x = (image.bounds.left + image.bounds.right) / 2.0
         centre_y = (image.bounds.bottom + image.bounds.top) / 2.0
-        if source_crs.is_geographic:
+        if image_crs.is_geographic:
             centre_lon, centre_lat = centre_x, centre_y
         else:
             to_wgs84 = Transformer.from_crs(
-                source_crs, CRS.from_epsg(4326), always_xy=True
+                image_crs, CRS.from_epsg(4326), always_xy=True
             )
             centre_lon, centre_lat = to_wgs84.transform(centre_x, centre_y)
         zone = max(1, min(60, int((centre_lon + 180.0) // 6.0) + 1))
         epsg = 32600 + zone if centre_lat >= 0 else 32700 + zone
         metric_crs = CRS.from_epsg(epsg)
 
-        to_metric = Transformer.from_crs(
-            source_crs, metric_crs, always_xy=True
+        label_to_metric = Transformer.from_crs(
+            label_crs, metric_crs, always_xy=True
         ).transform
-
-        from_metric = Transformer.from_crs(
-            metric_crs, source_crs, always_xy=True
+        metric_to_image = Transformer.from_crs(
+            metric_crs, image_crs, always_xy=True
         ).transform
 
         buffered = []
 
         for geometry in geometries:
-            metric_geometry = shapely_transform(to_metric, geometry)
+            metric_geometry = shapely_transform(
+                label_to_metric, geometry
+            )
             metric_geometry = metric_geometry.buffer(
                 road_half_width_m,
                 cap_style=2,
                 join_style=2,
             )
             buffered.append(
-                shapely_transform(from_metric, metric_geometry)
+                shapely_transform(metric_to_image, metric_geometry)
             )
 
         return rasterize(
