@@ -16,6 +16,9 @@ export interface ImageryPreviewLayer { url: string; corners: [[number, number], 
 
 type BasemapMap = Pick<maplibregl.Map, "getLayer" | "setLayoutProperty">;
 type OverlayMap = Pick<maplibregl.Map, "getLayer" | "setLayoutProperty">;
+type LayerLookupMap = Pick<maplibregl.Map, "getLayer">;
+type ImageryReadyMap = Pick<maplibregl.Map, "getLayer" | "getSource">;
+type DataReadyMap = Pick<maplibregl.Map, "getLayer" | "getSource" | "isStyleLoaded" | "off" | "once" | "setPaintProperty">;
 
 const collection = (features: MapFeature[]): MapData => ({ type: "FeatureCollection", features });
 const feature = (item: MapItem): MapFeature => ({ type: "Feature", id: item.id, geometry: item.geometry, properties: { ...item, ...item.properties } });
@@ -46,6 +49,28 @@ export function applyOverlayVisibility(map: OverlayMap, visibility: LayerVisibil
   for (const [layerId, shown] of Object.entries(states)) {
     if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", shown ? "visible" : "none");
   }
+}
+
+export function imageryLayerBeforeId(map: LayerLookupMap): string | undefined {
+  return map.getLayer("land-use-fill") ? "land-use-fill" : undefined;
+}
+
+export function canApplyImagery(map: ImageryReadyMap): boolean {
+  return Boolean(map.getLayer("land-use-fill") || map.getSource("imagery-preview"));
+}
+
+export function scheduleMapDataUpdate(map: DataReadyMap, sourceData: Record<string, MapData>, selectedParcelId: string | null): () => void {
+  const apply = () => {
+    for (const [name, data] of Object.entries(sourceData)) {
+      (map.getSource(name) as maplibregl.GeoJSONSource | undefined)?.setData(data as Parameters<maplibregl.GeoJSONSource["setData"]>[0]);
+    }
+    if (map.getLayer("parcels-line")) {
+      map.setPaintProperty("parcels-line", "line-color", ["case", ["==", ["get", "id"], selectedParcelId ?? ""], "#f7f3da", "#8f632f"]);
+    }
+  };
+  if (map.isStyleLoaded()) apply();
+  else map.once("load", apply);
+  return () => map.off("load", apply);
 }
 
 export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, visibility, basemapStyle, selectedParcelId, onParcelSelect, onFeatureSelect, editOverlay, drawOverlay, imageryPreview, imageryZoomRequest = 0 }: { parcels: Parcel[]; buildings: Building[]; roads: Road[]; landUse: LandUseFeature[]; topologyParcelIds: string[]; visibility: LayerVisibility; basemapStyle: BasemapStyle; selectedParcelId: string | null; onParcelSelect: (id: string) => void; onFeatureSelect: (kind: MapFeatureKind, id: string) => void; editOverlay: EditOverlay | null; drawOverlay?: DrawOverlay | null; imageryPreview?: ImageryPreviewLayer | null; imageryZoomRequest?: number; }) {
@@ -102,9 +127,9 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
   }, []);
 
   useEffect(() => {
-    const map = mapRef.current; if (!map?.isStyleLoaded()) return;
-    for (const [name, sourceData] of Object.entries({ ...data, ...editData })) (map.getSource(name) as maplibregl.GeoJSONSource | undefined)?.setData(sourceData as Parameters<maplibregl.GeoJSONSource["setData"]>[0]);
-    map.setPaintProperty("parcels-line", "line-color", ["case", ["==", ["get", "id"], selectedParcelId ?? ""], "#f7f3da", "#8f632f"]);
+    const map = mapRef.current;
+    if (!map) return;
+    return scheduleMapDataUpdate(map, { ...data, ...editData }, selectedParcelId);
   }, [parcels, buildings, roads, landUse, topologyParcelIds, selectedParcelId, editOverlay, drawOverlay]);
   useEffect(() => {
     const map = mapRef.current;
@@ -123,56 +148,9 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
 
     const applyImagery = () => {
       const source = map.getSource("imagery-preview") as maplibregl.ImageSource | undefined;
+      const beforeId = imageryLayerBeforeId(map);
 
       if (imageryPreview) {
-        const maskData = {
-          type: "FeatureCollection",
-          features: [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: {
-                type: "Polygon",
-                coordinates: [[
-                  imageryPreview.corners[0],
-                  imageryPreview.corners[1],
-                  imageryPreview.corners[2],
-                  imageryPreview.corners[3],
-                  imageryPreview.corners[0],
-                ]],
-              },
-            },
-          ],
-        };
-
-        const maskSource = map.getSource(
-          "imagery-background-mask",
-        ) as maplibregl.GeoJSONSource | undefined;
-
-        if (maskSource) {
-          maskSource.setData(
-            maskData as Parameters<maplibregl.GeoJSONSource["setData"]>[0],
-          );
-        } else {
-          map.addSource("imagery-background-mask", {
-            type: "geojson",
-            data: maskData as Parameters<maplibregl.GeoJSONSource["setData"]>[0],
-          });
-
-          map.addLayer(
-            {
-              id: "imagery-background-mask",
-              type: "fill",
-              source: "imagery-background-mask",
-              paint: {
-                "fill-color": "#ffffff",
-                "fill-opacity": 1,
-              },
-            },
-            "land-use-fill",
-          );
-        }
-
         if (source) {
           source.updateImage({
             url: imageryPreview.url,
@@ -192,7 +170,7 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
               source: "imagery-preview",
               paint: { "raster-opacity": 1.0 },
             },
-            "land-use-fill",
+            beforeId,
           );
         }
 
@@ -217,16 +195,10 @@ export function GisMap({ parcels, buildings, roads, landUse, topologyParcelIds, 
           map.removeSource("imagery-preview");
         }
 
-        if (map.getLayer("imagery-background-mask")) {
-          map.removeLayer("imagery-background-mask");
-        }
-        if (map.getSource("imagery-background-mask")) {
-          map.removeSource("imagery-background-mask");
-        }
       }
     };
 
-    if (map.isStyleLoaded()) {
+    if (canApplyImagery(map)) {
       applyImagery();
     } else {
       map.once("load", applyImagery);

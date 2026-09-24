@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { applyBasemapVisibility, applyOverlayVisibility } from "../components/GisMap";
+import { applyBasemapVisibility, applyOverlayVisibility, canApplyImagery, imageryLayerBeforeId, scheduleMapDataUpdate } from "../components/GisMap";
 
 function mapWithBasemapLayers() {
   return {
@@ -60,5 +60,69 @@ describe("applyBasemapVisibility", () => {
     expect(map.setLayoutProperty).toHaveBeenCalledWith("land-use-fill", "visibility", "none");
     expect(map.setLayoutProperty).toHaveBeenCalledWith("topology-outline", "visibility", "none");
     expect(map.setLayoutProperty).toHaveBeenCalledWith("parcels-fill", "visibility", "visible");
+  });
+});
+
+describe("imageryLayerBeforeId", () => {
+  it("places imagery below vector overlays once their anchor exists", () => {
+    const map = { getLayer: vi.fn((id: string) => id === "land-use-fill" ? {} : undefined) };
+
+    expect(imageryLayerBeforeId(map as never)).toBe("land-use-fill");
+  });
+
+  it("does not reference a missing overlay while the map load callback is still initializing layers", () => {
+    const map = { getLayer: vi.fn(() => undefined) };
+
+    expect(imageryLayerBeforeId(map as never)).toBeUndefined();
+  });
+});
+
+describe("canApplyImagery", () => {
+  it("updates an existing image source even while MapLibre reports the style as busy", () => {
+    const map = {
+      getLayer: vi.fn(() => undefined),
+      getSource: vi.fn((id: string) => id === "imagery-preview" ? {} : undefined),
+    };
+
+    expect(canApplyImagery(map as never)).toBe(true);
+  });
+
+  it("applies after the application's vector layer graph is initialized", () => {
+    const map = {
+      getLayer: vi.fn((id: string) => id === "land-use-fill" ? {} : undefined),
+      getSource: vi.fn(() => undefined),
+    };
+
+    expect(canApplyImagery(map as never)).toBe(true);
+  });
+
+  it("waits for the initial map load when neither application layers nor imagery exist", () => {
+    const map = { getLayer: vi.fn(() => undefined), getSource: vi.fn(() => undefined) };
+
+    expect(canApplyImagery(map as never)).toBe(false);
+  });
+});
+
+describe("scheduleMapDataUpdate", () => {
+  it("applies the latest GeoJSON data when MapLibre finishes loading instead of dropping the update", () => {
+    const setData = vi.fn();
+    let load: (() => void) | undefined;
+    const map = {
+      getLayer: vi.fn((id: string) => id === "parcels-line" ? {} : undefined),
+      getSource: vi.fn(() => ({ setData })),
+      isStyleLoaded: vi.fn(() => false),
+      once: vi.fn((_event: string, listener: () => void) => { load = listener; }),
+      off: vi.fn(),
+      setPaintProperty: vi.fn(),
+    };
+    const latest = { type: "FeatureCollection", features: [{ type: "Feature", id: "active-building", geometry: { type: "Polygon", coordinates: [] }, properties: {} }] };
+
+    const cleanup = scheduleMapDataUpdate(map as never, { buildings: latest } as never, null);
+
+    expect(setData).not.toHaveBeenCalled();
+    load?.();
+    expect(setData).toHaveBeenCalledWith(latest);
+    cleanup();
+    expect(map.off).toHaveBeenCalledWith("load", load);
   });
 });

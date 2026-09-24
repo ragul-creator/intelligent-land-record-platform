@@ -10,6 +10,7 @@ import rasterio
 from affine import Affine
 from PIL import Image
 from pyproj import CRS, Transformer
+from rasterio.enums import MaskFlags
 from rasterio.features import bounds as feature_bounds, rasterize, shapes
 from rasterio.transform import array_bounds
 from rasterio.warp import Resampling, calculate_default_transform, reproject
@@ -107,6 +108,34 @@ def _edge_connected_bright_background(rgb: np.ndarray, valid: np.ndarray) -> np.
     ).astype(bool)
 
 
+def _has_explicit_validity(dataset: rasterio.io.DatasetReader) -> bool:
+    """Return whether the source declares nodata, alpha, or another real mask."""
+    return dataset.nodata is not None or any(
+        MaskFlags.all_valid not in flags for flags in dataset.mask_flag_enums
+    )
+
+
+def _source_rgb_for_background(dataset: rasterio.io.DatasetReader) -> np.ndarray:
+    """Read source RGB and normalize the native sample range to uint8."""
+    indexes = list(range(1, min(3, dataset.count) + 1))
+    data = dataset.read(indexes)
+    if data.shape[0] < 3:
+        return np.zeros((dataset.height, dataset.width, data.shape[0]), dtype=np.uint8)
+
+    if data.dtype == np.uint8:
+        normalized = data
+    elif np.issubdtype(data.dtype, np.integer):
+        maximum = float(np.iinfo(data.dtype).max)
+        normalized = np.clip(data.astype(np.float32) * (255.0 / maximum), 0, 255)
+    else:
+        values = data.astype(np.float32, copy=False)
+        finite = values[np.isfinite(values)]
+        if finite.size and finite.min() >= 0 and finite.max() <= 1:
+            values = values * 255.0
+        normalized = np.clip(values, 0, 255)
+    return np.moveaxis(normalized.astype(np.uint8), 0, 2)
+
+
 def _preview_png(
     path: Path,
     *,
@@ -120,6 +149,16 @@ def _preview_png(
         )
 
         source_mask = dataset.dataset_mask()
+        has_explicit_validity = _has_explicit_validity(dataset)
+        edge_background_removed = False
+        if not has_explicit_validity:
+            source_edge_background = _edge_connected_bright_background(
+                _source_rgb_for_background(dataset),
+                source_mask > 0,
+            )
+            if source_edge_background.any():
+                source_mask[source_edge_background] = 0
+                edge_background_removed = True
         alpha = np.zeros((out_height, out_width), dtype=np.uint8)
         reproject(
             source=source_mask,
@@ -155,16 +194,12 @@ def _preview_png(
             channels.append(channels[-1])
 
         rgb = np.dstack(channels[:3])
-        edge_background = _edge_connected_bright_background(rgb, valid)
-        if edge_background.any():
-            alpha[edge_background] = 0
-
         rgba = np.dstack([rgb, alpha])
         image = Image.fromarray(rgba, mode="RGBA")
         output = BytesIO()
         image.save(output, format="PNG", optimize=True)
         corners = _wgs84_corners_from_preview(transform, out_width, out_height)
-        return output.getvalue(), corners, out_width, out_height, bool(edge_background.any())
+        return output.getvalue(), corners, out_width, out_height, edge_background_removed
 
 
 def inspect_and_render_preview(path: str | Path) -> tuple[dict[str, object], bytes, list[list[float]]]:

@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GisPage } from "../pages/GisPage";
+import { GisPage, buildingsForActiveImagery } from "../pages/GisPage";
+import type { GeoFeature } from "../api/gis";
 
 vi.mock("../components/GisMap", () => ({
   GisMap: ({ parcels, buildings, roads, landUse, topologyParcelIds, onParcelSelect, onFeatureSelect }: { parcels: Array<{ id: string }>; buildings: unknown[]; roads: Array<{ id: string }>; landUse: unknown[]; topologyParcelIds: string[]; onParcelSelect: (id: string) => void; onFeatureSelect: (kind: "ROAD", id: string) => void }) => (
@@ -34,7 +35,9 @@ function installProjectFetch(imageryAssets: unknown[] = []) {
     if (url.includes("/roads")) return new Response(JSON.stringify(page([{ id: "road-1", source: "EXISTING_GIS", source_reference: "road-survey", confidence: 0.9, model_version: null, status: "DRAFT", verification_status: "UNVERIFIED", processed_at: null, geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] }, properties: { road_class: "ROAD", length_m: 155.5 } }])), { status: 200 });
     if (url.includes("/land-use")) return new Response(JSON.stringify(page([{ id: "land-use-1" }])), { status: 200 });
     if (url.includes("/topology-errors")) return new Response(JSON.stringify(page([topologyIssue])), { status: 200 });
+    if (url.includes("/preview-url")) return new Response(JSON.stringify({ imagery_asset_id: "imagery-1", preview_url: "https://example.invalid/preview.png", corners_wgs84: [[0, 1], [1, 1], [1, 0], [0, 0]], expires_in_seconds: 900 }), { status: 200 });
     if (url.includes("/imagery")) return new Response(JSON.stringify(page(imageryAssets)), { status: 200 });
+    if (url.includes("/geoai/jobs")) return new Response(JSON.stringify({ id: "road-job-1", project_id: "project-1", job_type: "ROAD_VECTORIZE", status: "QUEUED", progress: 0, has_error: false, output_references: {}, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }), { status: 202 });
     return new Response(JSON.stringify(page([])), { status: 200 });
   }));
 }
@@ -47,6 +50,31 @@ function renderPage() {
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe("GisPage", () => {
+  it("shows only the active imagery's unverified AI candidates while preserving reviewed and non-AI buildings", () => {
+    const building = (id: string, overrides: Partial<GeoFeature> = {}): GeoFeature => ({
+      id,
+      project_id: "project-1",
+      geometry: { type: "Polygon", coordinates: [] },
+      source: "AI_CANDIDATE",
+      source_reference: "imagery:imagery-1",
+      confidence: 0.9,
+      model_version: "building-segmentation-c2-v1",
+      status: "AI_PRELIMINARY",
+      verification_status: "UNVERIFIED",
+      processed_at: "2026-09-24T00:00:00Z",
+      properties: {},
+      ...overrides,
+    });
+    const visible = buildingsForActiveImagery([
+      building("active"),
+      building("stale", { source_reference: "imagery:imagery-2" }),
+      building("reviewed", { source_reference: "imagery:imagery-2", status: "VERIFIED", verification_status: "VERIFIED" }),
+      building("manual", { source: "MANUAL_DRAWN", source_reference: "manual:survey" }),
+    ], "imagery-1");
+
+    expect(visible.map((item) => item.id)).toEqual(["active", "reviewed", "manual"]);
+  });
+
   it("loads separate layer collections and renders selected parcel provenance and topology details", async () => {
     installProjectFetch();
     renderPage();
@@ -136,5 +164,15 @@ describe("GisPage", () => {
     expect(satellite).toHaveAttribute("aria-pressed", "true");
     expect(street).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("gis-map").parentElement).toHaveClass("map-stage");
+  });
+
+  it("lets an authorized user queue Road GeoAI for ready private imagery", async () => {
+    const imagery = [{ id: "imagery-1", project_id: "project-1", file_id: "file-1", filename: "orthomosaic.tif", source_reference: null, source_crs: "EPSG:4326", coordinate_space: "WORLD", metadata: { registration_status: "READY", width: 10, height: 10 }, registration_job_id: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }];
+    installProjectFetch(imagery);
+    renderPage();
+    await screen.findByRole("button", { name: "Run Road GeoAI" });
+    fireEvent.click(screen.getByRole("button", { name: "Run Road GeoAI" }));
+    expect(await screen.findByText(/Road processing queued/i)).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes("/geoai/jobs"))).toBe(true);
   });
 });

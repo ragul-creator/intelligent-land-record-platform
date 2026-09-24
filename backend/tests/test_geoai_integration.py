@@ -4,6 +4,7 @@ import os
 import sys
 import types
 import uuid
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -193,6 +194,222 @@ def test_building_job_without_checkpoint_fails_terminally(monkeypatch) -> None:
             assert job.status == "FAILED"
             assert job.error_json == {"message": "Processing failed."}
             assert session.scalar(select(Building).where(Building.project_id == project_id)) is None
+    finally:
+        get_settings.cache_clear()
+
+
+def test_building_job_replaces_only_same_imagery_unverified_candidates(monkeypatch, tmp_path: Path) -> None:
+    """A rerun replaces its candidates without touching reviewed or unrelated buildings."""
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import Polygon
+
+    from app.core.config import get_settings
+
+    checkpoint = tmp_path / "building-checkpoint.pt"
+    checkpoint.write_bytes(b"test checkpoint marker")
+    monkeypatch.setenv("GEOAI_BUILDING_CHECKPOINT", str(checkpoint))
+    get_settings.cache_clear()
+
+    class Storage:
+        def read_private_object(self, _storage_key: str) -> bytes:
+            return b"GeoTIFF bytes supplied by the private storage boundary"
+
+    first_features = (
+        types.SimpleNamespace(
+            geometry=Polygon([(80.0, 13.0), (80.001, 13.0), (80.001, 13.001), (80.0, 13.001)]),
+            confidence=0.91,
+            model_version="building-test-v1",
+            area_m2=100.0,
+            area_sqft=1076.39104167,
+            processed_at="2026-09-24T00:00:00Z",
+        ),
+        types.SimpleNamespace(
+            geometry=Polygon([(80.002, 13.0), (80.003, 13.0), (80.003, 13.001), (80.002, 13.001)]),
+            confidence=0.89,
+            model_version="building-test-v1",
+            area_m2=90.0,
+            area_sqft=968.751937503,
+            processed_at="2026-09-24T00:00:00Z",
+        ),
+    )
+    second_features = (
+        types.SimpleNamespace(
+            geometry=Polygon([(80.004, 13.0), (80.005, 13.0), (80.005, 13.001), (80.004, 13.001)]),
+            confidence=0.95,
+            model_version="building-test-v2",
+            area_m2=110.0,
+            area_sqft=1184.030145837,
+            processed_at="2026-09-24T00:01:00Z",
+        ),
+    )
+    results = iter(
+        (
+            types.SimpleNamespace(features=first_features, coordinate_space="WORLD", source_crs="EPSG:4326"),
+            types.SimpleNamespace(features=second_features, coordinate_space="WORLD", source_crs="EPSG:4326"),
+        )
+    )
+    runtime = types.ModuleType("ai.geoai.runtime.buildings")
+    runtime.infer_and_vectorize_geotiff = lambda *_args, **_kwargs: next(results)
+    monkeypatch.setitem(sys.modules, "ai.geoai.runtime.buildings", runtime)
+    monkeypatch.setattr("app.workers.tasks.get_storage_service", lambda: Storage())
+
+    def make_imagery(session, project_id: uuid.UUID, name: str) -> ImageryAsset:
+        source_file = File(
+            project_id=project_id,
+            original_name=f"{name}.tif",
+            category="IMAGERY",
+            mime_type="image/tiff",
+            size_bytes=4096,
+            storage_key=f"projects/{project_id}/originals/{name}-{uuid.uuid4()}.tif",
+            status="UPLOADED",
+        )
+        session.add(source_file)
+        session.flush()
+        asset = ImageryAsset(
+            project_id=project_id,
+            file_id=source_file.id,
+            source_crs="EPSG:4326",
+            coordinate_space="WORLD",
+            metadata_json={"registration_status": "READY"},
+        )
+        session.add(asset)
+        session.flush()
+        return asset
+
+    def make_job(session, project_id: uuid.UUID, asset_id: uuid.UUID, user_id: uuid.UUID) -> uuid.UUID:
+        processing = ProcessingJob(
+            project_id=project_id,
+            job_type="BUILDING_VECTORIZE",
+            idempotency_key=f"building-replacement:{uuid.uuid4()}",
+            status="QUEUED",
+        )
+        session.add(processing)
+        session.flush()
+        session.add(
+            GeoAIJob(
+                id=processing.id,
+                project_id=project_id,
+                requested_by_user_id=user_id,
+                job_type="BUILDING_VECTORIZE",
+                imagery_asset_id=asset_id,
+                parameters_json={},
+            )
+        )
+        session.flush()
+        return processing.id
+
+    def stored_building(
+        session,
+        *,
+        project_id: uuid.UUID,
+        source_reference: str,
+        source: str = "AI_CANDIDATE",
+        status: str = "AI_PRELIMINARY",
+        verification_status: str = "UNVERIFIED",
+    ) -> Building:
+        building = Building(
+            project_id=project_id,
+            geometry=from_shape(
+                Polygon([(79.0, 12.0), (79.001, 12.0), (79.001, 12.001), (79.0, 12.001)]),
+                srid=4326,
+            ),
+            source=source,
+            source_reference=source_reference,
+            status=status,
+            verification_status=verification_status,
+        )
+        session.add(building)
+        session.flush()
+        return building
+
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            other_project = _project(session, surveyor)
+            asset = make_imagery(session, project.id, "target")
+            other_asset = make_imagery(session, project.id, "other")
+            target_reference = f"imagery:{asset.id}"
+
+            stale = stored_building(session, project_id=project.id, source_reference=target_reference)
+            verified = stored_building(
+                session,
+                project_id=project.id,
+                source_reference=target_reference,
+                status="VERIFIED",
+                verification_status="VERIFIED",
+            )
+            manual = stored_building(
+                session,
+                project_id=project.id,
+                source_reference=target_reference,
+                source="MANUAL_DRAWN",
+                status="DRAFT",
+            )
+            other_imagery = stored_building(
+                session,
+                project_id=project.id,
+                source_reference=f"imagery:{other_asset.id}",
+            )
+            other_project_building = stored_building(
+                session,
+                project_id=other_project.id,
+                source_reference=target_reference,
+            )
+            first_job_id = make_job(session, project.id, asset.id, surveyor.id)
+            preserved_ids = {verified.id, manual.id, other_imagery.id, other_project_building.id}
+            stale_id = stale.id
+            project_id, asset_id, user_id = project.id, asset.id, surveyor.id
+            session.commit()
+
+        process_geoai_buildings.run(str(first_job_id))
+
+        with SessionLocal() as session:
+            candidates = session.scalars(
+                select(Building).where(
+                    Building.project_id == project_id,
+                    Building.source == "AI_CANDIDATE",
+                    Building.source_reference == f"imagery:{asset_id}",
+                    Building.status == "AI_PRELIMINARY",
+                    Building.verification_status == "UNVERIFIED",
+                )
+            ).all()
+            assert len(candidates) == 2
+            assert stale_id not in {candidate.id for candidate in candidates}
+            assert {candidate.model_version for candidate in candidates} == {"building-test-v1"}
+            assert all(session.get(Building, building_id) is not None for building_id in preserved_ids)
+            first_candidate_ids = {candidate.id for candidate in candidates}
+            first_job = session.get(ProcessingJob, first_job_id)
+            first_job_detail = session.get(GeoAIJob, first_job_id)
+            assert first_job is not None and first_job.status == "COMPLETED"
+            assert first_job_detail is not None
+            assert first_job_detail.output_refs_json["feature_count"] == 2
+
+            second_job_id = make_job(session, project_id, asset_id, user_id)
+            session.commit()
+
+        process_geoai_buildings.run(str(second_job_id))
+
+        with SessionLocal() as session:
+            candidates = session.scalars(
+                select(Building).where(
+                    Building.project_id == project_id,
+                    Building.source == "AI_CANDIDATE",
+                    Building.source_reference == f"imagery:{asset_id}",
+                    Building.status == "AI_PRELIMINARY",
+                    Building.verification_status == "UNVERIFIED",
+                )
+            ).all()
+            assert len(candidates) == 1
+            assert candidates[0].model_version == "building-test-v2"
+            assert candidates[0].id not in first_candidate_ids
+            assert all(session.get(Building, building_id) is None for building_id in first_candidate_ids)
+            assert all(session.get(Building, building_id) is not None for building_id in preserved_ids)
+            second_job = session.get(ProcessingJob, second_job_id)
+            second_job_detail = session.get(GeoAIJob, second_job_id)
+            assert second_job is not None and second_job.status == "COMPLETED"
+            assert second_job_detail is not None
+            assert second_job_detail.output_refs_json["feature_count"] == 1
     finally:
         get_settings.cache_clear()
 

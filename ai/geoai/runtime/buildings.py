@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections import deque
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import numpy as np
 import rasterio
 import torch
+from rasterio.enums import MaskFlags
 from torchvision.transforms import functional as transforms
 
 from ai.geoai.polygonization.buildings import (
@@ -24,12 +26,20 @@ from ai.geoai.tiling.raster_tiler import tile_geotiff
 # Larger orthomosaics are tiled so inference memory remains bounded.
 DIRECT_INFERENCE_MAX_PIXELS = 2048 * 2048
 TILE_SIZE = 512
+SATURATED_BACKGROUND_MIN = 250
+MIN_BUILDING_AREA_M2 = 0.25
 
 
-def _input_tensor(dataset: rasterio.io.DatasetReader) -> torch.Tensor:
+def _input_tensor(
+    dataset: rasterio.io.DatasetReader,
+    *,
+    data: np.ndarray | None = None,
+) -> torch.Tensor:
     """Read up to three raster bands into the C.2 model's normalized RGB tensor."""
-    indexes = list(range(1, min(3, dataset.count) + 1))
-    data = dataset.read(indexes).astype(np.float32)
+    if data is None:
+        indexes = list(range(1, min(3, dataset.count) + 1))
+        data = dataset.read(indexes)
+    data = data.astype(np.float32, copy=False)
 
     channels: list[np.ndarray] = []
     for band in data:
@@ -69,6 +79,61 @@ def _input_tensor(dataset: rasterio.io.DatasetReader) -> torch.Tensor:
     ).unsqueeze(0)
 
 
+def _edge_connected_saturated_background(data: np.ndarray) -> np.ndarray:
+    """Find saturated-white exterior pixels without masking isolated white roofs."""
+    if data.shape[0] < 3:
+        return np.zeros(data.shape[1:], dtype=bool)
+
+    candidate = np.all(data[:3] >= SATURATED_BACKGROUND_MIN, axis=0)
+    if not candidate.any():
+        return candidate
+    if candidate.all():
+        return candidate
+
+    height, width = candidate.shape
+    exterior = np.zeros_like(candidate)
+    pending: deque[tuple[int, int]] = deque()
+
+    def add(row: int, column: int) -> None:
+        if candidate[row, column] and not exterior[row, column]:
+            exterior[row, column] = True
+            pending.append((row, column))
+
+    for column in range(width):
+        add(0, column)
+        add(height - 1, column)
+    for row in range(1, height - 1):
+        add(row, 0)
+        add(row, width - 1)
+
+    while pending:
+        row, column = pending.popleft()
+        if row > 0:
+            add(row - 1, column)
+        if row + 1 < height:
+            add(row + 1, column)
+        if column > 0:
+            add(row, column - 1)
+        if column + 1 < width:
+            add(row, column + 1)
+
+    return exterior
+
+
+def _valid_inference_mask(
+    dataset: rasterio.io.DatasetReader,
+    data: np.ndarray,
+) -> np.ndarray:
+    """Honor raster validity and conservatively detect unmarked white exterior."""
+    valid = dataset.dataset_mask() != 0
+    has_explicit_validity = dataset.nodata is not None or any(
+        MaskFlags.all_valid not in flags for flags in dataset.mask_flag_enums
+    )
+    if has_explicit_validity:
+        return valid
+    return valid & ~_edge_connected_saturated_background(data)
+
+
 def _infer_dataset(
     dataset: rasterio.io.DatasetReader,
     *,
@@ -82,7 +147,10 @@ def _infer_dataset(
             "Building inference requires a source GeoTIFF with a CRS."
         )
 
-    tensor = _input_tensor(dataset).to(
+    indexes = list(range(1, min(3, dataset.count) + 1))
+    data = dataset.read(indexes)
+    valid = _valid_inference_mask(dataset, data)
+    tensor = _input_tensor(dataset, data=data).to(
         selected_device,
         non_blocking=selected_device.type == "cuda",
     )
@@ -98,12 +166,19 @@ def _infer_dataset(
             .numpy()
         )
 
+    # Invalid/exterior pixels must never become vector candidates even when the
+    # model assigns them high building probability.
+    probability[~valid] = 0.0
+
     return vectorize_buildings(
         probability,
         transform=dataset.transform,
         crs=dataset.crs,
         probability_mask=probability,
-        config=VectorizationConfig(threshold=threshold),
+        config=VectorizationConfig(
+            threshold=threshold,
+            min_area=MIN_BUILDING_AREA_M2,
+        ),
         model_version=model.config.model_version,
         source_image=source_image,
         source_mask=None,
@@ -191,7 +266,7 @@ def infer_and_vectorize_geotiff(
             processed_at=processed_at,
             processing_parameters={
                 "threshold": threshold,
-                "min_area": 0.0,
+                "min_area": MIN_BUILDING_AREA_M2,
                 "simplify_tolerance": 0.0,
                 "default_confidence": None,
                 "tile_size": float(TILE_SIZE),

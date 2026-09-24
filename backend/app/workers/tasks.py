@@ -4,7 +4,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.database import SessionLocal
 from app.core.storage import get_storage_service
@@ -180,13 +180,35 @@ def process_geoai_buildings(self, geoai_job_id: str) -> None:
                 source_path.unlink(missing_ok=True)
             if result.coordinate_space != "WORLD" or not result.source_crs:
                 raise GeoAIServiceError("Building processing requires georeferenced imagery; pixel-space outputs were not persisted.")
+
+            # Serialize replacements for this imagery so concurrent/retried jobs
+            # cannot leave multiple unverified AI candidate sets behind.
+            session.execute(
+                select(ImageryAsset.id)
+                .where(
+                    ImageryAsset.id == asset.id,
+                    ImageryAsset.project_id == geoai_job.project_id,
+                )
+                .with_for_update()
+            ).scalar_one()
+            source_reference = f"imagery:{asset.id}"
+            session.execute(
+                delete(Building).where(
+                    Building.project_id == geoai_job.project_id,
+                    Building.source == "AI_CANDIDATE",
+                    Building.source_reference == source_reference,
+                    Building.status == "AI_PRELIMINARY",
+                    Building.verification_status == "UNVERIFIED",
+                )
+            )
+
             created_ids: list[str] = []
             for feature in result.features:
                 building = Building(
                     project_id=geoai_job.project_id,
                     geometry=from_shape(_to_wgs84(feature.geometry, result.source_crs), srid=4326),
                     source="AI_CANDIDATE",
-                    source_reference=f"imagery:{asset.id}",
+                    source_reference=source_reference,
                     confidence=feature.confidence,
                     model_version=feature.model_version,
                     status="AI_PRELIMINARY",
