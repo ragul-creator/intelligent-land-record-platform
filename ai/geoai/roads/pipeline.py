@@ -106,6 +106,14 @@ def _best_threshold(
     )
 
 
+def _evaluation_thresholds(threshold: float | None) -> tuple[float, ...]:
+    if threshold is None:
+        return DEFAULT_VALIDATION_THRESHOLDS
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError("threshold must be between 0.0 and 1.0.")
+    return (threshold,)
+
+
 def train(config: RoadTrainingConfig) -> dict[str, object]:
     """Train a road-only BCE+Dice checkpoint; callers control data and run duration."""
     if config.epochs <= 0 or config.batch_size <= 0 or config.learning_rate <= 0:
@@ -218,7 +226,18 @@ def train(config: RoadTrainingConfig) -> dict[str, object]:
     }
 
 
-def evaluate(dataset_root: str | Path, split: str, checkpoint: str | Path, *, device_request: str = "auto", batch_size: int = 2, num_workers: int | None = None, limit: int | None = None, image_size: int | None = None) -> dict[str, object]:
+def evaluate(
+    dataset_root: str | Path,
+    split: str,
+    checkpoint: str | Path,
+    *,
+    device_request: str = "auto",
+    batch_size: int = 2,
+    num_workers: int | None = None,
+    limit: int | None = None,
+    image_size: int | None = None,
+    threshold: float | None = None,
+) -> dict[str, object]:
     device, hardware = select_device(device_request)
     model, payload = load_checkpoint(checkpoint, device=device)
     dataset = RoadSegmentationDataset(dataset_root, split, image_size=image_size, limit=limit)
@@ -232,15 +251,17 @@ def evaluate(dataset_root: str | Path, split: str, checkpoint: str | Path, *, de
             shuffle=False,
         ),
         device,
+        thresholds=_evaluation_thresholds(threshold),
     )
     best_threshold, metrics = _best_threshold(sweep)
     return {
         "split": split,
         "metrics": metrics.to_dict(),
         "best_threshold": best_threshold,
+        "threshold_mode": "fixed" if threshold is not None else "sweep",
         "threshold_sweep": {
-            f"{threshold:.2f}": value.to_dict()
-            for threshold, value in sweep.items()
+            f"{evaluated_threshold:.2f}": value.to_dict()
+            for evaluated_threshold, value in sweep.items()
         },
         "device": hardware.to_dict(),
         "model_version": model.config.model_version,
