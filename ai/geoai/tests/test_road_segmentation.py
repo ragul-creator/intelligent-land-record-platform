@@ -15,7 +15,7 @@ from ai.geoai.roads.dataset import (
     validate_road_dataset,
 )
 from ai.geoai.roads.model import load_checkpoint
-from ai.geoai.roads.pipeline import _best_threshold
+from ai.geoai.roads.pipeline import _best_threshold, _evaluation_thresholds
 from ai.geoai.roads.vectorization import RoadVectorizationConfig, vectorize_roads
 from ai.geoai.segmentation.metrics import SegmentationMetrics
 
@@ -216,3 +216,12 @@ def test_road_threshold_selection_prefers_best_validation_iou() -> None:
 
     assert threshold == 0.4
     assert metrics.iou == pytest.approx(0.68)
+
+def test_road_evaluation_can_use_a_fixed_threshold() -> None:
+    assert _evaluation_thresholds(None) == (0.30, 0.40, 0.50, 0.60, 0.70)
+    assert _evaluation_thresholds(0.4) == (0.4,)
+    with pytest.raises(ValueError, match="threshold"):
+        _evaluation_thresholds(-0.01)
+    with pytest.raises(ValueError, match="threshold"):
+        _evaluation_thresholds(1.01)
+
