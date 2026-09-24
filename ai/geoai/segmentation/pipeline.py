@@ -14,9 +14,10 @@ import torch
 from PIL import Image
 from torch import Tensor, nn
 from torch.utils.data import DataLoader
-from torchvision.transforms import functional as transforms
-
-from ai.geoai.segmentation.building_dataset import WHUBuildingDataset
+from ai.geoai.segmentation.building_dataset import (
+    WHUBuildingDataset,
+    _percentile_normalize_rgb,
+)
 from ai.geoai.segmentation.metrics import SegmentationMetrics, binary_confusion, metrics_from_confusion
 from ai.geoai.segmentation.model import BuildingSegmenter, ModelConfig, create_model, load_checkpoint, save_checkpoint
 from ai.geoai.segmentation.runtime import HardwareInfo, choose_num_workers, select_device
@@ -258,7 +259,13 @@ def infer_input(checkpoint: str | Path, input_path: str | Path, output_directory
     for file in files:
         with Image.open(file) as opened:
             image = opened.convert("RGB")
-            tensor = transforms.normalize(transforms.to_tensor(image), mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]).unsqueeze(0)
+            normalized = _percentile_normalize_rgb(image)
+            tensor = torch.from_numpy(normalized)
+            tensor = (
+                tensor
+                - torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+            ) / torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+            tensor = tensor.unsqueeze(0)
         with torch.inference_mode(), torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda"):
             probability = model.probabilities(tensor.to(device, non_blocking=device.type == "cuda"))[0, 0].float().cpu().numpy()
         binary = probability >= threshold
