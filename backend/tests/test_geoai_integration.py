@@ -524,7 +524,12 @@ def test_road_job_persists_preliminary_wgs84_features_from_mocked_runtime(monkey
             geoai = GeoAIJob(id=processing.id, project_id=project.id, requested_by_user_id=surveyor.id, job_type="ROAD_VECTORIZE", imagery_asset_id=asset.id, parameters_json={})
             session.add(geoai)
             session.commit()
-            job_id, project_id, asset_id = geoai.id, project.id, asset.id
+            job_id, project_id, asset_id, user_id = (
+                geoai.id,
+                project.id,
+                asset.id,
+                surveyor.id,
+            )
 
         process_geoai_roads.run(str(job_id))
 
@@ -567,7 +572,7 @@ def test_road_job_persists_preliminary_wgs84_features_from_mocked_runtime(monkey
             second_geoai = GeoAIJob(
                 id=second_processing.id,
                 project_id=project_id,
-                requested_by_user_id=surveyor.id,
+                requested_by_user_id=user_id,
                 job_type="ROAD_VECTORIZE",
                 imagery_asset_id=asset_id,
                 parameters_json={},
