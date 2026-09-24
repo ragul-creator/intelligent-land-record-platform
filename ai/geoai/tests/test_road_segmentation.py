@@ -24,7 +24,12 @@ def test_road_mask_vectorizes_to_a_confident_projected_centerline() -> None:
     probability = np.zeros((12, 12), dtype=np.float32)
     probability[5:7, 2:10] = 0.8
 
-    result = vectorize_roads(probability, transform=Affine.translation(500000, 1000000), crs="EPSG:32643", model_version="road-segmentation-h2b5-v1", config=RoadVectorizationConfig(threshold=0.5, min_component_pixels=8))
+    result = vectorize_roads(probability, transform=Affine.translation(500000, 1000000), crs="EPSG:32643", model_version="road-segmentation-h2b5-v1", config=RoadVectorizationConfig(
+        threshold=0.5,
+        min_component_pixels=8,
+        min_path_pixels=2,
+        closing_radius=0,
+    ))
 
     assert len(result.features) == 1
     assert result.features[0].confidence == pytest.approx(0.8)
@@ -225,3 +230,68 @@ def test_road_evaluation_can_use_a_fixed_threshold() -> None:
     with pytest.raises(ValueError, match="threshold"):
         _evaluation_thresholds(1.01)
 
+
+
+def test_skeleton_road_vectorizer_follows_a_bend_without_diagonal_shortcut() -> None:
+    probability = np.zeros((24, 24), dtype=np.float32)
+
+    probability[5, 4:19] = 0.9
+    probability[5:20, 18] = 0.9
+
+    result = vectorize_roads(
+        probability,
+        transform=Affine.identity(),
+        crs="EPSG:3857",
+        model_version="road-segmentation-h2b5-v1",
+        config=RoadVectorizationConfig(
+            threshold=0.5,
+            min_component_pixels=4,
+            min_path_pixels=2,
+            closing_radius=0,
+        ),
+    )
+
+    assert len(result.features) == 1
+
+    line = result.features[0].geometry
+    coordinates = np.asarray(line.coords)
+
+    assert len(coordinates) > 4
+
+    direct_distance = np.linalg.norm(
+        coordinates[-1] - coordinates[0]
+    )
+
+    # An L-shaped road must remain longer than a straight diagonal
+    # joining its endpoints.
+    assert line.length > direct_distance * 1.2
+
+
+def test_skeleton_road_vectorizer_preserves_crossroad_branches() -> None:
+    probability = np.zeros((25, 25), dtype=np.float32)
+
+    probability[12, 3:22] = 0.9
+    probability[3:22, 12] = 0.9
+
+    result = vectorize_roads(
+        probability,
+        transform=Affine.identity(),
+        crs="EPSG:3857",
+        model_version="road-segmentation-h2b5-v1",
+        config=RoadVectorizationConfig(
+            threshold=0.5,
+            min_component_pixels=4,
+            min_path_pixels=3,
+            closing_radius=0,
+        ),
+    )
+
+    # The crossing must remain a graph with multiple road branches
+    # rather than collapsing to one principal-axis line.
+    assert len(result.features) >= 4
+
+    assert all(
+        feature.geometry.is_valid
+        and feature.geometry.length > 0
+        for feature in result.features
+    )
