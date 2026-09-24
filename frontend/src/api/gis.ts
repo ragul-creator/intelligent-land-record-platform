@@ -47,7 +47,7 @@ export function createParcelVersion(projectId: string, parcelId: string, payload
 
 export function loadImageryPreview(projectId: string, assetId: string): Promise<ImageryPreview> { return get<ImageryPreview>(`/projects/${projectId}/imagery/${assetId}/preview-url`); }
 
-export function createGeoAIJob(projectId: string, payload: { job_type: "BUILDING_VECTORIZE" | "PARCEL_IMPORT"; source_type: string; source_payload: Record<string, unknown>; source_crs?: string; source_reference?: string | null; imagery_asset_id?: string; idempotency_key?: string }): Promise<GeoAIJob> {
+export function createGeoAIJob(projectId: string, payload: { job_type: "BUILDING_VECTORIZE" | "ROAD_VECTORIZE" | "PARCEL_IMPORT"; source_type: string; source_payload: Record<string, unknown>; source_crs?: string; source_reference?: string | null; imagery_asset_id?: string; idempotency_key?: string }): Promise<GeoAIJob> {
   return request<GeoAIJob>(`/projects/${projectId}/geoai/jobs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
 }
 
