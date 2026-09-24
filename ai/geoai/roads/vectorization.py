@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Iterable
 
 import numpy as np
@@ -86,7 +86,7 @@ def vectorize_roads(probability: np.ndarray, *, transform: Affine, crs: CRS | st
     if probability.ndim != 2 or not 0 <= config.threshold <= 1 or config.min_component_pixels < 1:
         raise ValueError("Road probability mask or vectorization configuration is invalid.")
     source_crs = crs_to_string(crs)
-    processed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    processed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     features = []
     for component in _components(np.isfinite(probability) & (probability >= config.threshold)):
         if len(component) < config.min_component_pixels:
