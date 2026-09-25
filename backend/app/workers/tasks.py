@@ -262,6 +262,28 @@ def process_geoai_roads(self, geoai_job_id: str) -> None:
                 result = infer_and_vectorize_geotiff(source_path, checkpoint=checkpoint, device=get_settings().geoai_device, threshold=get_settings().geoai_road_threshold)
             finally:
                 source_path.unlink(missing_ok=True)
+
+            # Match building rerun semantics: keep reviewed/manual roads, but
+            # replace stale unverified AI candidates for this exact imagery.
+            session.execute(
+                select(ImageryAsset.id)
+                .where(
+                    ImageryAsset.id == asset.id,
+                    ImageryAsset.project_id == geoai_job.project_id,
+                )
+                .with_for_update()
+            ).scalar_one()
+            source_reference = f"imagery:{asset.id}"
+            session.execute(
+                delete(Road).where(
+                    Road.project_id == geoai_job.project_id,
+                    Road.source == "AI_CANDIDATE",
+                    Road.source_reference == source_reference,
+                    Road.status == "AI_PRELIMINARY",
+                    Road.verification_status == "UNVERIFIED",
+                )
+            )
+
             created_ids: list[str] = []
             for feature in result.features:
                 road = Road(
@@ -269,7 +291,7 @@ def process_geoai_roads(self, geoai_job_id: str) -> None:
                     geometry=from_shape(_to_wgs84(feature.geometry, result.source_crs), srid=4326),
                     road_class="ROAD",
                     source="AI_CANDIDATE",
-                    source_reference=f"imagery:{asset.id}",
+                    source_reference=source_reference,
                     confidence=feature.confidence,
                     model_version=feature.model_version,
                     status="AI_PRELIMINARY",

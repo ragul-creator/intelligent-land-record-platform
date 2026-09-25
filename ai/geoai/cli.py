@@ -109,6 +109,7 @@ def _parser() -> argparse.ArgumentParser:
     road_train_command.add_argument("--image-size", type=int)
     road_train_command.add_argument("--checkpoint-directory", type=Path, default=Path("data/models/roads"))
     road_train_command.add_argument("--resume", type=Path)
+    road_train_command.add_argument("--pretrained-backbone", action="store_true")
     road_infer_command = commands.add_parser("road-infer", help="Run a local road checkpoint against one georeferenced GeoTIFF.")
     road_infer_command.add_argument("--checkpoint", type=Path, required=True)
     road_infer_command.add_argument("--source", type=Path, required=True)
@@ -125,6 +126,7 @@ def _parser() -> argparse.ArgumentParser:
     road_evaluate_command.add_argument("--num-workers", type=int)
     road_evaluate_command.add_argument("--limit", type=int)
     road_evaluate_command.add_argument("--image-size", type=int)
+    road_evaluate_command.add_argument("--threshold", type=float)
     return parser
 
 
@@ -281,7 +283,28 @@ def main(argv: list[str] | None = None) -> int:
         if arguments.command == "road-train":
             from ai.geoai.roads.pipeline import RoadTrainingConfig, train
 
-            print(json.dumps(train(RoadTrainingConfig(dataset_root=arguments.dataset_root, epochs=arguments.epochs, batch_size=arguments.batch_size, learning_rate=arguments.learning_rate, device=arguments.device, num_workers=arguments.num_workers, limit=arguments.limit, image_size=arguments.image_size, checkpoint_directory=arguments.checkpoint_directory, resume=arguments.resume)), indent=2, default=str, sort_keys=True))
+            print(
+                json.dumps(
+                    train(
+                        RoadTrainingConfig(
+                            dataset_root=arguments.dataset_root,
+                            epochs=arguments.epochs,
+                            batch_size=arguments.batch_size,
+                            learning_rate=arguments.learning_rate,
+                            device=arguments.device,
+                            num_workers=arguments.num_workers,
+                            limit=arguments.limit,
+                            image_size=arguments.image_size,
+                            checkpoint_directory=arguments.checkpoint_directory,
+                            resume=arguments.resume,
+                            pretrained_backbone=arguments.pretrained_backbone,
+                        )
+                    ),
+                    indent=2,
+                    default=str,
+                    sort_keys=True,
+                )
+            )
             return 0
         if arguments.command == "road-infer":
             from ai.geoai.runtime.roads import infer_and_vectorize_geotiff
@@ -292,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         if arguments.command == "road-evaluate":
             from ai.geoai.roads.pipeline import evaluate
 
-            print(json.dumps(evaluate(arguments.dataset_root, arguments.split, arguments.checkpoint, device_request=arguments.device, batch_size=arguments.batch_size, num_workers=arguments.num_workers, limit=arguments.limit, image_size=arguments.image_size), indent=2, sort_keys=True))
+            print(json.dumps(evaluate(arguments.dataset_root, arguments.split, arguments.checkpoint, device_request=arguments.device, batch_size=arguments.batch_size, num_workers=arguments.num_workers, limit=arguments.limit, image_size=arguments.image_size, threshold=arguments.threshold), indent=2, sort_keys=True))
             return 0
         from ai.geoai.segmentation.pipeline import evaluate
 

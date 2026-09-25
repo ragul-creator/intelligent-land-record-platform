@@ -490,22 +490,67 @@ def test_road_job_persists_preliminary_wgs84_features_from_mocked_runtime(monkey
             asset = ImageryAsset(project_id=project.id, file_id=source_file.id, source_crs="EPSG:4326", coordinate_space="WORLD", metadata_json={"registration_status": "READY"})
             session.add(asset)
             session.flush()
+            source_reference = f"imagery:{asset.id}"
+            stale_road = Road(
+                project_id=project.id,
+                geometry=from_shape(
+                    LineString([(77.0, 13.0), (77.0005, 13.0005)]),
+                    srid=4326,
+                ),
+                road_class="ROAD",
+                source="AI_CANDIDATE",
+                source_reference=source_reference,
+                status="AI_PRELIMINARY",
+                verification_status="UNVERIFIED",
+            )
+            verified_road = Road(
+                project_id=project.id,
+                geometry=from_shape(
+                    LineString([(77.01, 13.01), (77.011, 13.011)]),
+                    srid=4326,
+                ),
+                road_class="ROAD",
+                source="AI_CANDIDATE",
+                source_reference=source_reference,
+                status="VERIFIED",
+                verification_status="VERIFIED",
+            )
+            session.add_all((stale_road, verified_road))
+            session.flush()
+            stale_id, verified_id = stale_road.id, verified_road.id
             processing = ProcessingJob(project_id=project.id, job_type="ROAD_VECTORIZE", idempotency_key=f"h2b5:{uuid.uuid4()}", status="QUEUED")
             session.add(processing)
             session.flush()
             geoai = GeoAIJob(id=processing.id, project_id=project.id, requested_by_user_id=surveyor.id, job_type="ROAD_VECTORIZE", imagery_asset_id=asset.id, parameters_json={})
             session.add(geoai)
             session.commit()
-            job_id, project_id, asset_id = geoai.id, project.id, asset.id
+            job_id, project_id, asset_id, user_id = (
+                geoai.id,
+                project.id,
+                asset.id,
+                surveyor.id,
+            )
 
         process_geoai_roads.run(str(job_id))
 
         with SessionLocal() as session:
             job = session.get(ProcessingJob, job_id)
-            persisted = session.scalar(select(Road).where(Road.project_id == project_id))
+            candidates = session.scalars(
+                select(Road).where(
+                    Road.project_id == project_id,
+                    Road.source == "AI_CANDIDATE",
+                    Road.source_reference == f"imagery:{asset_id}",
+                    Road.status == "AI_PRELIMINARY",
+                    Road.verification_status == "UNVERIFIED",
+                )
+            ).all()
             detail = session.get(GeoAIJob, job_id)
             assert job is not None and job.status == "COMPLETED" and job.progress == 100
-            assert persisted is not None
+            assert len(candidates) == 1
+            persisted = candidates[0]
+            assert persisted.id != stale_id
+            assert session.get(Road, stale_id) is None
+            assert session.get(Road, verified_id) is not None
             assert persisted.source == "AI_CANDIDATE"
             assert persisted.status == "AI_PRELIMINARY"
             assert persisted.verification_status == "UNVERIFIED"
@@ -514,6 +559,44 @@ def test_road_job_persists_preliminary_wgs84_features_from_mocked_runtime(monkey
             assert persisted.confidence == pytest.approx(0.82)
             assert persisted.length_m == pytest.approx(155.0)
             assert detail is not None and detail.output_refs_json["road_ids"] == [str(persisted.id)]
+
+            first_candidate_id = persisted.id
+            second_processing = ProcessingJob(
+                project_id=project_id,
+                job_type="ROAD_VECTORIZE",
+                idempotency_key=f"h2b5:{uuid.uuid4()}",
+                status="QUEUED",
+            )
+            session.add(second_processing)
+            session.flush()
+            second_geoai = GeoAIJob(
+                id=second_processing.id,
+                project_id=project_id,
+                requested_by_user_id=user_id,
+                job_type="ROAD_VECTORIZE",
+                imagery_asset_id=asset_id,
+                parameters_json={},
+            )
+            session.add(second_geoai)
+            session.commit()
+            second_job_id = second_processing.id
+
+        process_geoai_roads.run(str(second_job_id))
+
+        with SessionLocal() as session:
+            candidates = session.scalars(
+                select(Road).where(
+                    Road.project_id == project_id,
+                    Road.source == "AI_CANDIDATE",
+                    Road.source_reference == f"imagery:{asset_id}",
+                    Road.status == "AI_PRELIMINARY",
+                    Road.verification_status == "UNVERIFIED",
+                )
+            ).all()
+            assert len(candidates) == 1
+            assert candidates[0].id != first_candidate_id
+            assert session.get(Road, first_candidate_id) is None
+            assert session.get(Road, verified_id) is not None
     finally:
         get_settings.cache_clear()
 

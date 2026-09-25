@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import random
 from typing import Callable
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 
 class DatasetValidationError(ValueError):
@@ -84,6 +85,58 @@ def validate_whu_dataset(root: str | Path, split: str) -> tuple[DatasetCheck, tu
     )
 
 
+def _augment_pair(
+    image: Image.Image,
+    mask: Image.Image,
+) -> tuple[Image.Image, Image.Image]:
+    """Apply aerial-orientation and mild radiometric augmentation."""
+    if image.width == image.height:
+        turns = random.randrange(4)
+        for _ in range(turns):
+            image = image.transpose(Image.Transpose.ROTATE_90)
+            mask = mask.transpose(Image.Transpose.ROTATE_90)
+    elif random.random() < 0.5:
+        image = image.transpose(Image.Transpose.ROTATE_180)
+        mask = mask.transpose(Image.Transpose.ROTATE_180)
+    if random.random() < 0.5:
+        image = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        mask = mask.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    if random.random() < 0.5:
+        image = image.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        mask = mask.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+
+    image = ImageEnhance.Brightness(image).enhance(
+        random.uniform(0.85, 1.15)
+    )
+    image = ImageEnhance.Contrast(image).enhance(
+        random.uniform(0.85, 1.15)
+    )
+    image = ImageEnhance.Color(image).enhance(
+        random.uniform(0.90, 1.10)
+    )
+    return image, mask
+
+
+def _percentile_normalize_rgb(image: Image.Image) -> np.ndarray:
+    """Mirror runtime per-band 2/98 percentile stretching for train/inference parity."""
+    data = np.array(image, dtype=np.float32, copy=True).transpose(2, 0, 1)
+    channels: list[np.ndarray] = []
+    for band in data[:3]:
+        finite = np.isfinite(band)
+        if not finite.any():
+            channels.append(np.zeros(band.shape, dtype=np.float32))
+            continue
+        low, high = np.percentile(band[finite], (2, 98))
+        if high <= low:
+            high = low + 1.0
+        channels.append(
+            np.clip((band - low) / (high - low), 0.0, 1.0).astype(
+                np.float32, copy=False
+            )
+        )
+    return np.stack(channels[:3]).astype(np.float32, copy=False)
+
+
 class WHUBuildingDataset:
     """Deterministic WHU RGB/mask dataset with optional train-only augmentation callback."""
 
@@ -124,12 +177,12 @@ class WHUBuildingDataset:
                 raise DatasetValidationError(f"Image/mask dimensions differ for sample {sample.sample_id}.")
             if self.transform is not None:
                 image, mask = self.transform(image, mask)
-            elif self.augment and index % 2 == 1:
-                image, mask = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT), mask.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            elif self.augment:
+                image, mask = _augment_pair(image, mask)
             if self.image_size is not None:
                 image = image.resize((self.image_size, self.image_size), Image.Resampling.BILINEAR)
                 mask = mask.resize((self.image_size, self.image_size), Image.Resampling.NEAREST)
-            image_array = np.array(image, dtype=np.float32, copy=True).transpose(2, 0, 1) / 255.0
+            image_array = _percentile_normalize_rgb(image)
             image_tensor = torch.from_numpy(image_array)
             image_tensor = (image_tensor - torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)) / torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
             mask_tensor = torch.from_numpy(np.array(mask, dtype=np.uint8, copy=True)).unsqueeze(0).gt(0).to(dtype=image_tensor.dtype)

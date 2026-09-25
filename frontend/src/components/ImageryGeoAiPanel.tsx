@@ -31,6 +31,7 @@ export function ImageryGeoAiPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [activeJobKind, setActiveJobKind] = useState<"BUILDING_VECTORIZE" | "ROAD_VECTORIZE" | null>(null);
 
   const selected =
     assets.find((asset) => asset.id === selectedId) ??
@@ -87,26 +88,28 @@ export function ImageryGeoAiPanel({
   });
 
   const run = useMutation({
-    mutationFn: () =>
+    mutationFn: (jobType: "BUILDING_VECTORIZE" | "ROAD_VECTORIZE") =>
       createGeoAIJob(projectId, {
-        job_type: "BUILDING_VECTORIZE",
+        job_type: jobType,
         source_type: "REGISTERED_IMAGERY",
         source_payload: {},
         imagery_asset_id: selected!.id,
         source_reference: `imagery:${selected!.id}`,
-        idempotency_key: `buildings:${selected!.id}:${crypto.randomUUID()}`,
+        idempotency_key: `${jobType === "ROAD_VECTORIZE" ? "roads" : "buildings"}:${selected!.id}:${crypto.randomUUID()}`,
       }),
-    onSuccess: (createdJob) => {
+    onSuccess: (createdJob, jobType) => {
       setActiveJobId(createdJob.id);
+      setActiveJobKind(jobType);
+      const label = jobType === "ROAD_VECTORIZE" ? "Road" : "Building";
       setMessage(
-        `Building processing ${createdJob.status.toLowerCase()}. Waiting for completion...`,
+        `${label} processing ${createdJob.status.toLowerCase()}. Waiting for completion...`,
       );
     },
     onError: (error) =>
       setMessage(
         error instanceof ApiError
           ? error.message
-          : "Building processing could not be queued.",
+          : "GeoAI processing could not be queued.",
       ),
   });
 
@@ -132,38 +135,42 @@ export function ImageryGeoAiPanel({
   useEffect(() => {
     if (!job.data) return;
 
+    const label = activeJobKind === "ROAD_VECTORIZE" ? "Road" : "Building";
+
     if (job.data.status === "QUEUED") {
-      setMessage("Building processing queued...");
+      setMessage(`${label} processing queued...`);
       return;
     }
 
     if (job.data.status === "PROCESSING") {
-      setMessage("Building processing in progress...");
+      setMessage(`${label} processing in progress...`);
       return;
     }
 
     if (job.data.status === "COMPLETED") {
-      setMessage("Building processing completed. Refreshing imagery and map layers...");
+      setMessage(`${label} processing completed. Refreshing imagery and map layers...`);
       setActiveJobId(null);
+      setActiveJobKind(null);
       void (async () => {
         await onChanged();
         const refreshedPreview = await preview.refetch();
         if (refreshedPreview.data) onPreview(refreshedPreview.data);
-        setMessage("Building processing completed. Imagery and map layers refreshed.");
+        setMessage(`${label} processing completed. Imagery and map layers refreshed.`);
         onZoomToImagery();
       })();
       return;
     }
 
     if (job.data.status === "FAILED") {
-      setMessage("Building processing failed.");
+      setMessage(`${label} processing failed.`);
       setActiveJobId(null);
+      setActiveJobKind(null);
     }
-  }, [job.data, onChanged, onPreview, onZoomToImagery, preview.refetch]);
+  }, [activeJobKind, job.data, onChanged, onPreview, onZoomToImagery, preview.refetch]);
 
   return (
     <section className="imagery-panel" aria-label="Imagery and GeoAI controls">
-      <p className="eyebrow">Imagery and building GeoAI</p>
+      <p className="eyebrow">Imagery, building and road GeoAI</p>
       <h2>Registered GeoTIFFs</h2>
 
       {canUpload && (
@@ -231,28 +238,42 @@ export function ImageryGeoAiPanel({
       {selected && !hasPrivateFile && (
         <p className="panel-note">
           Metadata-only legacy imagery has no private source file, so preview
-          and building processing are unavailable.
+          and GeoAI processing are unavailable.
         </p>
       )}
 
       {selected?.metadata.registration_status === "READY" &&
         hasPrivateFile &&
         canProcess && (
-          <button
-            type="button"
-            className="primary-action"
-            disabled={run.isPending || Boolean(activeJobId)}
-            onClick={() => run.mutate()}
-          >
-            {activeJobId ? "Building GeoAI running..." : "Run Building GeoAI"}
-          </button>
+          <div className="imagery-actions">
+            <button
+              type="button"
+              className="primary-action"
+              disabled={run.isPending || Boolean(activeJobId)}
+              onClick={() => run.mutate("BUILDING_VECTORIZE")}
+            >
+              {activeJobKind === "BUILDING_VECTORIZE" && activeJobId
+                ? "Building GeoAI running..."
+                : "Run Building GeoAI"}
+            </button>
+            <button
+              type="button"
+              className="primary-action"
+              disabled={run.isPending || Boolean(activeJobId)}
+              onClick={() => run.mutate("ROAD_VECTORIZE")}
+            >
+              {activeJobKind === "ROAD_VECTORIZE" && activeJobId
+                ? "Road GeoAI running..."
+                : "Run Road GeoAI"}
+            </button>
+          </div>
         )}
 
       {selected?.metadata.registration_status === "READY" &&
         hasPrivateFile &&
         !canProcess && (
           <p className="panel-note">
-            `geoai:process` is required to run building extraction.
+            `geoai:process` is required to run building or road extraction.
           </p>
         )}
 
@@ -269,8 +290,8 @@ export function ImageryGeoAiPanel({
 
       <p className="panel-note">
         Original imagery remains private. The map uses a time-limited derived
-        preview. Building footprints are AI preliminary and never parcel
-        boundaries.
+        preview. Building footprints and road vectors are AI preliminary and
+        require human review; they never define legal parcel boundaries.
       </p>
     </section>
   );
