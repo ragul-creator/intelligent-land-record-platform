@@ -6,14 +6,16 @@ import csv
 import io
 import uuid
 
-from fastapi import APIRouter, Depends, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import FileResponse, JSONResponse, Response
+from starlette.background import BackgroundTask
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audit.service import record_audit
 from app.core.auth import get_current_user, user_permissions
 from app.core.database import get_db_session
+from app.core.errors import ApiError
 from app.models import (
     Document,
     DocumentExtractedField,
@@ -31,6 +33,7 @@ from app.schemas.platform import (
     ProjectSearchResponse,
 )
 from app.services.geoai import current_version, geometry_geojson
+from app.services.gis_interchange import cleanup_temp_file, generate_project_geopackage
 from app.services.project_access import get_project_for_user
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["platform hardening"])
@@ -219,6 +222,13 @@ def export_manifest(
                 media_type="application/geo+json",
                 description="Persisted parcel geometries with draft and verification labels preserved.",
             ),
+            ExportDescriptor(
+                code="GIS_GEOPACKAGE",
+                label="Project GIS GeoPackage",
+                path=f"/api/v1/projects/{project.id}/exports/gis.gpkg",
+                media_type="application/geopackage+sqlite3",
+                description="Project GIS evidence with provenance and verification status.",
+            ),
         ],
     )
 
@@ -369,3 +379,63 @@ def export_parcels_geojson(
         media_type="application/geo+json",
         headers={"Content-Disposition": f'attachment; filename="project-{project.id}-parcels.geojson"'},
     )
+
+
+@router.get("/exports/gis.gpkg")
+def export_project_geopackage(
+    project_id: uuid.UUID,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> FileResponse:
+    project = get_project_for_user(session, user, project_id, "export:read")
+    record_audit(
+        session,
+        "project.export_geopackage_requested",
+        "project",
+        project.id,
+        actor_id=user.id,
+        project_id=project.id,
+    )
+    session.commit()
+
+    temp_path = None
+    try:
+        temp_path, layer_counts = generate_project_geopackage(session, project.id)
+        record_audit(
+            session,
+            "project.export_geopackage",
+            "project",
+            project.id,
+            actor_id=user.id,
+            project_id=project.id,
+            metadata={
+                "layer_counts": layer_counts,
+                "total_features": sum(layer_counts.values()),
+            },
+        )
+        session.commit()
+        return FileResponse(
+            path=str(temp_path),
+            media_type="application/geopackage+sqlite3",
+            filename=f"project-{project.id}.gpkg",
+            background=BackgroundTask(cleanup_temp_file, temp_path),
+        )
+    except Exception as err:
+        session.rollback()
+        if temp_path is not None:
+            cleanup_temp_file(temp_path)
+        record_audit(
+            session,
+            "project.export_geopackage_failed",
+            "project",
+            project.id,
+            actor_id=user.id,
+            project_id=project.id,
+            metadata={"error_code": "GIS_EXPORT_FAILED"},
+        )
+        session.commit()
+        raise ApiError(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "GIS_EXPORT_FAILED",
+            "Failed to generate project GeoPackage export.",
+        ) from err
