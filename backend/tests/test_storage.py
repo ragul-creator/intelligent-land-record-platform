@@ -4,7 +4,7 @@ import pytest
 
 from app.core.config import Settings
 from app.core.storage import PrivateObjectStorage
-from app.services.file_policy import FileCategory, UploadMetadata
+from app.services.file_policy import FileCategory, UploadMetadata, upload_permission_for_category
 
 
 class FakeS3Client:
@@ -102,3 +102,79 @@ def test_upload_metadata_rejects_unsafe_or_disallowed_values() -> None:
             size_bytes=1024,
             category=FileCategory.DOCUMENT,
         )
+
+
+@pytest.mark.parametrize(
+    "mime_type",
+    [
+        "application/geopackage+sqlite3",
+        "application/x-sqlite3",
+        "application/octet-stream",
+    ],
+)
+def test_gis_import_metadata_accepts_supported_mime_types(mime_type: str) -> None:
+    metadata = UploadMetadata(
+        filename="cadastral_survey.gpkg",
+        content_type=mime_type,
+        size_bytes=4096,
+        category=FileCategory.GIS_IMPORT,
+    )
+    assert metadata.category == FileCategory.GIS_IMPORT
+    assert metadata.content_type == mime_type
+
+
+def test_gis_import_metadata_rejects_non_gpkg_extensions() -> None:
+    for invalid_filename in ("parcels.geojson", "parcels.zip", "parcels.sqlite", "parcels.gpkg.bak", "parcels.pdf"):
+        with pytest.raises(ValueError, match=r"\.gpkg extension"):
+            UploadMetadata(
+                filename=invalid_filename,
+                content_type="application/geopackage+sqlite3",
+                size_bytes=4096,
+                category=FileCategory.GIS_IMPORT,
+            )
+
+
+def test_gis_import_metadata_rejects_unsupported_mime_types() -> None:
+    for invalid_mime in ("application/geo+json", "application/json", "application/pdf", "image/tiff"):
+        with pytest.raises(ValueError, match="Content type is not allowed"):
+            UploadMetadata(
+                filename="parcels.gpkg",
+                content_type=invalid_mime,
+                size_bytes=4096,
+                category=FileCategory.GIS_IMPORT,
+            )
+
+
+def test_upload_permission_for_category_enforces_rbac_rules() -> None:
+    assert upload_permission_for_category(FileCategory.GIS_IMPORT) == "geo:edit_draft"
+    assert upload_permission_for_category("GIS_IMPORT") == "geo:edit_draft"
+    assert upload_permission_for_category(FileCategory.IMAGERY) == "imagery:upload"
+    assert upload_permission_for_category(FileCategory.DOCUMENT) == "document:upload"
+    assert upload_permission_for_category(FileCategory.GIS) == "document:upload"
+    assert upload_permission_for_category(FileCategory.SUPPORTING) == "document:upload"
+
+
+def test_existing_categories_and_gis_behavior_preserved() -> None:
+    gis_meta = UploadMetadata(
+        filename="boundary.geojson",
+        content_type="application/geo+json",
+        size_bytes=2048,
+        category=FileCategory.GIS,
+    )
+    assert gis_meta.category == FileCategory.GIS
+
+    doc_meta = UploadMetadata(
+        filename="deed.pdf",
+        content_type="application/pdf",
+        size_bytes=2048,
+        category=FileCategory.DOCUMENT,
+    )
+    assert doc_meta.category == FileCategory.DOCUMENT
+
+    img_meta = UploadMetadata(
+        filename="ortho.tif",
+        content_type="image/tiff",
+        size_bytes=2048,
+        category=FileCategory.IMAGERY,
+    )
+    assert img_meta.category == FileCategory.IMAGERY

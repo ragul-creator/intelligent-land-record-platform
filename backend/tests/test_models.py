@@ -86,3 +86,33 @@ def test_record_parcel_link_constraints_are_declared() -> None:
         "ck_record_parcel_links_confidence",
     } <= constraints
     assert len(RecordParcelLink.__table__.foreign_key_constraints) == 6
+
+
+def test_geopackage_interchange_constraints_are_declared() -> None:
+    file_constraints = {
+        constraint.name: constraint
+        for constraint in foundation.File.__table__.constraints
+        if constraint.name == "ck_files_category"
+    }
+    assert "ck_files_category" in file_constraints
+    file_sql = str(file_constraints["ck_files_category"].sqltext)
+    for category in ("DOCUMENT", "IMAGERY", "GIS", "SUPPORTING", "GIS_IMPORT"):
+        assert f"'{category}'" in file_sql
+
+    geoai_constraints = {
+        constraint.name: constraint
+        for constraint in foundation.GeoAIJob.__table__.constraints
+        if constraint.name == "ck_geoai_jobs_type"
+    }
+    assert "ck_geoai_jobs_type" in geoai_constraints
+    geoai_sql = str(geoai_constraints["ck_geoai_jobs_type"].sqltext)
+    for job_type in (
+        "PARCEL_IMPORT",
+        "BUILDING_VECTORIZE",
+        "ROAD_VECTORIZE",
+        "ROAD_IMPORT",
+        "LAND_USE_IMPORT",
+        "TOPOLOGY_VALIDATE",
+        "GEOPACKAGE_IMPORT",
+    ):
+        assert f"'{job_type}'" in geoai_sql
