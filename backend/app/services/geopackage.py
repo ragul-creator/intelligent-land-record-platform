@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 import sqlite3
 import struct
+import tempfile
+import uuid
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
@@ -15,7 +17,11 @@ from shapely.geometry import GeometryCollection, LineString, MultiLineString, Mu
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as transform_geometry
 from shapely.ops import unary_union
+from sqlalchemy.orm import Session
 
+from app.audit.service import record_audit
+from app.core.storage import get_storage_service
+from app.models import File, GeoAIJob, ProcessingJob
 from app.schemas.geopackage import (
     EXPECTED_GEOMETRY_FAMILIES,
     GIS_IMPORT_CRS_MISSING,
@@ -24,6 +30,8 @@ from app.schemas.geopackage import (
     GIS_IMPORT_LAYER_NOT_FOUND,
     GIS_IMPORT_MAPPING_INVALID,
     CRSInfo,
+    GeoPackageImportJobResult,
+    GeoPackageImportLayerResult,
     GeoPackageInspection,
     GeometryValidationResult,
     LayerInspection,
@@ -31,6 +39,7 @@ from app.schemas.geopackage import (
     LogicalLayer,
     RejectionSummary,
 )
+from app.services.processing_jobs import mark_job_completed, mark_job_processing
 
 
 class GeoPackageServiceError(ValueError):
@@ -532,3 +541,232 @@ def iter_layer_features(
             row_idx += 1
     finally:
         conn.close()
+
+
+def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[str, Any]:
+    """Execute GeoPackage validation pipeline for a GEOPACKAGE_IMPORT processing job.
+
+    Performs:
+    1. ProcessingJob & GeoAIJob resolution and status validation.
+    2. File resolution, category check, and project isolation check.
+    3. Storage fetch to temporary local file with guaranteed cleanup.
+    4. Inspection and layer mapping validation.
+    5. Per-layer feature streaming, geometry validation, repair, and transformation to EPSG:4326.
+    6. Bounded metrics accumulation and ProcessingJob completion.
+    """
+    job = session.get(ProcessingJob, job_id)
+    if job is None or job.status not in ("QUEUED", "PROCESSING"):
+        return {}
+
+    if job.job_type != "GEOPACKAGE_IMPORT":
+        raise GeoPackageServiceError(
+            f"Unsupported job type '{job.job_type}' for GeoPackage import.",
+            code=GIS_IMPORT_FILE_INVALID,
+        )
+
+    geoai_job = session.get(GeoAIJob, job_id)
+    if geoai_job is None:
+        raise GeoPackageServiceError(
+            "Linked GeoAI job record not found for GeoPackage import.",
+            code=GIS_IMPORT_FILE_INVALID,
+        )
+
+    params = geoai_job.parameters_json or {}
+    file_id_raw = params.get("file_id")
+    if not file_id_raw:
+        raise GeoPackageServiceError(
+            "Missing 'file_id' in GeoPackage import parameters.",
+            code=GIS_IMPORT_FILE_INVALID,
+        )
+    try:
+        file_id = uuid.UUID(str(file_id_raw))
+    except (ValueError, TypeError) as err:
+        raise GeoPackageServiceError(
+            "Invalid 'file_id' format in parameters.",
+            code=GIS_IMPORT_FILE_INVALID,
+        ) from err
+
+    raw_mapping = params.get("layer_mapping")
+    if not raw_mapping:
+        raise GeoPackageServiceError(
+            "Missing 'layer_mapping' in GeoPackage import parameters.",
+            code=GIS_IMPORT_MAPPING_INVALID,
+        )
+    try:
+        mapping_req = (
+            LayerMappingRequest(**raw_mapping)
+            if isinstance(raw_mapping, dict)
+            else raw_mapping
+        )
+    except Exception as err:
+        raise GeoPackageServiceError(
+            f"Invalid layer mapping configuration: {err}",
+            code=GIS_IMPORT_MAPPING_INVALID,
+        ) from err
+
+    import_mode = params.get("import_mode", "DRAFT_IMPORT")
+    source_reference = params.get("source_reference")
+
+    # Mark job as processing if queued
+    if job.status == "QUEUED":
+        mark_job_processing(session, job)
+        record_audit(
+            session,
+            "geopackage.import_processing",
+            "processing_job",
+            job.id,
+            project_id=job.project_id,
+            metadata={"file_id": str(file_id)},
+        )
+        session.commit()
+
+    try:
+        # File isolation and category validation
+        file_record = session.get(File, file_id)
+        if file_record is None:
+            raise GeoPackageServiceError(
+                "Source file record was not found.",
+                code=GIS_IMPORT_FILE_INVALID,
+            )
+        if file_record.project_id != job.project_id:
+            raise GeoPackageServiceError(
+                "File does not belong to the requested project.",
+                code=GIS_IMPORT_FILE_INVALID,
+            )
+        if file_record.category != "GIS_IMPORT":
+            raise GeoPackageServiceError(
+                f"File category '{file_record.category}' is not valid for GIS_IMPORT.",
+                code=GIS_IMPORT_FILE_INVALID,
+            )
+
+        storage = get_storage_service()
+        file_bytes = storage.read_private_object(file_record.storage_key)
+
+        with tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False) as temp_file:
+            temp_file.write(file_bytes)
+            temp_path = Path(temp_file.name)
+
+        try:
+            inspection = inspect_geopackage(temp_path)
+            resolved_layers = validate_layer_mapping(inspection, mapping_req)
+
+            layers_summary: dict[str, Any] = {}
+            all_rejections: list[tuple[str, str]] = []
+            warnings: list[str] = []
+
+            for logical_key, layer_insp in resolved_layers.items():
+                source_crs_info = detect_crs(layer_insp)
+                expected_fam = EXPECTED_GEOMETRY_FAMILIES.get(logical_key, ())
+
+                total_count = 0
+                valid_count = 0
+                rejected_count = 0
+                repaired_count = 0
+
+                for _row_idx, raw_geom, _attrs in iter_layer_features(temp_path, layer_insp.name):
+                    total_count += 1
+                    if raw_geom is None:
+                        rejected_count += 1
+                        all_rejections.append((GIS_IMPORT_GEOMETRY_INVALID, "NULL_GEOMETRY"))
+                        continue
+
+                    try:
+                        transformed = transform_to_interchange_crs(raw_geom, source_crs_info)
+                    except Exception as err:
+                        rejected_count += 1
+                        all_rejections.append((GIS_IMPORT_GEOMETRY_INVALID, f"TRANSFORM_FAILED: {err}"))
+                        continue
+
+                    valid_geom, was_repaired, err_code, reason = validate_geometry(
+                        transformed, expected_fam
+                    )
+                    if err_code:
+                        rejected_count += 1
+                        all_rejections.append((err_code, reason or "GEOMETRY_INVALID"))
+                    else:
+                        valid_count += 1
+                        if was_repaired:
+                            repaired_count += 1
+                            if reason and reason not in warnings:
+                                warnings.append(reason)
+
+                layers_summary[logical_key] = GeoPackageImportLayerResult(
+                    source_layer=layer_insp.name,
+                    total=total_count,
+                    valid=valid_count,
+                    rejected=rejected_count,
+                    repaired=repaired_count,
+                    source_crs=source_crs_info.crs_string,
+                ).model_dump()
+
+            bounded_rejections = bounded_rejection_summary(all_rejections)
+            job_result = GeoPackageImportJobResult(
+                kind="GEOPACKAGE_IMPORT",
+                status="VALIDATED",
+                project_id=str(job.project_id),
+                file_id=str(file_record.id),
+                source_reference=source_reference,
+                import_mode=import_mode,
+                layers={k: GeoPackageImportLayerResult(**v) for k, v in layers_summary.items()},
+                warnings=warnings,
+                rejection_summary=bounded_rejections,
+            )
+
+            geoai_job.metrics_json = {
+                "layers": layers_summary,
+                "rejection_summary": [s.model_dump() for s in bounded_rejections],
+            }
+            geoai_job.output_refs_json = job_result.model_dump()
+            job.progress = 100
+            mark_job_completed(session, job)
+            record_audit(
+                session,
+                "geopackage.import_completed",
+                "processing_job",
+                job.id,
+                project_id=job.project_id,
+                metadata={"layers": list(layers_summary.keys())},
+            )
+            session.commit()
+            return job_result.model_dump()
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    except GeoPackageServiceError as err:
+        session.rollback()
+        job = session.get(ProcessingJob, job_id)
+        geoai_job = session.get(GeoAIJob, job_id)
+        if job is not None and job.status == "PROCESSING":
+            job.status = "FAILED"
+            job.error_json = {"code": err.code, "message": str(err), "details": err.details}
+            if geoai_job is not None:
+                geoai_job.metrics_json = {"error_code": err.code, "message": str(err)}
+            record_audit(
+                session,
+                "geopackage.import_failed",
+                "processing_job",
+                job.id,
+                project_id=job.project_id,
+                metadata={"code": err.code, "reason": str(err)},
+            )
+            session.commit()
+        raise
+    except Exception as err:
+        session.rollback()
+        job = session.get(ProcessingJob, job_id)
+        geoai_job = session.get(GeoAIJob, job_id)
+        if job is not None and job.status == "PROCESSING":
+            job.status = "FAILED"
+            job.error_json = {"code": "GIS_IMPORT_FAILED", "message": "GeoPackage import processing failed."}
+            if geoai_job is not None:
+                geoai_job.metrics_json = {"error_code": "GIS_IMPORT_FAILED"}
+            record_audit(
+                session,
+                "geopackage.import_failed",
+                "processing_job",
+                job.id,
+                project_id=job.project_id,
+                metadata={"reason": "Unexpected error during import"},
+            )
+            session.commit()
+        raise
