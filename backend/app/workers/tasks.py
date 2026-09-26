@@ -450,3 +450,67 @@ def revalidate_document(self, job_id: str) -> None:
                         record_audit(session, "document.processing_failed", "document", document.id, project_id=document.project_id, metadata={"processing_job_id": str(job.id)})
                 session.commit()
             raise
+
+
+@celery_app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
+def process_geopackage_import(self, job_id: str) -> None:
+    """Validate and process a GeoPackage GIS import asynchronously."""
+    job_uuid = uuid.UUID(job_id)
+    with SessionLocal() as session:
+        job = session.get(ProcessingJob, job_uuid)
+        geoai_job = session.get(GeoAIJob, job_uuid)
+        if job is None or job.status != "QUEUED":
+            return
+        try:
+            job.retry_count = max(job.retry_count or 0, self.request.retries)
+            mark_job_processing(session, job)
+            record_audit(
+                session,
+                "geopackage.import_processing",
+                "processing_job",
+                job.id,
+                project_id=job.project_id,
+            )
+            session.commit()
+            from app.services.geopackage import process_geopackage_import_job
+
+            process_geopackage_import_job(session, job_uuid)
+        except Exception as error:
+            session.rollback()
+            job = session.get(ProcessingJob, job_uuid)
+            geoai_job = session.get(GeoAIJob, job_uuid)
+            if job is not None and job.status == "PROCESSING":
+                from app.services.geopackage import GeoPackageServiceError
+
+                if isinstance(error, GeoPackageServiceError) or self.request.retries >= self.max_retries:
+                    mark_job_failed(session, job, str(error))
+                    if isinstance(error, GeoPackageServiceError):
+                        job.error_json = {"code": error.code, "message": str(error), "details": error.details}
+                    if geoai_job is not None:
+                        record_audit(
+                            session,
+                            "geopackage.import_failed",
+                            "geoai_job",
+                            geoai_job.id,
+                            project_id=geoai_job.project_id,
+                            metadata={"reason": str(error)},
+                        )
+                else:
+                    mark_job_retry_queued(
+                        session,
+                        job,
+                        max((job.retry_count or 0) + 1, self.request.retries + 1),
+                    )
+                    if geoai_job is not None:
+                        record_audit(
+                            session,
+                            "geopackage.import_retry_queued",
+                            "geoai_job",
+                            geoai_job.id,
+                            project_id=geoai_job.project_id,
+                            metadata={"retry_count": job.retry_count},
+                        )
+                session.commit()
+            if isinstance(error, GeoPackageServiceError):
+                return
+            raise

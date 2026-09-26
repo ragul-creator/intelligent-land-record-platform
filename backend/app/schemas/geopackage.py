@@ -1,5 +1,6 @@
 """Pydantic schemas and contracts for GeoPackage GIS interchange."""
 
+import uuid
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -177,4 +178,39 @@ class GeometryValidationResult(BaseModel):
     repaired_count: int = 0
     warning_codes: list[str] = Field(default_factory=list)
     error_codes: list[str] = Field(default_factory=list)
+    rejection_summary: list[RejectionSummary] = Field(default_factory=list)
+
+
+class GeoPackageImportJobPayload(BaseModel):
+    """Deterministic internal payload stored in GeoAIJob.parameters_json."""
+
+    project_id: uuid.UUID
+    file_id: uuid.UUID
+    layer_mapping: LayerMappingRequest | dict[str, str]
+    import_mode: ImportMode = "DRAFT_IMPORT"
+    source_reference: str | None = None
+
+
+class GeoPackageImportLayerResult(BaseModel):
+    """Layer-level validation metrics for GeoPackage import."""
+
+    source_layer: str
+    total: int
+    valid: int
+    rejected: int
+    repaired: int
+    source_crs: str | None = None
+
+
+class GeoPackageImportJobResult(BaseModel):
+    """Bounded, safe result payload stored in GeoAIJob / ProcessingJob output references."""
+
+    kind: Literal["GEOPACKAGE_IMPORT"] = "GEOPACKAGE_IMPORT"
+    status: str = "VALIDATED"
+    project_id: str
+    file_id: str
+    source_reference: str | None = None
+    import_mode: ImportMode = "DRAFT_IMPORT"
+    layers: dict[str, GeoPackageImportLayerResult]
+    warnings: list[str] = Field(default_factory=list)
     rejection_summary: list[RejectionSummary] = Field(default_factory=list)
