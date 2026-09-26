@@ -31,6 +31,7 @@ from app.models.documents import (
     DocumentProcessingJob,
     DocumentValidationResultRecord,
 )
+from app.models.gis_imports import GisImportRun
 
 __all__ = [
     "AuditLog",
@@ -44,6 +45,7 @@ __all__ = [
     "DocumentValidationResultRecord",
     "File",
     "GeoAIJob",
+    "GisImportRun",
     "ImageryAsset",
     "LandUseFeature",
     "Parcel",
