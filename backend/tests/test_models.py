@@ -41,6 +41,8 @@ def test_foundational_geoai_and_document_ai_tables_are_registered() -> None:
         "document_field_corrections",
         "record_parcel_links",
         "gis_import_runs",
+        "sync_operations",
+        "sync_changes",
     }
 
 
