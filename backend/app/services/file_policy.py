@@ -10,11 +10,17 @@ class FileCategory(StrEnum):
     IMAGERY = "IMAGERY"
     GIS = "GIS"
     SUPPORTING = "SUPPORTING"
+    GIS_IMPORT = "GIS_IMPORT"
 
 
 def upload_permission_for_category(category: FileCategory | str) -> str:
     """Keep the upload permission decision consistent across presign and completion."""
-    return "imagery:upload" if FileCategory(category) == FileCategory.IMAGERY else "document:upload"
+    parsed = FileCategory(category)
+    if parsed == FileCategory.IMAGERY:
+        return "imagery:upload"
+    if parsed == FileCategory.GIS_IMPORT:
+        return "geo:edit_draft"
+    return "document:upload"
 
 
 ALLOWED_CONTENT_TYPES: dict[FileCategory, frozenset[str]] = {
@@ -22,6 +28,11 @@ ALLOWED_CONTENT_TYPES: dict[FileCategory, frozenset[str]] = {
     FileCategory.IMAGERY: frozenset({"image/tiff", "image/jpeg", "image/png", "application/geotiff"}),
     FileCategory.GIS: frozenset({"application/geo+json", "application/json", "application/zip"}),
     FileCategory.SUPPORTING: frozenset({"application/pdf", "image/jpeg", "image/png", "text/csv"}),
+    FileCategory.GIS_IMPORT: frozenset({
+        "application/geopackage+sqlite3",
+        "application/x-sqlite3",
+        "application/octet-stream",
+    }),
 }
 MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024 * 1024
 
@@ -51,4 +62,6 @@ class UploadMetadata(BaseModel):
     def validate_allowed_content_type(self) -> "UploadMetadata":
         if self.content_type not in ALLOWED_CONTENT_TYPES[self.category]:
             raise ValueError("Content type is not allowed for the selected file category.")
+        if self.category == FileCategory.GIS_IMPORT and not self.filename.lower().endswith(".gpkg"):
+            raise ValueError("GIS_IMPORT files must have a .gpkg extension.")
         return self

@@ -156,7 +156,7 @@ class File(TimestampedModel, Base):
         CheckConstraint("size_bytes >= 0", name="ck_files_size_bytes_nonnegative"),
         CheckConstraint("char_length(sha256) = 64", name="ck_files_sha256_length"),
         CheckConstraint(
-            "category IN ('DOCUMENT', 'IMAGERY', 'GIS', 'SUPPORTING')",
+            "category IN ('DOCUMENT', 'IMAGERY', 'GIS', 'SUPPORTING', 'GIS_IMPORT')",
             name="ck_files_category",
         ),
         Index("ix_files_project_status", "project_id", "status"),
@@ -221,7 +221,7 @@ class GeoAIJob(TimestampedModel, Base):
     __tablename__ = "geoai_jobs"
     __table_args__ = (
         CheckConstraint(
-            "job_type IN ('PARCEL_IMPORT', 'BUILDING_VECTORIZE', 'ROAD_VECTORIZE', 'ROAD_IMPORT', 'LAND_USE_IMPORT', 'TOPOLOGY_VALIDATE')",
+            "job_type IN ('PARCEL_IMPORT', 'BUILDING_VECTORIZE', 'ROAD_VECTORIZE', 'ROAD_IMPORT', 'LAND_USE_IMPORT', 'TOPOLOGY_VALIDATE', 'GEOPACKAGE_IMPORT')",
             name="ck_geoai_jobs_type",
         ),
         Index("ix_geoai_jobs_project_created", "project_id", "created_at"),
