@@ -544,3 +544,124 @@ def test_model_and_migration_contract_integrity() -> None:
     assert "summary_json" in table.c
     assert "detected_layers_json" in table.c
     assert "error_code" in table.c
+
+
+def test_inspect_gis_import_endpoint(monkeypatch) -> None:
+    session = FakeDbSession()
+    project = Project(id=uuid.uuid4(), name="Inspect Project", owner_id=session.user.id, state="ACTIVE")
+    session.add(project)
+    session.add(ProjectMember(project_id=project.id, user_id=session.user.id, role="OFFICER"))
+
+    file_record = File(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        category="GIS_IMPORT",
+        original_name="survey.gpkg",
+        mime_type="application/geopackage+sqlite3",
+        size_bytes=1024,
+        storage_key="test/survey.gpkg",
+        status="UPLOADED",
+    )
+    session.add(file_record)
+    _setup_environment(session, monkeypatch)
+
+    from app.services.geopackage import GeoPackageInspection, LayerInspection, CRSInfo
+
+    fake_inspection = GeoPackageInspection(
+        file_path="survey.gpkg",
+        layer_count=2,
+        layers=[
+            LayerInspection(
+                name="parcels",
+                geometry_type="MULTIPOLYGON",
+                feature_count=10,
+                crs=CRSInfo(detected=True, authority="EPSG", code=4326, crs_string="EPSG:4326", is_geographic=True),
+                fields=["id"],
+            ),
+            LayerInspection(
+                name="buildings",
+                geometry_type="MULTIPOLYGON",
+                feature_count=5,
+                crs=CRSInfo(detected=True, authority="EPSG", code=4326, crs_string="EPSG:4326", is_geographic=True),
+                fields=["id"],
+            ),
+        ],
+    )
+
+    monkeypatch.setattr("app.api.v1.gis_imports.inspect_geopackage", lambda p: fake_inspection)
+    monkeypatch.setattr(
+        "app.core.storage.PrivateObjectStorage.download_private_file",
+        lambda self, key, target: None,
+    )
+    monkeypatch.setattr(
+        "app.core.storage.PrivateObjectStorage.read_private_object",
+        lambda self, key: b"fake-sqlite-bytes",
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/v1/projects/{project.id}/gis-imports/inspect",
+        json={"file_id": str(file_record.id)},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["file_id"] == str(file_record.id)
+    assert data["layer_count"] == 2
+    assert len(data["layers"]) == 2
+    assert data["layers"][0]["name"] == "parcels"
+    assert data["layers"][0]["geometry_type"] == "MULTIPOLYGON"
+    assert data["layers"][0]["crs"]["crs_string"] == "EPSG:4326"
+
+
+def test_preview_gis_import_endpoint(monkeypatch) -> None:
+    session = FakeDbSession()
+    project = Project(id=uuid.uuid4(), name="Preview Project", owner_id=session.user.id, state="ACTIVE")
+    session.add(project)
+    session.add(ProjectMember(project_id=project.id, user_id=session.user.id, role="OFFICER"))
+
+    file_record = File(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        category="GIS_IMPORT",
+        original_name="survey.gpkg",
+        mime_type="application/geopackage+sqlite3",
+        size_bytes=1024,
+        storage_key="test/survey.gpkg",
+        status="UPLOADED",
+    )
+    session.add(file_record)
+    _setup_environment(session, monkeypatch)
+
+    preview_result = {
+        "layers_detected": 2,
+        "layers_mapped": 1,
+        "features_read": 10,
+        "features_imported": 9,
+        "features_rejected": 1,
+        "repairs_applied": 0,
+        "warnings": [],
+        "rejection_summary": [{"error_code": "GIS_IMPORT_GEOMETRY_INVALID", "reason": "NULL_GEOMETRY", "count": 1}],
+        "layer_details": {
+            "parcels": {"source_layer": "raw_parcels", "read": 10, "valid": 9, "rejected": 1, "repaired": 0}
+        },
+    }
+
+    monkeypatch.setattr("app.api.v1.gis_imports.preview_geopackage_import", lambda *args, **kwargs: preview_result)
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/v1/projects/{project.id}/gis-imports/preview",
+        json={
+            "file_id": str(file_record.id),
+            "layer_mapping": {"parcels": "raw_parcels"},
+            "source_reference": "Field Survey 2026",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["file_id"] == str(file_record.id)
+    assert data["layers_detected"] == 2
+    assert data["layers_mapped"] == 1
+    assert data["summary"]["features_read"] == 10
+    assert data["summary"]["features_imported"] == 9
+    assert data["summary"]["features_rejected"] == 1

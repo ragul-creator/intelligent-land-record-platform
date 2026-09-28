@@ -199,6 +199,7 @@ class GeoPackageImportLayerResult(BaseModel):
     valid: int
     rejected: int
     repaired: int
+    imported: int = 0
     source_crs: str | None = None
 
 

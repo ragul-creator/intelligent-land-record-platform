@@ -742,3 +742,69 @@ def test_sync_operation_recovery_endpoint() -> None:
     assert rec_body["status"] == "APPLIED"
     assert rec_body["operation_type"] == "PARCEL_VERSION_CREATE"
     assert rec_body["result"]["parcel_version"] == 2
+
+
+def test_malformed_cursor_rejected_http_400() -> None:
+    """F-16: Malformed cursor values rejected with 400 and stable error code."""
+    client = TestClient(app)
+    with SessionLocal() as session:
+        officer = _user(session, "OFFICER")
+        project = _project(session, officer)
+        session.commit()
+        project_id = str(project.id)
+        officer_login = officer.login_id
+
+    headers = _login(client, officer_login)
+
+    for bad_cursor in ("invalid", "-1", "-99", "1;DROP TABLE sync_changes;", "abc"):
+        res = client.get(f"/api/v1/projects/{project_id}/sync/changes?cursor={bad_cursor}", headers=headers)
+        assert res.status_code == 400
+        body = res.json()
+        assert body["error"]["code"] == "INVALID_CURSOR"
+        assert "DROP" not in str(body)
+        assert "SQL" not in str(body)
+
+
+def test_field_correction_retry_preserves_idempotency_integration() -> None:
+    """F-18: Field-correction retry returns DUPLICATE and preserves idempotency."""
+    client = TestClient(app)
+    with SessionLocal() as session:
+        officer = _user(session, "OFFICER")
+        project = _project(session, officer)
+        doc, field = _document_field(session, project.id, officer.id)
+        session.commit()
+        project_id = str(project.id)
+        field_id = str(field.id)
+        officer_login = officer.login_id
+
+    headers = _login(client, officer_login)
+    op_id = str(uuid.uuid4())
+
+    batch_payload = {
+        "operations": [
+            {
+                "operation_id": op_id,
+                "operation_type": "FIELD_CORRECTION_CREATE",
+                "entity_id": field_id,
+                "payload": {
+                    "corrected_value": "Rajesh Kumar",
+                    "reason": "Full legal name verification",
+                },
+            }
+        ]
+    }
+
+    # 1. First submission -> APPLIED
+    res1 = client.post(f"/api/v1/projects/{project_id}/sync/batch", json=batch_payload, headers=headers)
+    assert res1.status_code == 200
+    res1_data = res1.json()["results"][0]
+    assert res1_data["status"] == "APPLIED"
+    assert res1_data["operation_id"] == op_id
+
+    # 2. Retry submission with same operation_id -> DUPLICATE
+    res2 = client.post(f"/api/v1/projects/{project_id}/sync/batch", json=batch_payload, headers=headers)
+    assert res2.status_code == 200
+    res2_data = res2.json()["results"][0]
+    assert res2_data["status"] == "DUPLICATE"
+    assert res2_data["operation_id"] == op_id
+    assert res2_data["result"]["corrected_value"] == "Rajesh Kumar"

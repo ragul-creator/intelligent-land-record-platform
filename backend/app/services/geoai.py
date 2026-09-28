@@ -102,6 +102,15 @@ def persist_parcel_import(session: Session, project_id: uuid.UUID, parameters: d
             processed_at=_as_utc(result.processed_at),
         )
     )
+    from app.services.sync import record_sync_change
+    record_sync_change(
+        session,
+        project_id=project_id,
+        entity_type="PARCEL",
+        entity_id=parcel.id,
+        change_type="CREATED",
+        server_version=1,
+    )
     return parcel
 
 
@@ -182,4 +191,13 @@ def create_human_parcel_version(
     locked.current_geometry_version = next_version
     locked.status = "REVIEW_REQUIRED" if result.status == "REVIEW_REQUIRED" else "DRAFT"
     _persist_topology_issues(session, locked.project_id, locked.id, result.issues)
+    from app.services.sync import record_sync_change
+    record_sync_change(
+        session,
+        project_id=locked.project_id,
+        entity_type="PARCEL",
+        entity_id=locked.id,
+        change_type="UPDATED",
+        server_version=next_version,
+    )
     return persisted, result

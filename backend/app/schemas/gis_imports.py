@@ -82,3 +82,49 @@ class GeoPackageImportDetailResponse(BaseModel):
     error_code: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class GeoPackageInspectRequest(BaseModel):
+    """Request to inspect layers, geometry types, and CRS metadata of an uploaded GeoPackage."""
+
+    file_id: uuid.UUID
+
+
+class LayerInspectResponse(BaseModel):
+    """Inspection metadata for a single feature layer in a GeoPackage."""
+
+    name: str
+    geometry_type: str
+    feature_count: int
+    crs: dict[str, Any]
+    fields: list[str] = Field(default_factory=list)
+
+
+class GeoPackageInspectResponse(BaseModel):
+    """Discovered layers and CRS metadata for an uploaded GeoPackage file."""
+
+    file_id: uuid.UUID
+    layer_count: int
+    layers: list[LayerInspectResponse]
+
+
+class GeoPackagePreviewRequest(BaseModel):
+    """Request to preview GeoPackage validation and mapping without persistence."""
+
+    file_id: uuid.UUID
+    layer_mapping: dict[str, str] = Field(..., min_length=1)
+    source_reference: str | None = Field(default=None, max_length=1024)
+
+    @field_validator("layer_mapping")
+    @classmethod
+    def validate_layer_mapping(cls, mapping: dict[str, str]) -> dict[str, str]:
+        return GeoPackageImportCreateRequest.validate_layer_mapping(mapping)
+
+
+class GeoPackagePreviewResponse(BaseModel):
+    """Validation preview showing what would be imported before persistent execution."""
+
+    file_id: uuid.UUID
+    layers_detected: int
+    layers_mapped: int
+    summary: GeoPackageImportSummary

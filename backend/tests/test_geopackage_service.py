@@ -1,7 +1,9 @@
 """Focused unit and service tests for Step 2: GeoPackage schemas, inspection, CRS, and geometry validation."""
 
 import sqlite3
+import uuid
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon
@@ -430,3 +432,143 @@ def test_iter_layer_features_streaming(tmp_path: Path) -> None:
     assert idx1 == 1
     assert geom1 is not None and geom1.equals(p2)
     assert attrs1["khasra_no"] == "100/2"
+
+
+def test_feature_level_crs_consistency(tmp_path: Path) -> None:
+    """F-15: Feature-level CRS consistency tests."""
+    from app.services.geopackage import (
+        inspect_geopackage,
+        preview_geopackage_import,
+        GIS_IMPORT_CRS_MISSING,
+        LayerMappingRequest,
+    )
+    from app.models import File
+
+    gpkg_path = tmp_path / "feat_crs.gpkg"
+    p_wgs = Polygon([(77.0, 28.0), (77.01, 28.0), (77.01, 28.01), (77.0, 28.01), (77.0, 28.0)])
+    p_undef = Polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)])
+
+    # Construct GPKG where layer is 4326, but feature 2 has srs_id=0 (undefined)
+    conn = sqlite3.connect(gpkg_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE gpkg_spatial_ref_sys (srs_name TEXT, srs_id INTEGER PRIMARY KEY, organization TEXT, organization_coordsys_id INTEGER, definition TEXT)")
+    cur.execute("INSERT INTO gpkg_spatial_ref_sys VALUES ('WGS 84', 4326, 'EPSG', 4326, 'GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563]],PRIMEM[\"Greenwich\",0],UNIT[\"degree\",0.0174532925199433]]')")
+    cur.execute("CREATE TABLE gpkg_contents (table_name TEXT PRIMARY KEY, data_type TEXT, srs_id INTEGER)")
+    cur.execute("INSERT INTO gpkg_contents VALUES ('parcels', 'features', 4326)")
+    cur.execute("CREATE TABLE gpkg_geometry_columns (table_name TEXT, column_name TEXT, geometry_type_name TEXT, srs_id INTEGER, z TINYINT, m TINYINT)")
+    cur.execute("INSERT INTO gpkg_geometry_columns VALUES ('parcels', 'geom', 'POLYGON', 4326, 0, 0)")
+
+    cur.execute("CREATE TABLE parcels (id INTEGER PRIMARY KEY, geom BLOB, parcel_id TEXT)")
+    blob_wgs = pack_gpkg_geometry(p_wgs, srs_id=4326)
+    cur.execute("INSERT INTO parcels VALUES (1, ?, 'P-1')", (blob_wgs,))
+    blob_undef = pack_gpkg_geometry(p_undef, srs_id=0)
+    cur.execute("INSERT INTO parcels VALUES (2, ?, 'P-2')", (blob_undef,))
+    conn.commit()
+    conn.close()
+
+    # Inspect features using iter_layer_features
+    features = list(iter_layer_features(gpkg_path, "parcels"))
+    assert len(features) == 2
+    assert features[0][2]["_feature_srs_id"] == 4326
+    assert features[1][2]["_feature_srs_id"] == 0
+
+    # Dry-run preview
+    file_record = File(
+        id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        category="GIS_IMPORT",
+        original_name="feat_crs.gpkg",
+        mime_type="application/geopackage+sqlite3",
+        size_bytes=1024,
+        storage_key="dummy_key",
+        status="UPLOADED",
+    )
+    mock_session = MagicMock()
+    mock_session.scalar.return_value = None
+
+    with patch("app.services.geopackage.get_storage_service") as mock_storage_factory:
+        mock_storage = MagicMock()
+        mock_storage.read_private_object.return_value = gpkg_path.read_bytes()
+        mock_storage_factory.return_value = mock_storage
+
+        preview_result = preview_geopackage_import(
+            mock_session,
+            project_id=file_record.project_id,
+            file_record=file_record,
+            mapping_req=LayerMappingRequest(parcels="parcels"),
+        )
+
+        assert preview_result["features_read"] == 2
+        assert preview_result["features_imported"] == 1
+        assert preview_result["features_rejected"] == 1
+        rejection_reasons = [r["reason"] for r in preview_result["rejection_summary"]]
+        assert "FEATURE_CRS_UNDEFINED" in rejection_reasons
+
+
+def test_duplicate_upsert_policy_verified_parcel_protected(tmp_path: Path) -> None:
+    """F-23: Duplicate/Upsert policy: verified parcel geometry cannot be overwritten."""
+    from app.services.geopackage import preview_geopackage_import, LayerMappingRequest
+    from app.models import File, Parcel
+
+    gpkg_path = tmp_path / "upsert_test.gpkg"
+    p_wgs = Polygon([(77.0, 28.0), (77.01, 28.0), (77.01, 28.01), (77.0, 28.01), (77.0, 28.0)])
+
+    conn = sqlite3.connect(gpkg_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE gpkg_spatial_ref_sys (srs_name TEXT, srs_id INTEGER PRIMARY KEY, organization TEXT, organization_coordsys_id INTEGER, definition TEXT)")
+    cur.execute("INSERT INTO gpkg_spatial_ref_sys VALUES ('WGS 84', 4326, 'EPSG', 4326, 'GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563]],PRIMEM[\"Greenwich\",0],UNIT[\"degree\",0.0174532925199433]]')")
+    cur.execute("CREATE TABLE gpkg_contents (table_name TEXT PRIMARY KEY, data_type TEXT, srs_id INTEGER)")
+    cur.execute("INSERT INTO gpkg_contents VALUES ('parcels', 'features', 4326)")
+    cur.execute("CREATE TABLE gpkg_geometry_columns (table_name TEXT, column_name TEXT, geometry_type_name TEXT, srs_id INTEGER, z TINYINT, m TINYINT)")
+    cur.execute("INSERT INTO gpkg_geometry_columns VALUES ('parcels', 'geom', 'POLYGON', 4326, 0, 0)")
+    cur.execute("CREATE TABLE parcels (id INTEGER PRIMARY KEY, geom BLOB, external_identifier TEXT)")
+    blob_wgs = pack_gpkg_geometry(p_wgs, srs_id=4326)
+    cur.execute("INSERT INTO parcels VALUES (1, ?, 'KHASRA-999-VERIFIED')", (blob_wgs,))
+    conn.commit()
+    conn.close()
+
+    proj_id = uuid.uuid4()
+    file_record = File(
+        id=uuid.uuid4(),
+        project_id=proj_id,
+        category="GIS_IMPORT",
+        original_name="upsert_test.gpkg",
+        mime_type="application/geopackage+sqlite3",
+        size_bytes=1024,
+        storage_key="key",
+        status="UPLOADED",
+    )
+
+    # Mock DB session having an existing verified parcel with the same external_identifier
+    verified_parcel = Parcel(
+        id=uuid.uuid4(),
+        project_id=proj_id,
+        external_identifier="KHASRA-999-VERIFIED",
+        status="ACTIVE",
+        verification_status="VERIFIED",
+        source="OFFICIAL_SURVEY",
+        current_geometry_version=3,
+    )
+    mock_session = MagicMock()
+    mock_session.scalar.return_value = verified_parcel
+
+    with patch("app.services.geopackage.get_storage_service") as mock_storage_factory:
+        mock_storage = MagicMock()
+        mock_storage.read_private_object.return_value = gpkg_path.read_bytes()
+        mock_storage_factory.return_value = mock_storage
+
+        preview_result = preview_geopackage_import(
+            mock_session,
+            project_id=proj_id,
+            file_record=file_record,
+            mapping_req=LayerMappingRequest(parcels="parcels"),
+        )
+
+        # Verified parcel was blocked from overwrite
+        assert preview_result["features_read"] == 1
+        assert preview_result["features_imported"] == 0
+        assert preview_result["features_rejected"] == 1
+        assert any(
+            "CANNOT_OVERWRITE_VERIFIED_PARCEL: KHASRA-999-VERIFIED" in r["reason"]
+            for r in preview_result["rejection_summary"]
+        )

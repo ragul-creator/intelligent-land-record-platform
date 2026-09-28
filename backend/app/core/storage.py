@@ -160,6 +160,15 @@ class PrivateObjectStorage:
             Metadata={"sha256": checksum},
         )
 
+    def download_private_file(self, storage_key: str, target_path: str | PurePath) -> None:
+        """Stream source bytes directly to disk for workers without buffering large objects in RAM."""
+        try:
+            self.client.download_file(self.bucket, storage_key, str(target_path))
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                raise StorageObjectNotFoundError(storage_key) from error
+            raise
+
     def read_private_object(self, storage_key: str) -> bytes:
         """Read source bytes internally for workers; callers never receive a public URL."""
         try:

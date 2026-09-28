@@ -266,3 +266,12 @@ def update_review_task(
             correction_reference=correction_reference,
             reprocess_job_id=reprocess_job_id,
         )
+
+    from app.services.sync import record_sync_change
+    record_sync_change(
+        session,
+        project_id=task.project_id,
+        entity_type="REVIEW_TASK",
+        entity_id=task.id,
+        change_type=task.status,
+    )

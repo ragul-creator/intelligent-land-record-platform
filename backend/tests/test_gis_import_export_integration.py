@@ -434,6 +434,12 @@ def test_export_geopackage_headers_and_validity() -> None:
         conn = sqlite3.connect(tmp_path)
         cur = conn.cursor()
 
+        # OGC GeoPackage binary header pragmas
+        app_id_row = cur.execute("PRAGMA application_id").fetchone()
+        assert app_id_row is not None and app_id_row[0] == 0x47504B47
+        user_ver_row = cur.execute("PRAGMA user_version").fetchone()
+        assert user_ver_row is not None and user_ver_row[0] == 10300
+
         # Requirement 11: gpkg_contents exists
         tables = {row[0] for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "gpkg_contents" in tables
@@ -460,6 +466,20 @@ def test_export_geopackage_headers_and_validity() -> None:
         assert geom_layers["roads"] == ("geom", "MULTILINESTRING", 4326)
         assert "land_use" in geom_layers
         assert geom_layers["land_use"] == ("geom", "MULTIPOLYGON", 4326)
+
+        # F-24: Standard OGC Metadata tables and bhumi_package_metadata exist
+        assert "gpkg_extensions" in tables
+        assert "gpkg_metadata" in tables
+        assert "gpkg_metadata_reference" in tables
+        assert "bhumi_package_metadata" in tables
+
+        # Verify package-level metadata values
+        pkg_meta = dict(cur.execute("SELECT key, value FROM bhumi_package_metadata").fetchall())
+        assert pkg_meta["project_id"] == str(project.id)
+        assert pkg_meta["project_name"] == project.name
+        assert pkg_meta["schema_version"] == "20260926_13"
+        assert pkg_meta["geopackage_version"] == "1.3.0"
+        assert "disclaimer" in pkg_meta
 
         conn.close()
 
