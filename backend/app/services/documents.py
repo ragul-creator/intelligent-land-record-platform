@@ -156,6 +156,15 @@ def create_correction(session: Session, *, document: Document, field: DocumentEx
     session.add(correction)
     session.flush()
     record_audit(session, "document.field_corrected", "document_field_correction", correction.id, actor_id=actor_id, project_id=document.project_id, metadata={"document_id": str(document.id), "field_name": field.field_name, "extracted_field_id": str(field.id), "version": version})
+    from app.services.sync import record_sync_change
+    record_sync_change(
+        session,
+        project_id=document.project_id,
+        entity_type="DOCUMENT_FIELD",
+        entity_id=field.id,
+        change_type="UPDATED",
+        server_version=version,
+    )
     return correction
 
 

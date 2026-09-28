@@ -17,3 +17,7 @@ def not_found(code: str = "NOT_FOUND", message: str = "The requested resource wa
 
 def forbidden(code: str = "FORBIDDEN", message: str = "You are not allowed to perform this action.") -> ApiError:
     return ApiError(status.HTTP_403_FORBIDDEN, code, message)
+
+
+def bad_request(code: str = "BAD_REQUEST", message: str = "The request was invalid.") -> ApiError:
+    return ApiError(status.HTTP_400_BAD_REQUEST, code, message)

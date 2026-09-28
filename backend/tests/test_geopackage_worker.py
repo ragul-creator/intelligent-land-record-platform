@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from shapely.geometry import LineString, Polygon
 
-from app.models import File, GeoAIJob, ProcessingJob
+from app.models import Building, File, GeoAIJob, LandUseFeature, Parcel, ParcelGeometryVersion, ProcessingJob, Road
 from app.schemas.geopackage import (
     GIS_IMPORT_CRS_MISSING,
     GIS_IMPORT_FILE_INVALID,
@@ -21,6 +21,7 @@ from app.services.geopackage import (
     pack_gpkg_geometry,
     process_geopackage_import_job,
 )
+from app.services.processing_jobs import mark_job_completed, mark_job_retry_queued
 from app.workers.tasks import process_geopackage_import
 
 
@@ -32,10 +33,18 @@ class InMemorySession:
             ProcessingJob: {},
             GeoAIJob: {},
             File: {},
+            Parcel: {},
+            ParcelGeometryVersion: {},
+            Building: {},
+            Road: {},
+            LandUseFeature: {},
         }
         self.added: list[object] = []
         self.committed = 0
         self.rolled_back = 0
+
+    def flush(self) -> None:
+        pass
 
     def add(self, item: object) -> None:
         self.added.append(item)
@@ -490,3 +499,116 @@ def test_celery_task_execution_handles_domain_error_safely() -> None:
 
     assert job.status == "FAILED"
     assert job.error_json["code"] == GIS_IMPORT_LAYER_NOT_FOUND
+
+
+def test_celery_task_retries_on_transient_error_and_recovers() -> None:
+    """F-06 regression test: Transient error triggers retry and recovers on next attempt."""
+    job_uuid = uuid.uuid4()
+    mock_session = InMemorySession()
+    job = ProcessingJob(
+        id=job_uuid,
+        project_id=uuid.uuid4(),
+        job_type="GEOPACKAGE_IMPORT",
+        status="QUEUED",
+        retry_count=0,
+        idempotency_key="task:retry_test",
+    )
+    mock_session.add(job)
+
+    observed_statuses: list[str] = []
+    orig_mark_retry = mark_job_retry_queued
+
+    def tracking_mark_retry(s, j, count):
+        observed_statuses.append(f"RETRY_QUEUED:{count}")
+        return orig_mark_retry(s, j, count)
+
+    attempt = 0
+    def mock_import_job(s, j_id):
+        nonlocal attempt
+        attempt += 1
+        if attempt == 1:
+            raise RuntimeError("Transient DB timeout")
+        j = s.get(ProcessingJob, j_id)
+        if j:
+            mark_job_completed(s, j)
+        return {"status": "VALIDATED"}
+
+    # Transient error on 1st call, success on 2nd call
+    with patch("app.workers.tasks.SessionLocal", return_value=mock_session), \
+         patch("app.workers.tasks.mark_job_retry_queued", side_effect=tracking_mark_retry), \
+         patch("app.services.geopackage.process_geopackage_import_job", side_effect=mock_import_job):
+        process_geopackage_import.apply(args=[str(job_uuid)])
+
+    # Confirms that retry was queued on transient error and then recovered to COMPLETED
+    assert "RETRY_QUEUED:1" in observed_statuses
+    assert job.status == "COMPLETED"
+    assert job.retry_count == 1
+
+    # Second attempt: transient error resolved, succeeds
+    with patch("app.workers.tasks.SessionLocal", return_value=mock_session), \
+         patch("app.services.geopackage.process_geopackage_import_job", return_value={"status": "VALIDATED"}):
+        process_geopackage_import.apply(args=[str(job_uuid)])
+
+    assert job.status == "COMPLETED"
+
+
+def test_import_idempotency_prevents_duplicate_records(mock_storage) -> None:
+    """F-11 regression test: Retrying or repeating the same import does not create duplicate records."""
+    poly = Polygon([(80.0, 13.0), (80.01, 13.0), (80.01, 13.01), (80.0, 13.01), (80.0, 13.0)])
+    line = LineString([(80.0, 13.0), (80.02, 13.02)])
+    gpkg_bytes = _create_test_gpkg_bytes({
+        "parcels": {"geom_type": "POLYGON", "srs_id": 4326, "features": [(poly, {"external_identifier": "P-101", "area_m2": 150.0})]},
+        "buildings": {"geom_type": "POLYGON", "srs_id": 4326, "features": [(poly, {"building_id": "B-201", "area_m2": 80.0})]},
+        "roads": {"geom_type": "LINESTRING", "srs_id": 4326, "features": [(line, {"road_id": "R-301", "length_m": 500.0})]},
+        "land_use": {"geom_type": "POLYGON", "srs_id": 4326, "features": [(poly, {"land_use_id": "LU-401", "area_m2": 200.0})]},
+    })
+    mock_storage.read_private_object.return_value = gpkg_bytes
+
+    project_id = uuid.uuid4()
+    file_id = uuid.uuid4()
+    session = InMemorySession()
+
+    session.add(File(
+        id=file_id,
+        project_id=project_id,
+        original_name="survey.gpkg",
+        category="GIS_IMPORT",
+        mime_type="application/geopackage+sqlite3",
+        size_bytes=len(gpkg_bytes),
+        storage_key="key",
+        status="UPLOADED",
+    ))
+
+    # Run Job 1
+    job1_id = uuid.uuid4()
+    session.add(ProcessingJob(id=job1_id, project_id=project_id, job_type="GEOPACKAGE_IMPORT", status="QUEUED", idempotency_key="import:job1"))
+    session.add(GeoAIJob(id=job1_id, project_id=project_id, job_type="GEOPACKAGE_IMPORT", parameters_json={
+        "file_id": str(file_id),
+        "layer_mapping": {"parcels": "parcels", "buildings": "buildings", "roads": "roads", "land_use": "land_use"},
+    }))
+
+    res1 = process_geopackage_import_job(session, job1_id)
+    assert res1["status"] == "VALIDATED"
+    assert len(session.records[Parcel]) == 1
+    assert len(session.records[ParcelGeometryVersion]) == 1
+    assert len(session.records[Building]) == 1
+    assert len(session.records[Road]) == 1
+    assert len(session.records[LandUseFeature]) == 1
+
+    # Run Job 2 (e.g. retry or second import of same data)
+    job2_id = uuid.uuid4()
+    session.add(ProcessingJob(id=job2_id, project_id=project_id, job_type="GEOPACKAGE_IMPORT", status="QUEUED", idempotency_key="import:job2"))
+    session.add(GeoAIJob(id=job2_id, project_id=project_id, job_type="GEOPACKAGE_IMPORT", parameters_json={
+        "file_id": str(file_id),
+        "layer_mapping": {"parcels": "parcels", "buildings": "buildings", "roads": "roads", "land_use": "land_use"},
+    }))
+
+    res2 = process_geopackage_import_job(session, job2_id)
+    assert res2["status"] == "VALIDATED"
+
+    # CRITICAL: Records must NOT have doubled! Exactly 1 of each must remain!
+    assert len(session.records[Parcel]) == 1
+    assert len(session.records[ParcelGeometryVersion]) == 1
+    assert len(session.records[Building]) == 1
+    assert len(session.records[Road]) == 1
+    assert len(session.records[LandUseFeature]) == 1

@@ -46,7 +46,7 @@ class SyncOperation(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     project_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True, nullable=False
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

@@ -10,7 +10,7 @@ from sqlalchemy import URL
 class Settings(BaseSettings):
     """Settings loaded from environment variables without committing secrets."""
 
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
+    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore", env_file=(".env", "backend/.env", "../.env"))
 
     app_env: str = "development"
     db_host: str = "postgres"

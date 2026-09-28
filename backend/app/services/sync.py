@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.audit.service import record_audit, sanitize_audit_metadata
 from app.core.auth import user_permissions
-from app.core.errors import ApiError, forbidden, not_found
+from app.core.errors import ApiError, bad_request, forbidden, not_found
 from app.models import (
     Document,
     DocumentExtractedField,
@@ -46,6 +47,37 @@ from app.services.record_parcel_links import (
 from app.services.review import ReviewWorkflowError, update_review_task
 
 MAX_SYNC_BATCH_SIZE = 100
+MAX_OPERATION_PAYLOAD_BYTES = 256 * 1024  # 256 KB
+MAX_GEOMETRY_COORDINATES = 5000
+
+
+def _count_coords(geom: Any) -> int:
+    if not isinstance(geom, dict):
+        return 0
+    coords = geom.get("coordinates")
+    if not coords:
+        return 0
+
+    def _walk(c: Any) -> int:
+        if isinstance(c, (list, tuple)):
+            if len(c) >= 2 and isinstance(c[0], (int, float)) and isinstance(c[1], (int, float)):
+                return 1
+            return sum(_walk(sub) for sub in c)
+        return 0
+
+    return _walk(coords)
+
+
+def _validate_payload_size(payload: dict[str, Any]) -> str | None:
+    if not isinstance(payload, dict):
+        return "Payload must be a JSON dictionary."
+    try:
+        dumped = json.dumps(payload)
+        if len(dumped.encode("utf-8")) > MAX_OPERATION_PAYLOAD_BYTES:
+            return f"Payload size exceeds maximum limit of {MAX_OPERATION_PAYLOAD_BYTES} bytes."
+    except Exception:
+        return "Payload could not be serialized as valid JSON."
+    return None
 
 SUPPORTED_OPERATIONS = frozenset(
     {
@@ -71,7 +103,7 @@ OPERATION_ENTITY_TYPES = {
 }
 
 
-def _record_sync_change(
+def record_sync_change(
     session: Session,
     *,
     project_id: uuid.UUID,
@@ -89,6 +121,9 @@ def _record_sync_change(
     )
     session.add(change)
     return change
+
+
+_record_sync_change = record_sync_change
 
 
 def _persist_sync_operation(
@@ -109,7 +144,16 @@ def _persist_sync_operation(
     error_message: str | None = None,
     client_created_at: datetime | None = None,
 ) -> SyncOperation:
-    existing = session.get(SyncOperation, operation_id)
+    existing = session.get(SyncOperation, (operation_id, project_id))
+    if existing is None and hasattr(session, "scalar"):
+        res = session.scalar(
+            select(SyncOperation).where(
+                SyncOperation.id == operation_id,
+                SyncOperation.project_id == project_id,
+            )
+        )
+        if isinstance(res, SyncOperation):
+            existing = res
     if existing is not None:
         return existing
 
@@ -197,6 +241,34 @@ def _handle_parcel_version_create(
             error=SyncErrorDetail(
                 code="SYNC_OPERATION_INVALID",
                 message="Payload must include valid geometry and source_crs.",
+            ),
+        )
+
+    coord_count = _count_coords(geometry)
+    if coord_count > MAX_GEOMETRY_COORDINATES:
+        _persist_sync_operation(
+            session,
+            operation_id=op.operation_id,
+            project_id=project_id,
+            user_id=user.id,
+            client_id=client_id,
+            operation_type=op.operation_type,
+            entity_id=op.entity_id,
+            base_version=op.base_version,
+            payload=op.payload,
+            status="REJECTED",
+            error_code="SYNC_OPERATION_INVALID",
+            error_message=f"Geometry coordinate count ({coord_count}) exceeds limit of {MAX_GEOMETRY_COORDINATES}.",
+            client_created_at=op.client_created_at,
+        )
+        return SyncOperationResult(
+            operation_id=op.operation_id,
+            status="REJECTED",
+            entity_type="PARCEL",
+            entity_id=op.entity_id,
+            error=SyncErrorDetail(
+                code="SYNC_OPERATION_INVALID",
+                message=f"Geometry coordinate count ({coord_count}) exceeds limit of {MAX_GEOMETRY_COORDINATES}.",
             ),
         )
 
@@ -342,15 +414,6 @@ def _handle_parcel_version_create(
         },
     )
 
-    _record_sync_change(
-        session,
-        project_id=project_id,
-        entity_type="PARCEL",
-        entity_id=parcel.id,
-        change_type="UPDATED",
-        server_version=version.version,
-    )
-
     result_dict = {
         "parcel_version": version.version,
         "status": result.status,
@@ -492,15 +555,6 @@ def _handle_field_correction_create(
     except Exception:
         # Revalidation queue failure should not roll back valid field correction
         pass
-
-    _record_sync_change(
-        session,
-        project_id=project_id,
-        entity_type="DOCUMENT_FIELD",
-        entity_id=field.id,
-        change_type="UPDATED",
-        server_version=correction.version,
-    )
 
     result_dict = {
         "correction_id": str(correction.id),
@@ -763,14 +817,6 @@ def _handle_review_task_update(
             ),
         )
 
-    _record_sync_change(
-        session,
-        project_id=project_id,
-        entity_type="REVIEW_TASK",
-        entity_id=task.id,
-        change_type=task.status,
-    )
-
     result_dict = {
         "task_id": str(task.id),
         "status": task.status,
@@ -990,14 +1036,6 @@ def _handle_record_link_resolve(
             ),
         )
 
-    _record_sync_change(
-        session,
-        project_id=project_id,
-        entity_type="RECORD_PARCEL_LINK",
-        entity_id=link.id,
-        change_type=link.link_status,
-    )
-
     result_dict = {
         "link_id": str(link.id),
         "link_status": link.link_status,
@@ -1043,12 +1081,28 @@ def apply_sync_batch(
             f"Batch size {len(batch.operations)} exceeds hard limit of {MAX_SYNC_BATCH_SIZE}.",
         )
 
+    if batch.client_id and len(batch.client_id) > 128:
+        raise ApiError(
+            422,
+            "SYNC_CLIENT_ID_TOO_LONG",
+            "client_id must not exceed 128 characters.",
+        )
+
     caller_permissions = user_permissions(session, user.id)
     results: list[SyncOperationResult] = []
 
     for op in batch.operations:
-        # Step 1: Check if already processed (global idempotency)
-        existing = session.get(SyncOperation, op.operation_id)
+        # Step 1: Check if already processed for this project (project-scoped idempotency)
+        existing = session.get(SyncOperation, (op.operation_id, project_id))
+        if existing is None and hasattr(session, "scalar"):
+            res = session.scalar(
+                select(SyncOperation).where(
+                    SyncOperation.id == op.operation_id,
+                    SyncOperation.project_id == project_id,
+                )
+            )
+            if isinstance(res, SyncOperation):
+                existing = res
         if existing is not None:
             server_version = None
             if existing.result_json:
@@ -1066,7 +1120,7 @@ def apply_sync_batch(
                     server_version=server_version,
                     result=existing.result_json,
                     conflict=SyncConflictDetail(**existing.conflict_json)
-                    if existing.conflict_json
+                    if isinstance(existing.conflict_json, dict) and isinstance(existing.conflict_json.get("conflict_type"), str)
                     else None,
                     error=SyncErrorDetail(
                         code=existing.error_code or "DUPLICATE_OPERATION",
@@ -1074,6 +1128,38 @@ def apply_sync_batch(
                     )
                     if existing.error_code
                     else None,
+                )
+            )
+            continue
+
+        # Step 1b: Validate payload size
+        payload_err = _validate_payload_size(op.payload)
+        if payload_err:
+            _persist_sync_operation(
+                session,
+                operation_id=op.operation_id,
+                project_id=project_id,
+                user_id=user.id,
+                client_id=batch.client_id,
+                operation_type=op.operation_type,
+                entity_id=op.entity_id,
+                base_version=op.base_version,
+                payload={},
+                status="REJECTED",
+                error_code="SYNC_OPERATION_INVALID",
+                error_message=payload_err,
+                client_created_at=op.client_created_at,
+            )
+            results.append(
+                SyncOperationResult(
+                    operation_id=op.operation_id,
+                    status="REJECTED",
+                    entity_type=OPERATION_ENTITY_TYPES.get(op.operation_type),
+                    entity_id=op.entity_id,
+                    error=SyncErrorDetail(
+                        code="SYNC_OPERATION_INVALID",
+                        message=payload_err,
+                    ),
                 )
             )
             continue
@@ -1243,8 +1329,13 @@ def get_sync_changes(
     if cursor is not None:
         try:
             cursor_val = int(cursor)
+            if cursor_val < 0:
+                raise ValueError("Cursor cannot be negative")
         except (ValueError, TypeError):
-            cursor_val = 0
+            raise bad_request(
+                code="INVALID_CURSOR",
+                message="Cursor must be a valid non-negative integer representation.",
+            )
 
     bounded_limit = max(1, min(limit, 100))
 
@@ -1290,8 +1381,17 @@ def get_sync_operation_by_id(
     operation_id: uuid.UUID,
 ) -> SyncOperationDetailResponse:
     """Retrieve persisted operation result for client recovery."""
-    op = session.get(SyncOperation, operation_id)
-    if op is None or op.project_id != project_id:
+    op = session.get(SyncOperation, (operation_id, project_id))
+    if op is None and hasattr(session, "scalar"):
+        res = session.scalar(
+            select(SyncOperation).where(
+                SyncOperation.id == operation_id,
+                SyncOperation.project_id == project_id,
+            )
+        )
+        if isinstance(res, SyncOperation):
+            op = res
+    if op is None:
         raise not_found("SYNC_OPERATION_NOT_FOUND", "The requested sync operation was not found.")
 
     return SyncOperationDetailResponse(

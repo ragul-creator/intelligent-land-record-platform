@@ -6,10 +6,12 @@ project GIS evidence (parcels, buildings, roads, land_use).
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import tempfile
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +22,7 @@ from shapely.ops import transform as transform_geometry
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Building, LandUseFeature, Parcel, Road
+from app.models import Building, LandUseFeature, Parcel, Project, Road
 from app.schemas.geopackage import GIS_EXPORT_FAILED
 from app.services.geoai import current_version
 from app.services.geopackage import GeoPackageServiceError, pack_gpkg_geometry
@@ -175,6 +177,10 @@ def generate_project_geopackage(session: Session, project_id: uuid.UUID) -> tupl
         conn = sqlite3.connect(gpkg_path)
         cur = conn.cursor()
 
+        # OGC GeoPackage Header Requirements
+        cur.execute("PRAGMA application_id = 0x47504B47")  # 1196444487 ('GPKG')
+        cur.execute("PRAGMA user_version = 10300")  # GeoPackage 1.3.0
+
         # Enable foreign keys
         cur.execute("PRAGMA foreign_keys = ON")
 
@@ -327,10 +333,11 @@ def generate_project_geopackage(session: Session, project_id: uuid.UUID) -> tupl
         layer_counts: dict[str, int] = {"parcels": 0, "buildings": 0, "roads": 0, "land_use": 0}
 
         # --- A. Export Parcels ---
-        parcels = list(
-            session.scalars(
-                select(Parcel).where(Parcel.project_id == project_id).order_by(Parcel.created_at, Parcel.id)
-            )
+        parcels = session.scalars(
+            select(Parcel)
+            .where(Parcel.project_id == project_id)
+            .order_by(Parcel.created_at, Parcel.id)
+            .execution_options(yield_per=1000)
         )
         p_bounds: list[float] | None = None
         for parcel in parcels:
@@ -401,10 +408,11 @@ def generate_project_geopackage(session: Session, project_id: uuid.UUID) -> tupl
             )
 
         # --- B. Export Buildings ---
-        buildings = list(
-            session.scalars(
-                select(Building).where(Building.project_id == project_id).order_by(Building.created_at, Building.id)
-            )
+        buildings = session.scalars(
+            select(Building)
+            .where(Building.project_id == project_id)
+            .order_by(Building.created_at, Building.id)
+            .execution_options(yield_per=1000)
         )
         b_bounds: list[float] | None = None
         for building in buildings:
@@ -461,10 +469,11 @@ def generate_project_geopackage(session: Session, project_id: uuid.UUID) -> tupl
             )
 
         # --- C. Export Roads ---
-        roads = list(
-            session.scalars(
-                select(Road).where(Road.project_id == project_id).order_by(Road.created_at, Road.id)
-            )
+        roads = session.scalars(
+            select(Road)
+            .where(Road.project_id == project_id)
+            .order_by(Road.created_at, Road.id)
+            .execution_options(yield_per=1000)
         )
         r_bounds: list[float] | None = None
         for road in roads:
@@ -521,10 +530,11 @@ def generate_project_geopackage(session: Session, project_id: uuid.UUID) -> tupl
             )
 
         # --- D. Export Land Use ---
-        land_use_features = list(
-            session.scalars(
-                select(LandUseFeature).where(LandUseFeature.project_id == project_id).order_by(LandUseFeature.created_at, LandUseFeature.id)
-            )
+        land_use_features = session.scalars(
+            select(LandUseFeature)
+            .where(LandUseFeature.project_id == project_id)
+            .order_by(LandUseFeature.created_at, LandUseFeature.id)
+            .execution_options(yield_per=1000)
         )
         lu_bounds: list[float] | None = None
         for lu in land_use_features:
@@ -579,6 +589,89 @@ def generate_project_geopackage(session: Session, project_id: uuid.UUID) -> tupl
             cur.execute(
                 "UPDATE gpkg_contents SET min_x = ?, min_y = ?, max_x = ?, max_y = ? WHERE table_name = 'land_use'",
                 (lu_bounds[0], lu_bounds[1], lu_bounds[2], lu_bounds[3]),
+            )
+
+        # 4. Standard OGC GeoPackage Extension Metadata (clause 2.4 / Annex E)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS gpkg_extensions (
+                table_name TEXT,
+                column_name TEXT,
+                extension_name TEXT NOT NULL,
+                definition TEXT NOT NULL,
+                scope TEXT NOT NULL,
+                CONSTRAINT pk_gpkg_ext PRIMARY KEY (extension_name, table_name, column_name)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS gpkg_metadata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                md_scope TEXT NOT NULL DEFAULT 'dataset',
+                md_standard_uri TEXT NOT NULL,
+                mime_type TEXT NOT NULL DEFAULT 'text/xml',
+                metadata TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS gpkg_metadata_reference (
+                reference_scope TEXT NOT NULL,
+                table_name TEXT,
+                column_name TEXT,
+                row_id_value INTEGER,
+                timestamp DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                md_file_id INTEGER NOT NULL,
+                md_parent_id INTEGER,
+                CONSTRAINT fk_gmr_mfi FOREIGN KEY (md_file_id) REFERENCES gpkg_metadata(id),
+                CONSTRAINT fk_gmr_mpi FOREIGN KEY (md_parent_id) REFERENCES gpkg_metadata(id)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS bhumi_package_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+
+        cur.execute(
+            "INSERT OR REPLACE INTO gpkg_extensions (table_name, column_name, extension_name, definition, scope) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (None, None, "gpkg_metadata", "http://www.geopackage.org/spec121/#extension_metadata", "read-write"),
+        )
+
+        project = session.get(Project, project_id)
+        project_name = project.name if project is not None else f"Project {project_id}"
+        now_utc = datetime.now(UTC)
+        package_metadata = {
+            "project_id": str(project_id),
+            "project_name": project_name,
+            "export_timestamp": now_utc.isoformat(),
+            "application_version": "1.0.0",
+            "schema_version": "20260926_13",
+            "geopackage_version": "1.3.0",
+            "filter_export_policy": "CURRENT_PARCEL_VERSION_AND_PROJECT_FEATURES",
+            "disclaimer": "AI-derived parcel boundaries are preliminary until authorized officer review. Official legal identifiers (khasra/survey/khata) must be validated against official land records.",
+            "layer_counts": layer_counts,
+            "srs": "EPSG:4326",
+        }
+
+        cur.execute(
+            "INSERT INTO gpkg_metadata (md_scope, md_standard_uri, mime_type, metadata) VALUES (?, ?, ?, ?)",
+            (
+                "dataset",
+                "http://www.geopackage.org/spec121/#extension_metadata",
+                "application/json",
+                json.dumps(package_metadata, indent=2),
+            ),
+        )
+        md_id = cur.lastrowid
+        cur.execute(
+            "INSERT INTO gpkg_metadata_reference (reference_scope, table_name, md_file_id) VALUES (?, ?, ?)",
+            ("geopackage", None, md_id),
+        )
+
+        for k, v in package_metadata.items():
+            cur.execute(
+                "INSERT OR REPLACE INTO bhumi_package_metadata (key, value) VALUES (?, ?)",
+                (k, json.dumps(v) if isinstance(v, (dict, list)) else str(v)),
             )
 
         conn.commit()

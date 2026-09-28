@@ -21,7 +21,7 @@ SyncOperationStatus = Literal["APPLIED", "DUPLICATE", "CONFLICT", "REJECTED"]
 
 class SyncOperationItemRequest(BaseModel):
     operation_id: uuid.UUID
-    operation_type: str
+    operation_type: str = Field(..., max_length=64)
     entity_id: uuid.UUID
     base_version: int | None = None
     client_created_at: datetime | None = None
@@ -29,7 +29,7 @@ class SyncOperationItemRequest(BaseModel):
 
 
 class SyncBatchRequest(BaseModel):
-    client_id: str | None = None
+    client_id: str | None = Field(default=None, max_length=128)
     operations: list[SyncOperationItemRequest] = Field(default_factory=list)
 
 

@@ -92,7 +92,7 @@ def sync_gis_import_run(session: Session, import_run: GisImportRun) -> GisImport
                 "layers_detected": len(layers),
                 "layers_mapped": len(layers),
                 "features_read": sum(l.get("total", 0) for l in layers.values()),
-                "features_imported": sum(l.get("valid", 0) for l in layers.values()),
+                "features_imported": sum(l.get("imported", l.get("valid", 0)) for l in layers.values()),
                 "features_rejected": sum(l.get("rejected", 0) for l in layers.values()),
                 "repairs_applied": sum(l.get("repaired", 0) for l in layers.values()),
                 "warnings": output.get("warnings", []),

@@ -20,7 +20,7 @@ def upgrade() -> None:
     op.create_table(
         "sync_operations",
         sa.Column("id", sa.Uuid(), primary_key=True, nullable=False),
-        sa.Column("project_id", sa.Uuid(), nullable=False),
+        sa.Column("project_id", sa.Uuid(), primary_key=True, nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=True),
         sa.Column("client_id", sa.String(length=128), nullable=True),
         sa.Column("operation_type", sa.String(length=64), nullable=False),

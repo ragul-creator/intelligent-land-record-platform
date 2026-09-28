@@ -165,7 +165,7 @@ All sync endpoints require a valid Bearer token and project membership:
 
 - **URL**: `GET /api/v1/projects/{project_id}/sync/changes?cursor={cursor}&limit={limit}`
 - **Parameters**:
-  - `cursor`: (Optional string) Monotonic sequence ID. If omitted or `0`, begins from the start.
+  - `cursor`: (Optional string) Monotonic sequence ID. If omitted or `0`, begins from the start. Must be a valid non-negative integer representation. Invalid or negative cursor values are rejected with HTTP 400 and error code `INVALID_CURSOR`.
   - `limit`: (Optional integer, default: 50, max: 100) Maximum records to return.
 - **Response**:
 
@@ -269,6 +269,7 @@ Each operation in `results` returns one of four statuses:
 
 | Error Code | HTTP Status | Description |
 | :--- | :--- | :--- |
+| `INVALID_CURSOR` | 400 | Cursor parameter is not a valid non-negative integer representation |
 | `SYNC_BATCH_TOO_LARGE` | 422 | Batch contains more than 100 operations |
 | `SYNC_OPERATION_UNSUPPORTED` | 200 (in item) | Operation type not in Phase 1 scope |
 | `SYNC_OPERATION_INVALID` | 200 (in item) | Missing required fields, invalid geometry, or malformed payload |

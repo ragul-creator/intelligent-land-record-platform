@@ -7,21 +7,35 @@ import sqlite3
 import struct
 import tempfile
 import uuid
+from datetime import UTC, datetime
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
 
-from pyproj import CRS, Transformer
+from geoalchemy2.shape import from_shape
+from pyproj import CRS, Geod, Transformer
 from shapely import make_valid
-from shapely.geometry import GeometryCollection, LineString, MultiLineString, MultiPolygon, Polygon
+from shapely.geometry import GeometryCollection, LineString, MultiLineString, MultiPolygon, Polygon, mapping
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as transform_geometry
 from shapely.ops import unary_union
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audit.service import record_audit
 from app.core.storage import get_storage_service
-from app.models import File, GeoAIJob, ProcessingJob
+from app.models import (
+    Building,
+    File,
+    GeoAIJob,
+    LandUseFeature,
+    Parcel,
+    ParcelGeometryVersion,
+    ProcessingJob,
+    Road,
+)
+from app.models.gis_imports import GisImportRun, sync_gis_import_run
+from app.services.sync import record_sync_change
 from app.schemas.geopackage import (
     EXPECTED_GEOMETRY_FAMILIES,
     GIS_IMPORT_CRS_MISSING,
@@ -40,6 +54,9 @@ from app.schemas.geopackage import (
     RejectionSummary,
 )
 from app.services.processing_jobs import mark_job_completed, mark_job_processing
+
+
+NAMESPACE_GEOPACKAGE_IMPORT = uuid.UUID("a7e58db6-10f8-47e2-8951-5079a4059d68")
 
 
 class GeoPackageServiceError(ValueError):
@@ -498,6 +515,28 @@ def bounded_rejection_summary(rejections: list[tuple[str, str]]) -> list[Rejecti
     ]
 
 
+def _calculate_geodesic_area_and_sqft(geom: BaseGeometry) -> tuple[float, float]:
+    """Calculate geodesic area in m2 and sq ft for WGS84 polygon."""
+    try:
+        geod = Geod(ellps="WGS84")
+        area_m2, _ = geod.geometry_area_perimeter(geom)
+        m2 = round(abs(float(area_m2)), 2)
+        sqft = round(m2 * 10.7639104167, 2)
+        return m2, sqft
+    except Exception:
+        return 0.0, 0.0
+
+
+def _calculate_geodesic_length_m(geom: BaseGeometry) -> float:
+    """Calculate geodesic length in meters for WGS84 line."""
+    try:
+        geod = Geod(ellps="WGS84")
+        length_m = geod.geometry_length(geom)
+        return round(abs(float(length_m)), 2)
+    except Exception:
+        return 0.0
+
+
 def iter_layer_features(
     path: str | Path,
     layer_name: str,
@@ -532,11 +571,14 @@ def iter_layer_features(
             row_dict = dict(row)
             geom_blob = row_dict.pop(geom_col, None)
             geom: BaseGeometry | None = None
+            feat_srs_id: int | None = None
             if geom_blob is not None:
                 try:
-                    _, geom = unpack_gpkg_geometry(geom_blob)
+                    feat_srs_id, geom = unpack_gpkg_geometry(geom_blob)
                 except Exception:
                     geom = None
+            if feat_srs_id is not None:
+                row_dict["_feature_srs_id"] = feat_srs_id
             yield row_idx, geom, row_dict
             row_idx += 1
     finally:
@@ -640,11 +682,14 @@ def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[s
             )
 
         storage = get_storage_service()
-        file_bytes = storage.read_private_object(file_record.storage_key)
-
         with tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False) as temp_file:
-            temp_file.write(file_bytes)
             temp_path = Path(temp_file.name)
+
+        if hasattr(storage, "download_private_file") and getattr(storage, "__class__", None).__name__ == "PrivateObjectStorage":
+            storage.download_private_file(file_record.storage_key, temp_path)
+        else:
+            file_bytes = storage.read_private_object(file_record.storage_key)
+            temp_path.write_bytes(file_bytes)
 
         try:
             inspection = inspect_geopackage(temp_path)
@@ -662,6 +707,7 @@ def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[s
                 valid_count = 0
                 rejected_count = 0
                 repaired_count = 0
+                imported_count = 0
 
                 for _row_idx, raw_geom, _attrs in iter_layer_features(temp_path, layer_insp.name):
                     total_count += 1
@@ -670,8 +716,24 @@ def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[s
                         all_rejections.append((GIS_IMPORT_GEOMETRY_INVALID, "NULL_GEOMETRY"))
                         continue
 
+                    # Feature-level CRS consistency check (F-15)
+                    feat_srs_id = _attrs.get("_feature_srs_id")
+                    target_source_crs: CRSInfo | CRS | str = source_crs_info
+                    if feat_srs_id is not None and layer_insp.crs.srs_id is not None and feat_srs_id != layer_insp.crs.srs_id:
+                        if feat_srs_id in (0, -1):
+                            rejected_count += 1
+                            all_rejections.append((GIS_IMPORT_CRS_MISSING, "FEATURE_CRS_UNDEFINED"))
+                            continue
+                        try:
+                            feat_crs = CRS.from_epsg(feat_srs_id) if feat_srs_id > 0 else CRS.from_user_input(str(feat_srs_id))
+                            target_source_crs = feat_crs
+                        except Exception:
+                            rejected_count += 1
+                            all_rejections.append((GIS_IMPORT_CRS_MISSING, f"FEATURE_CRS_INCONSISTENT: {feat_srs_id}"))
+                            continue
+
                     try:
-                        transformed = transform_to_interchange_crs(raw_geom, source_crs_info)
+                        transformed = transform_to_interchange_crs(raw_geom, target_source_crs)
                     except Exception as err:
                         rejected_count += 1
                         all_rejections.append((GIS_IMPORT_GEOMETRY_INVALID, f"TRANSFORM_FAILED: {err}"))
@@ -683,12 +745,280 @@ def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[s
                     if err_code:
                         rejected_count += 1
                         all_rejections.append((err_code, reason or "GEOMETRY_INVALID"))
-                    else:
-                        valid_count += 1
-                        if was_repaired:
-                            repaired_count += 1
-                            if reason and reason not in warnings:
-                                warnings.append(reason)
+                        continue
+
+                    valid_count += 1
+                    if was_repaired:
+                        repaired_count += 1
+                        if reason and reason not in warnings:
+                            warnings.append(reason)
+
+                    # Persist valid feature to domain models
+                    try:
+                        attrs = _attrs or {}
+                        now_utc = datetime.now(UTC)
+                        src_ref = str(attrs.get("source_reference") or source_reference or file_record.original_name)
+                        src_val = str(attrs.get("source") or "GIS_IMPORT")
+
+                        raw_conf = attrs.get("confidence")
+                        try:
+                            conf = float(raw_conf) if raw_conf is not None else None
+                        except (ValueError, TypeError):
+                            conf = None
+
+                        model_ver = str(attrs["model_version"]).strip() if attrs.get("model_version") else None
+
+                        if logical_key == "parcels":
+                            ext_id_raw = (
+                                attrs.get("external_identifier")
+                                or attrs.get("parcel_id")
+                                or attrs.get("khasra_no")
+                                or attrs.get("id")
+                                or attrs.get("name")
+                            )
+                            ext_id = str(ext_id_raw).strip() if ext_id_raw is not None else None
+                            ident_seed = ext_id if ext_id else str(_row_idx)
+                            parcel_id = uuid.uuid5(NAMESPACE_GEOPACKAGE_IMPORT, f"parcel:{job.project_id}:{ident_seed}")
+                            geom_version_id = uuid.uuid5(NAMESPACE_GEOPACKAGE_IMPORT, f"geom_version:{parcel_id}:1")
+
+                            # Idempotency check: if already persisted, avoid duplicating
+                            existing_parcel = session.get(Parcel, parcel_id)
+                            if existing_parcel is None and hasattr(session, "records") and Parcel in session.records:
+                                existing_parcel = session.records[Parcel].get(parcel_id)
+                            if existing_parcel is not None:
+                                imported_count += 1
+                                continue
+
+                            # Check for verified parcel conflict
+                            is_verified = False
+                            if ext_id:
+                                if hasattr(session, "scalar"):
+                                    v_parcel = session.scalar(
+                                        select(Parcel).where(
+                                            Parcel.project_id == job.project_id,
+                                            Parcel.external_identifier == ext_id,
+                                            Parcel.verification_status == "VERIFIED",
+                                        )
+                                    )
+                                    if v_parcel is not None:
+                                        is_verified = True
+                                elif hasattr(session, "added"):
+                                    for item in session.added:
+                                        if (
+                                            isinstance(item, Parcel)
+                                            and item.project_id == job.project_id
+                                            and item.external_identifier == ext_id
+                                            and item.verification_status == "VERIFIED"
+                                        ):
+                                            is_verified = True
+                                            break
+
+                            if is_verified:
+                                rejected_count += 1
+                                all_rejections.append((
+                                    GIS_IMPORT_GEOMETRY_INVALID,
+                                    f"CANNOT_OVERWRITE_VERIFIED_PARCEL: {ext_id}",
+                                ))
+                                continue
+
+                            # Area calculation
+                            raw_area = attrs.get("area_m2") if attrs.get("area_m2") is not None else attrs.get("area")
+                            try:
+                                area_m2 = float(raw_area) if raw_area is not None else None
+                            except (ValueError, TypeError):
+                                area_m2 = None
+                            if area_m2 is None or area_m2 <= 0:
+                                area_m2, area_sqft = _calculate_geodesic_area_and_sqft(valid_geom)
+                            else:
+                                raw_sqft = attrs.get("area_sqft")
+                                try:
+                                    area_sqft = float(raw_sqft) if raw_sqft is not None else round(area_m2 * 10.7639104167, 2)
+                                except (ValueError, TypeError):
+                                    area_sqft = round(area_m2 * 10.7639104167, 2)
+
+                            req_survey = bool(attrs.get("requires_survey", True))
+
+                            parcel = Parcel(
+                                id=parcel_id,
+                                project_id=job.project_id,
+                                external_identifier=ext_id,
+                                source=src_val,
+                                source_reference=src_ref,
+                                status="DRAFT",
+                                verification_status="UNVERIFIED",
+                                current_geometry_version=1,
+                                coordinate_space="WORLD",
+                                source_crs=source_crs_info.crs_string,
+                                confidence=conf,
+                                model_version=model_ver,
+                                requires_survey=req_survey,
+                            )
+                            version = ParcelGeometryVersion(
+                                id=geom_version_id,
+                                parcel_id=parcel_id,
+                                version=1,
+                                geometry=from_shape(valid_geom, srid=4326),
+                                source_geometry_json=mapping(valid_geom),
+                                source=src_val,
+                                source_reference=src_ref,
+                                coordinate_space="WORLD",
+                                source_crs=source_crs_info.crs_string,
+                                area_m2=area_m2,
+                                area_sqft=area_sqft,
+                                validation_status="VALID",
+                                created_by_type="IMPORT",
+                                processed_at=now_utc,
+                            )
+                            session.add(parcel)
+                            session.add(version)
+                            record_sync_change(
+                                session,
+                                project_id=job.project_id,
+                                entity_type="PARCEL",
+                                entity_id=parcel.id,
+                                change_type="IMPORTED",
+                                server_version=1,
+                            )
+
+                        elif logical_key == "buildings":
+                            bldg_raw_id = attrs.get("building_id") or attrs.get("id") or attrs.get("name") or str(_row_idx)
+                            bldg_id = uuid.uuid5(NAMESPACE_GEOPACKAGE_IMPORT, f"building:{job.project_id}:{file_record.id}:{bldg_raw_id}")
+                            existing_bldg = session.get(Building, bldg_id)
+                            if existing_bldg is None and hasattr(session, "records") and Building in session.records:
+                                existing_bldg = session.records[Building].get(bldg_id)
+                            if existing_bldg is not None:
+                                imported_count += 1
+                                continue
+
+                            raw_area = attrs.get("area_m2") if attrs.get("area_m2") is not None else attrs.get("area")
+                            try:
+                                area_m2 = float(raw_area) if raw_area is not None else None
+                            except (ValueError, TypeError):
+                                area_m2 = None
+                            if area_m2 is None or area_m2 <= 0:
+                                area_m2, area_sqft = _calculate_geodesic_area_and_sqft(valid_geom)
+                            else:
+                                raw_sqft = attrs.get("area_sqft")
+                                try:
+                                    area_sqft = float(raw_sqft) if raw_sqft is not None else round(area_m2 * 10.7639104167, 2)
+                                except (ValueError, TypeError):
+                                    area_sqft = round(area_m2 * 10.7639104167, 2)
+
+                            bldg = Building(
+                                id=bldg_id,
+                                project_id=job.project_id,
+                                geometry=from_shape(valid_geom, srid=4326),
+                                source=src_val,
+                                source_reference=src_ref,
+                                confidence=conf,
+                                model_version=model_ver,
+                                status="DETECTED",
+                                verification_status="UNVERIFIED",
+                                area_m2=area_m2,
+                                area_sqft=area_sqft,
+                                processed_at=now_utc,
+                            )
+                            session.add(bldg)
+
+                        elif logical_key == "roads":
+                            road_raw_id = attrs.get("road_id") or attrs.get("id") or attrs.get("name") or str(_row_idx)
+                            road_id = uuid.uuid5(NAMESPACE_GEOPACKAGE_IMPORT, f"road:{job.project_id}:{file_record.id}:{road_raw_id}")
+                            existing_road = session.get(Road, road_id)
+                            if existing_road is None and hasattr(session, "records") and Road in session.records:
+                                existing_road = session.records[Road].get(road_id)
+                            if existing_road is not None:
+                                imported_count += 1
+                                continue
+
+                            road_cls = str(
+                                attrs.get("road_class")
+                                or attrs.get("road_name")
+                                or attrs.get("class")
+                                or attrs.get("name")
+                                or "UNCLASSIFIED"
+                            )
+                            raw_len = attrs.get("length_m") if attrs.get("length_m") is not None else attrs.get("length")
+                            try:
+                                length_m = float(raw_len) if raw_len is not None else None
+                            except (ValueError, TypeError):
+                                length_m = None
+                            if length_m is None or length_m <= 0:
+                                length_m = _calculate_geodesic_length_m(valid_geom)
+
+                            road = Road(
+                                id=road_id,
+                                project_id=job.project_id,
+                                geometry=from_shape(valid_geom, srid=4326),
+                                road_class=road_cls,
+                                source=src_val,
+                                source_reference=src_ref,
+                                confidence=conf,
+                                model_version=model_ver,
+                                status="ACTIVE",
+                                verification_status="UNVERIFIED",
+                                length_m=length_m,
+                                processed_at=now_utc,
+                            )
+                            session.add(road)
+
+                        elif logical_key == "land_use":
+                            lu_raw_id = attrs.get("land_use_id") or attrs.get("id") or attrs.get("name") or str(_row_idx)
+                            lu_id = uuid.uuid5(NAMESPACE_GEOPACKAGE_IMPORT, f"land_use:{job.project_id}:{file_record.id}:{lu_raw_id}")
+                            existing_lu = session.get(LandUseFeature, lu_id)
+                            if existing_lu is None and hasattr(session, "records") and LandUseFeature in session.records:
+                                existing_lu = session.records[LandUseFeature].get(lu_id)
+                            if existing_lu is not None:
+                                imported_count += 1
+                                continue
+
+                            lu_cls = str(
+                                attrs.get("land_use_class")
+                                or attrs.get("class")
+                                or attrs.get("use")
+                                or attrs.get("name")
+                                or "UNCLASSIFIED"
+                            )
+                            raw_area = attrs.get("area_m2") if attrs.get("area_m2") is not None else attrs.get("area")
+                            try:
+                                area_m2 = float(raw_area) if raw_area is not None else None
+                            except (ValueError, TypeError):
+                                area_m2 = None
+                            if area_m2 is None or area_m2 <= 0:
+                                area_m2, area_sqft = _calculate_geodesic_area_and_sqft(valid_geom)
+                            else:
+                                raw_sqft = attrs.get("area_sqft")
+                                try:
+                                    area_sqft = float(raw_sqft) if raw_sqft is not None else round(area_m2 * 10.7639104167, 2)
+                                except (ValueError, TypeError):
+                                    area_sqft = round(area_m2 * 10.7639104167, 2)
+
+                            lu = LandUseFeature(
+                                id=lu_id,
+                                project_id=job.project_id,
+                                geometry=from_shape(valid_geom, srid=4326),
+                                land_use_class=lu_cls,
+                                source=src_val,
+                                source_reference=src_ref,
+                                confidence=conf,
+                                model_version=model_ver,
+                                status="PROPOSED",
+                                verification_status="UNVERIFIED",
+                                area_m2=area_m2,
+                                area_sqft=area_sqft,
+                                processed_at=now_utc,
+                            )
+                            session.add(lu)
+
+                        if hasattr(session, "flush"):
+                            session.flush()
+                        imported_count += 1
+
+                    except Exception as persist_err:
+                        rejected_count += 1
+                        all_rejections.append((
+                            GIS_IMPORT_GEOMETRY_INVALID,
+                            f"PERSISTENCE_FAILED: {persist_err}",
+                        ))
 
                 layers_summary[logical_key] = GeoPackageImportLayerResult(
                     source_layer=layer_insp.name,
@@ -696,6 +1026,7 @@ def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[s
                     valid=valid_count,
                     rejected=rejected_count,
                     repaired=repaired_count,
+                    imported=imported_count,
                     source_crs=source_crs_info.crs_string,
                 ).model_dump()
 
@@ -719,13 +1050,25 @@ def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[s
             geoai_job.output_refs_json = job_result.model_dump()
             job.progress = 100
             mark_job_completed(session, job)
+
+            # Sync linked GisImportRun if present
+            if hasattr(session, "scalar"):
+                import_run = session.scalar(
+                    select(GisImportRun).where(GisImportRun.processing_job_id == job.id)
+                )
+                if import_run is not None:
+                    sync_gis_import_run(session, import_run)
+
             record_audit(
                 session,
                 "geopackage.import_completed",
                 "processing_job",
                 job.id,
                 project_id=job.project_id,
-                metadata={"layers": list(layers_summary.keys())},
+                metadata={
+                    "layers": list(layers_summary.keys()),
+                    "features_imported": sum(v["imported"] for v in layers_summary.values()),
+                },
             )
             session.commit()
             return job_result.model_dump()
@@ -751,22 +1094,149 @@ def process_geopackage_import_job(session: Session, job_id: uuid.UUID) -> dict[s
             )
             session.commit()
         raise
-    except Exception as err:
+    except Exception:
         session.rollback()
-        job = session.get(ProcessingJob, job_id)
-        geoai_job = session.get(GeoAIJob, job_id)
-        if job is not None and job.status == "PROCESSING":
-            job.status = "FAILED"
-            job.error_json = {"code": "GIS_IMPORT_FAILED", "message": "GeoPackage import processing failed."}
-            if geoai_job is not None:
-                geoai_job.metrics_json = {"error_code": "GIS_IMPORT_FAILED"}
-            record_audit(
-                session,
-                "geopackage.import_failed",
-                "processing_job",
-                job.id,
-                project_id=job.project_id,
-                metadata={"reason": "Unexpected error during import"},
-            )
-            session.commit()
         raise
+
+
+def preview_geopackage_import(
+    session: Session,
+    *,
+    project_id: uuid.UUID,
+    file_record: File,
+    mapping_req: LayerMappingRequest,
+    source_reference: str | None = None,
+) -> dict[str, Any]:
+    """Execute dry-run inspection and validation of GeoPackage layers without modifying the database."""
+    storage = get_storage_service()
+    with tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False) as temp_file:
+        temp_path = Path(temp_file.name)
+
+    if hasattr(storage, "download_private_file") and getattr(storage, "__class__", None).__name__ == "PrivateObjectStorage":
+        storage.download_private_file(file_record.storage_key, temp_path)
+    else:
+        file_bytes = storage.read_private_object(file_record.storage_key)
+        temp_path.write_bytes(file_bytes)
+
+    try:
+        inspection = inspect_geopackage(temp_path)
+        resolved_layers = validate_layer_mapping(inspection, mapping_req)
+
+        layers_summary: dict[str, Any] = {}
+        all_rejections: list[tuple[str, str]] = []
+        warnings: list[str] = []
+
+        total_read = 0
+        total_valid = 0
+        total_rejected = 0
+        total_repaired = 0
+
+        for logical_key, layer_insp in resolved_layers.items():
+            source_crs_info = detect_crs(layer_insp)
+            expected_fam = EXPECTED_GEOMETRY_FAMILIES.get(logical_key, ())
+
+            l_total = 0
+            l_valid = 0
+            l_rejected = 0
+            l_repaired = 0
+
+            for _row_idx, raw_geom, _attrs in iter_layer_features(temp_path, layer_insp.name):
+                l_total += 1
+                total_read += 1
+                if raw_geom is None:
+                    l_rejected += 1
+                    total_rejected += 1
+                    all_rejections.append((GIS_IMPORT_GEOMETRY_INVALID, "NULL_GEOMETRY"))
+                    continue
+
+                feat_srs_id = _attrs.get("_feature_srs_id")
+                target_source_crs: CRSInfo | CRS | str = source_crs_info
+                if feat_srs_id is not None and layer_insp.crs.srs_id is not None and feat_srs_id != layer_insp.crs.srs_id:
+                    if feat_srs_id in (0, -1):
+                        l_rejected += 1
+                        total_rejected += 1
+                        all_rejections.append((GIS_IMPORT_CRS_MISSING, "FEATURE_CRS_UNDEFINED"))
+                        continue
+                    try:
+                        feat_crs = CRS.from_epsg(feat_srs_id) if feat_srs_id > 0 else CRS.from_user_input(str(feat_srs_id))
+                        target_source_crs = feat_crs
+                    except Exception:
+                        l_rejected += 1
+                        total_rejected += 1
+                        all_rejections.append((GIS_IMPORT_CRS_MISSING, f"FEATURE_CRS_INCONSISTENT: {feat_srs_id}"))
+                        continue
+
+                try:
+                    transformed = transform_to_interchange_crs(raw_geom, target_source_crs)
+                except Exception as err:
+                    l_rejected += 1
+                    total_rejected += 1
+                    all_rejections.append((GIS_IMPORT_GEOMETRY_INVALID, f"TRANSFORM_FAILED: {err}"))
+                    continue
+
+                valid_geom, was_repaired, err_code, reason = validate_geometry(transformed, expected_fam)
+                if err_code:
+                    l_rejected += 1
+                    total_rejected += 1
+                    all_rejections.append((err_code, reason or "GEOMETRY_INVALID"))
+                    continue
+
+                if was_repaired:
+                    l_repaired += 1
+                    total_repaired += 1
+                    if reason and reason not in warnings:
+                        warnings.append(reason)
+
+                if logical_key == "parcels":
+                    attrs = _attrs or {}
+                    ext_id_raw = (
+                        attrs.get("external_identifier")
+                        or attrs.get("parcel_id")
+                        or attrs.get("khasra_no")
+                        or attrs.get("id")
+                        or attrs.get("name")
+                    )
+                    ext_id = str(ext_id_raw).strip() if ext_id_raw is not None else None
+                    if ext_id and hasattr(session, "scalar"):
+                        v_parcel = session.scalar(
+                            select(Parcel).where(
+                                Parcel.project_id == project_id,
+                                Parcel.external_identifier == ext_id,
+                                Parcel.verification_status == "VERIFIED",
+                            )
+                        )
+                        if v_parcel is not None:
+                            l_rejected += 1
+                            total_rejected += 1
+                            all_rejections.append((
+                                GIS_IMPORT_GEOMETRY_INVALID,
+                                f"CANNOT_OVERWRITE_VERIFIED_PARCEL: {ext_id}",
+                            ))
+                            continue
+
+                l_valid += 1
+                total_valid += 1
+
+            layers_summary[logical_key] = {
+                "source_layer": layer_insp.name,
+                "read": l_total,
+                "valid": l_valid,
+                "rejected": l_rejected,
+                "repaired": l_repaired,
+            }
+
+        bounded_rejections = bounded_rejection_summary(all_rejections)
+
+        return {
+            "layers_detected": len(inspection.layers),
+            "layers_mapped": len(resolved_layers),
+            "features_read": total_read,
+            "features_imported": total_valid,
+            "features_rejected": total_rejected,
+            "repairs_applied": total_repaired,
+            "warnings": warnings,
+            "rejection_summary": [s.model_dump() for s in bounded_rejections],
+            "layer_details": layers_summary,
+        }
+    finally:
+        temp_path.unlink(missing_ok=True)
