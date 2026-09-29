@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import os
 import uuid
+import zipfile
 from datetime import UTC, datetime
 
 import pytest
@@ -145,6 +147,21 @@ def _seed_project(session):
     session.add(field)
     session.flush()
     session.add(
+        DocumentExtractedField(
+            document_id=document.id,
+            ocr_result_id=ocr.id,
+            candidate_index=1,
+            field_name="owner_details",
+            original_value="Ramesh Example, Coimbatore",
+            normalized_value_json=None,
+            confidence=0.82,
+            page_number=1,
+            source_id=str(document.id),
+            extractor_version="h2b4-fixture",
+            processed_at=datetime.now(UTC),
+        )
+    )
+    session.add(
         DocumentFieldCorrection(
             document_id=document.id,
             extracted_field_id=field.id,
@@ -285,6 +302,33 @@ def test_h2b4_search_exports_dashboard_viewer_policy_and_job_recovery(monkeypatc
     )
     assert officer_records.status_code == 200
     assert "123/4A" in officer_records.text
+
+    officer_excel = client.get(
+        f"/api/v1/projects/{ids['project_id']}/exports/records.xlsx",
+        headers=officer_headers,
+    )
+    assert officer_excel.status_code == 200
+    assert officer_excel.content.startswith(b"PK")
+    assert "spreadsheetml.sheet" in officer_excel.headers["content-type"]
+    with zipfile.ZipFile(io.BytesIO(officer_excel.content)) as workbook_zip:
+        shared_strings = workbook_zip.read("xl/sharedStrings.xml").decode("utf-8")
+        workbook_xml = workbook_zip.read("xl/workbook.xml").decode("utf-8")
+    assert "Record Summary" in workbook_xml
+    assert "Extracted Fields" in workbook_xml
+    assert "OCR Text" in workbook_xml
+    assert "Owner Details" in shared_strings
+    assert "Ramesh Example, Coimbatore" in shared_strings
+    assert "123/4A" in shared_strings
+
+    viewer_excel = client.get(
+        f"/api/v1/projects/{ids['project_id']}/exports/records.xlsx",
+        headers=viewer_headers,
+    )
+    assert viewer_excel.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(viewer_excel.content)) as workbook_zip:
+        viewer_strings = workbook_zip.read("xl/sharedStrings.xml").decode("utf-8")
+    assert "123/4A" not in viewer_strings
+    assert "Ramesh Example, Coimbatore" not in viewer_strings
 
     parcels = client.get(
         f"/api/v1/projects/{ids['project_id']}/exports/parcels.geojson",

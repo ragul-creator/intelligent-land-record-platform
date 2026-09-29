@@ -67,22 +67,62 @@ export function HomePage() {
   return <main className="home-shell">
     <header className="home-hero">
       <div>
-        <p className="eyebrow">Tamil Nadu demo · SIH12 + SIH18</p>
-        <h1>Intelligent Land Record Platform</h1>
-        <p>One auditable workflow for digitized land records, human verification, cadastral GIS, and evidence-backed record ↔ parcel association.</p>
+        <h1>Bhumi-AI</h1>
+        <p>Professional land-record intelligence with two focused capabilities: document OCR and evidence extraction, plus Web-GIS and GeoAI analysis.</p>
       </div>
-      <aside className="home-safety-note"><strong>Demo boundary</strong><span>AI outputs are preliminary. Parcel associations are workflow evidence, not statutory ownership proof.</span></aside>
+
     </header>
 
-    {!loggedIn && <section className="login-card" aria-label="Sign in">
-      <div><p className="eyebrow">Secure project access</p><h2>Sign in</h2><p>Use an authorized application login ID such as the generated TN demo account.</p></div>
-      <form onSubmit={(event) => { event.preventDefault(); if (identifier.trim() && password) signIn.mutate(); }}>
-        <label>Login ID or email<input aria-label="Login ID or email" autoComplete="username" value={identifier} onChange={(event) => setIdentifier(event.target.value)} /></label>
-        <label>Password<input aria-label="Password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-        <button type="submit" disabled={!identifier.trim() || !password || signIn.isPending}>{signIn.isPending ? "Signing in…" : "Sign in"}</button>
-        {(signIn.isError || staleSession) && <p className="error-copy" role="alert">{staleSession ? "Your saved session is no longer valid. Sign in again." : "Sign in failed. Check the login ID and password."}</p>}
-      </form>
-      {staleSession && <button className="text-action" type="button" onClick={() => signOut.mutate()}>Clear expired session</button>}
+    {!loggedIn && <section className="login-card login-experience" aria-label="Sign in">
+      <aside className="login-visual" aria-label="Bhumi-AI capabilities">
+        <div className="login-visual-copy">
+          <p className="eyebrow">Unified land intelligence</p>
+          <h2>Evidence first.<br />Decisions with context.</h2>
+          <p>One workspace for digitized land records, geospatial evidence, and human review.</p>
+        </div>
+
+        <div className="login-map-motif" aria-hidden="true">
+          <svg viewBox="0 0 520 250" role="presentation">
+            <path className="login-boundary" d="M26 48 132 28 220 55 304 30 486 66 470 210 348 224 250 194 138 226 42 190Z" />
+            <path className="login-parcel" d="M132 28 122 114 138 226M220 55 210 122 250 194M304 30 298 116 348 224M42 132 122 114 210 122 298 116 480 138" />
+            <path className="login-road" d="M14 176c84-34 155-20 222-5 91 20 166 18 273-19" />
+            <rect className="login-building" x="69" y="74" width="39" height="27" rx="3" />
+            <rect className="login-building" x="254" y="72" width="52" height="33" rx="3" />
+            <rect className="login-building" x="384" y="152" width="42" height="29" rx="3" />
+            <circle className="login-node" cx="122" cy="114" r="4" />
+            <circle className="login-node" cx="298" cy="116" r="4" />
+          </svg>
+          <span className="login-map-tag login-map-tag-a">Document evidence</span>
+          <span className="login-map-tag login-map-tag-b">GeoAI layers</span>
+          <span className="login-map-tag login-map-tag-c">Human review</span>
+        </div>
+
+        <div className="login-capabilities">
+          <span>OCR & extraction</span>
+          <span>WebGIS & GeoAI</span>
+          <span>Audit-ready review</span>
+        </div>
+      </aside>
+
+      <div className="login-form-panel">
+        <div className="login-form-heading">
+          <p className="eyebrow">Secure project access</p>
+          <h2>Sign in</h2>
+          <p>Continue to your authorized Bhumi-AI workspace.</p>
+        </div>
+        <form onSubmit={(event) => { event.preventDefault(); if (identifier.trim() && password) signIn.mutate(); }}>
+          <label>Login ID or email<input aria-label="Login ID or email" autoComplete="username" value={identifier} onChange={(event) => setIdentifier(event.target.value)} /></label>
+          <label>Password<input aria-label="Password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+          <button type="submit" disabled={!identifier.trim() || !password || signIn.isPending}>{signIn.isPending ? "Signing in…" : "Sign in"}</button>
+          {(signIn.isError || staleSession) && <p className="error-copy" role="alert">{staleSession ? "Your saved session is no longer valid. Sign in again." : "Sign in failed. Check the login ID and password."}</p>}
+        </form>
+        <div className="login-trust-row" aria-label="Security information">
+          <span>Role-based access</span>
+          <span>Project isolation</span>
+          <span>Audit trail</span>
+        </div>
+        {staleSession && <button className="text-action" type="button" onClick={() => signOut.mutate()}>Clear expired session</button>}
+      </div>
     </section>}
 
     {loggedIn && <>
@@ -118,12 +158,10 @@ export function HomePage() {
       </section>
 
       <section className="home-demo-path">
-        <div><p className="eyebrow">Suggested judging path</p><h2>Show the vertical slice in four moves</h2></div>
+        <div><p className="eyebrow">Suggested judging path</p><h2>Two clear demo workflows</h2><p>Keep the live walkthrough focused and easy to follow.</p></div>
         <ol>
-          <li><strong>Document AI</strong><span>Open OCR, structured fields, confidence, and validation evidence.</span></li>
-          <li><strong>Human review</strong><span>Show low-confidence or conflicting evidence entering the review queue.</span></li>
-          <li><strong>Web-GIS</strong><span>Inspect draft parcels separately from buildings, roads, and land-use layers.</span></li>
-          <li><strong>Record ↔ Parcel</strong><span>Show the auditable association and its provenance without claiming statutory ownership.</span></li>
+          <li><strong>Document AI / OCR</strong><span>Upload the prepared land deed and show OCR evidence, extracted fields, confidence, and provenance.</span></li>
+          <li><strong>Web-GIS / GeoAI</strong><span>Open the prepared imagery and show detected buildings, roads, parcel candidates, and visible-boundary evidence.</span></li>
         </ol>
       </section>
     </>}

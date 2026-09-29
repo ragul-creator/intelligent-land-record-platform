@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -164,7 +164,7 @@ def vectorize_buildings(
     coordinate_space: CoordinateSpace = "WORLD" if transform is not None and crs is not None else "PIXEL"
     raster_transform = transform if coordinate_space == "WORLD" else Affine.identity()
     source_crs = crs_to_string(crs) if coordinate_space == "WORLD" else None
-    processed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    processed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     features: list[BuildingFeature] = []
     for geometry_mapping, value in shapes(binary.astype(np.uint8), mask=binary, connectivity=8, transform=raster_transform):
         if int(value) != 1:

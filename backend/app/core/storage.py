@@ -170,6 +170,11 @@ class PrivateObjectStorage:
             raise
         return response["Body"].read()
 
+    def delete_private_object(self, storage_key: str) -> None:
+        """Best-effort lifecycle primitive for permanently deleting a private object."""
+
+        self.client.delete_object(Bucket=self.bucket, Key=storage_key)
+
     def put_derived_bytes(self, storage_key: str, payload: bytes, *, content_type: str) -> None:
         """Store an immutable worker-generated preview without exposing it publicly."""
         import hashlib

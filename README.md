@@ -45,7 +45,13 @@ This starts the frontend, FastAPI backend, Celery worker, PostgreSQL/PostGIS, Re
 
 ### H.2B.1 imagery and GeoAI
 
-The Compose stack also includes a dedicated `geoai-worker`; FastAPI and the regular worker remain free of PyTorch and raster processing dependencies. Upload a project GeoTIFF from the GIS view, wait for registration, and run building processing only after provisioning a local C.2 checkpoint at `GEOAI_BUILDING_CHECKPOINT` in the GeoAI worker. Leave the variable blank to fail a building job safely instead of fabricating output. See [H.2B1 imagery and GeoAI](docs/H2B1_IMAGERY_GEOAI.md) for the private-preview, provenance, manual draft, and review workflow.
+The Compose stack also includes a dedicated `geoai-worker`; FastAPI and the regular worker remain free of PyTorch and raster processing dependencies. Upload a project GeoTIFF from the GIS view, wait for registration, and run building processing only after provisioning a local checkpoint at `GEOAI_BUILDING_CHECKPOINT`. The current local pilot uses the Karnataka-adapted `building-segmentation-c2-karnataka-v1` checkpoint at `/models/20260927T044130Z/best.pt`; its held-out Karnataka test IoU is 0.7211 with recall 0.8586 at threshold 0.50. Outputs remain `AI_PRELIMINARY` and `UNVERIFIED`. Leave the checkpoint variable blank to fail safely instead of fabricating output. See [H.2B1 imagery and GeoAI](docs/H2B1_IMAGERY_GEOAI.md) for model provenance, dataset-license notes, private-preview handling, and the review workflow.
+
+### H.2B.5 Road GeoAI
+
+Road extraction now runs through the Compose-managed GPU `samroad` service. The GeoAI worker calls it over the private Compose network at `http://samroad:8765`; model files are mounted from ignored local storage under `data/local/samroad_runtime/`. The current local pilot configuration is SAM-Road v7 with fixed high-bit normalization, 0.5-pixel centerline simplification, and targeted subpixel mask-midpoint recentering only for topology-disagreement candidates. Mask/topology disagreement remains review metadata rather than a rejection rule. Results remain `AI_PRELIMINARY` and `UNVERIFIED`.
+
+After laptop sleep or before a demo, run `powershell -ExecutionPolicy Bypass -File infrastructure\check-local-health.ps1`. It checks Docker, host and container GPU access, the core Compose services, frontend/backend health, SAM-Road CUDA health, and the GeoAI-worker-to-SAM-Road path. See [H.2B.5 Road GeoAI](docs/H2B5_ROAD_GEOAI.md) for the configuration, regression record, and recovery notes.
 
 Stop the stack with:
 

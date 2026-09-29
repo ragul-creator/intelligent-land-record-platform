@@ -55,6 +55,11 @@ export function updateProject(projectId: string, payload: Partial<Pick<ProjectAd
   return request(`/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
 }
 
+export function deleteProject(projectId: string, confirmationName: string): Promise<void> {
+  const params = new URLSearchParams({ confirmation_name: confirmationName });
+  return request<void>(`/projects/${projectId}?${params.toString()}`, { method: "DELETE" });
+}
+
 export async function loadProjectMembers(projectId: string): Promise<Page<ProjectMember>> {
   return request<Page<ProjectMember>>(`/projects/${projectId}/members?limit=100`);
 }

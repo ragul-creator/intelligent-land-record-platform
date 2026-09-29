@@ -32,7 +32,10 @@ RETRYABLE_JOB_TYPES = frozenset(
         "DOCUMENT_AI_PROCESS",
         "DOCUMENT_REVALIDATE",
         "PARCEL_IMPORT",
+        "PARCEL_DELINEATE",
         "BUILDING_VECTORIZE",
+        "ROAD_VECTORIZE",
+        "LAND_USE_VECTORIZE",
         "IMAGERY_REGISTER",
     }
 )
@@ -44,7 +47,10 @@ def _job_response(job: ProcessingJob) -> ProcessingJobResponse:
         "DOCUMENT_AI_PROCESS": "Retry the document processing workflow from its immutable source.",
         "DOCUMENT_REVALIDATE": "Retry validation against the persisted OCR and correction evidence.",
         "PARCEL_IMPORT": "Retry the parcel import with the original persisted request parameters.",
+        "PARCEL_DELINEATE": "Retry preliminary parcel delineation against the same imagery and current building/road evidence.",
         "BUILDING_VECTORIZE": "Retry building inference against the same registered imagery.",
+        "ROAD_VECTORIZE": "Retry road inference against the same registered imagery.",
+        "LAND_USE_VECTORIZE": "Retry land-use inference against the same registered imagery.",
         "IMAGERY_REGISTER": "Retry GeoTIFF inspection and private preview generation.",
     }
     return ProcessingJobResponse(
@@ -151,12 +157,21 @@ def retry_processing_job(
         dispatch_args = (str(job.id),)
     elif geoai_job is not None:
         get_project_for_user(session, user, job.project_id, "geoai:process")
-        from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import
+        from app.workers.tasks import process_geoai_buildings, process_geoai_land_use, process_geoai_parcel_delineation, process_geoai_parcel_import, process_geoai_roads
 
         if geoai_job.job_type == "PARCEL_IMPORT":
             dispatch = process_geoai_parcel_import
+        elif geoai_job.job_type == "PARCEL_DELINEATE":
+            dispatch = process_geoai_parcel_delineation
+            dispatch_queue = "geoai"
         elif geoai_job.job_type == "BUILDING_VECTORIZE":
             dispatch = process_geoai_buildings
+            dispatch_queue = "geoai"
+        elif geoai_job.job_type == "ROAD_VECTORIZE":
+            dispatch = process_geoai_roads
+            dispatch_queue = "geoai"
+        elif geoai_job.job_type == "LAND_USE_VECTORIZE":
+            dispatch = process_geoai_land_use
             dispatch_queue = "geoai"
         else:
             raise ApiError(

@@ -13,7 +13,7 @@ export interface SearchItem {
 }
 
 export interface ExportDescriptor {
-  code: "RECORDS_CSV" | "PARCELS_GEOJSON";
+  code: "RECORDS_XLSX" | "RECORDS_CSV" | "PARCELS_GEOJSON";
   label: string;
   path: string;
   media_type: string;
@@ -54,7 +54,8 @@ export async function downloadProjectExport(descriptor: ExportDescriptor): Promi
   const href = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   const contentDisposition = response.headers.get("Content-Disposition");
-  const filename = contentDisposition?.match(/filename="([^"]+)"/)?.[1] ?? (descriptor.code === "RECORDS_CSV" ? "records.csv" : "parcels.geojson");
+  const fallbackFilename = descriptor.code === "RECORDS_XLSX" ? "records.xlsx" : descriptor.code === "RECORDS_CSV" ? "records.csv" : "parcels.geojson";
+  const filename = contentDisposition?.match(/filename="([^"]+)"/)?.[1] ?? fallbackFilename;
   anchor.href = href;
   anchor.download = filename;
   anchor.click();

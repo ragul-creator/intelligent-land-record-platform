@@ -6,7 +6,7 @@ import json
 import logging
 import random
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -14,12 +14,16 @@ import torch
 from PIL import Image
 from torch import Tensor, nn
 from torch.utils.data import DataLoader
-from torchvision.transforms import functional as transforms
-
-from ai.geoai.segmentation.building_dataset import WHUBuildingDataset
+from ai.geoai.segmentation.building_dataset import (
+    WHUBuildingDataset,
+    _percentile_normalize_rgb,
+)
 from ai.geoai.segmentation.metrics import SegmentationMetrics, binary_confusion, metrics_from_confusion
 from ai.geoai.segmentation.model import BuildingSegmenter, ModelConfig, create_model, load_checkpoint, save_checkpoint
 from ai.geoai.segmentation.runtime import HardwareInfo, choose_num_workers, select_device
+
+
+DEFAULT_VALIDATION_THRESHOLDS = (0.30, 0.40, 0.50, 0.60, 0.70)
 
 
 @dataclass(frozen=True)
@@ -60,20 +64,51 @@ def _dice_loss(logits: Tensor, mask: Tensor, epsilon: float = 1e-7) -> Tensor:
     return 1 - ((2 * intersection + epsilon) / (denominator + epsilon)).mean()
 
 
-def _aggregate_metrics(model: BuildingSegmenter, loader: DataLoader, device: torch.device, threshold: float = 0.5) -> SegmentationMetrics:
-    true_positive = false_positive = false_negative = 0
+def _aggregate_metrics_sweep(
+    model: BuildingSegmenter,
+    loader: DataLoader,
+    device: torch.device,
+    thresholds: tuple[float, ...] = DEFAULT_VALIDATION_THRESHOLDS,
+) -> dict[float, SegmentationMetrics]:
+    totals = {threshold: [0, 0, 0] for threshold in thresholds}
     model.eval()
     with torch.inference_mode():
         for batch in loader:
-            image = batch["image"].to(device, non_blocking=device.type == "cuda")
-            mask = batch["mask"].to(device, non_blocking=device.type == "cuda")
-            with torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda"):
+            image = batch["image"].to(
+                device, non_blocking=device.type == "cuda"
+            )
+            mask = batch["mask"].to(
+                device, non_blocking=device.type == "cuda"
+            )
+            with torch.amp.autocast(
+                device_type=device.type, enabled=device.type == "cuda"
+            ):
                 probability = model.probabilities(image)
-            counts = binary_confusion(probability, mask, threshold=threshold)
-            true_positive += counts[0]
-            false_positive += counts[1]
-            false_negative += counts[2]
-    return metrics_from_confusion(true_positive, false_positive, false_negative)
+            for threshold in thresholds:
+                tp, fp, fn = binary_confusion(
+                    probability, mask, threshold=threshold
+                )
+                totals[threshold][0] += tp
+                totals[threshold][1] += fp
+                totals[threshold][2] += fn
+    return {
+        threshold: metrics_from_confusion(*counts)
+        for threshold, counts in totals.items()
+    }
+
+
+def _best_threshold(
+    sweep: dict[float, SegmentationMetrics],
+) -> tuple[float, SegmentationMetrics]:
+    return max(
+        sweep.items(),
+        key=lambda item: (
+            item[1].iou,
+            item[1].dice,
+            item[1].precision,
+            -abs(item[0] - 0.5),
+        ),
+    )
 
 
 def train(config: TrainingConfig) -> dict[str, object]:
@@ -103,7 +138,7 @@ def train(config: TrainingConfig) -> dict[str, object]:
         optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
     bce = nn.BCEWithLogitsLoss()
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     checkpoint_dir = config.checkpoint_directory / run_id
     best_iou = -1.0
     best_checkpoint: Path | None = None
@@ -125,25 +160,87 @@ def train(config: TrainingConfig) -> dict[str, object]:
                 scaler.update()
                 loss_total += float(loss.detach())
                 batches += 1
-            validation_metrics = _aggregate_metrics(model, validation_loader, device)
-            epoch_result = {"epoch": epoch, "train_loss": loss_total / max(1, batches), "validation": validation_metrics.to_dict()}
+            sweep = _aggregate_metrics_sweep(
+                model, validation_loader, device
+            )
+            validation_threshold, validation_metrics = _best_threshold(sweep)
+            validation_sweep = {
+                f"{threshold:.2f}": metrics.to_dict()
+                for threshold, metrics in sweep.items()
+            }
+            epoch_result = {
+                "epoch": epoch,
+                "train_loss": loss_total / max(1, batches),
+                "validation": validation_metrics.to_dict(),
+                "validation_threshold": validation_threshold,
+                "validation_sweep": validation_sweep,
+            }
             history.append(epoch_result)
             logging.info("GeoAI epoch result: %s", epoch_result)
-            latest = save_checkpoint(checkpoint_dir / "latest.pt", model, optimizer, epoch=epoch, training_config=asdict(config), validation=validation_metrics.to_dict())
+            latest = save_checkpoint(
+                checkpoint_dir / "latest.pt",
+                model,
+                optimizer,
+                epoch=epoch,
+                training_config=asdict(config),
+                validation=validation_metrics.to_dict(),
+                validation_threshold=validation_threshold,
+                validation_sweep=validation_sweep,
+            )
             if validation_metrics.iou > best_iou:
                 best_iou = validation_metrics.iou
-                best_checkpoint = save_checkpoint(checkpoint_dir / "best.pt", model, optimizer, epoch=epoch, training_config=asdict(config), validation=validation_metrics.to_dict())
+                best_checkpoint = save_checkpoint(
+                    checkpoint_dir / "best.pt",
+                    model,
+                    optimizer,
+                    epoch=epoch,
+                    training_config=asdict(config),
+                    validation=validation_metrics.to_dict(),
+                    validation_threshold=validation_threshold,
+                    validation_sweep=validation_sweep,
+                )
     except torch.OutOfMemoryError as error:
         raise RuntimeError("CUDA out of memory. Retry with a smaller --batch-size; CPU fallback is disabled.") from error
-    return {"run_id": run_id, "device": hardware.to_dict(), "checkpoint": str(best_checkpoint or latest), "history": history, "model_config": model_config.to_dict()}
+    return {
+        "run_id": run_id,
+        "device": hardware.to_dict(),
+        "checkpoint": str(best_checkpoint or latest),
+        "history": history,
+        "model_config": model_config.to_dict(),
+        "recommended_threshold": (
+            history[-1]["validation_threshold"] if history else 0.5
+        ),
+    }
 
 
 def evaluate(dataset_root: str | Path, split: str, checkpoint: str | Path, *, device_request: str = "auto", batch_size: int = 2, num_workers: int | None = None, limit: int | None = None, image_size: int | None = None) -> dict[str, object]:
     device, hardware = select_device(device_request)
     model, payload = load_checkpoint(checkpoint, device=device)
     dataset = WHUBuildingDataset(dataset_root, split, image_size=image_size, limit=limit)
-    metrics = _aggregate_metrics(model, _loader(dataset, batch_size, device, choose_num_workers(num_workers), False), device)
-    return {"split": split, "metrics": metrics.to_dict(), "device": hardware.to_dict(), "model_version": model.config.model_version, "checkpoint_epoch": payload.get("epoch")}
+    sweep = _aggregate_metrics_sweep(
+        model,
+        _loader(
+            dataset,
+            batch_size,
+            device,
+            choose_num_workers(num_workers),
+            False,
+        ),
+        device,
+    )
+    best_threshold, metrics = _best_threshold(sweep)
+    return {
+        "split": split,
+        "metrics": metrics.to_dict(),
+        "best_threshold": best_threshold,
+        "threshold_sweep": {
+            f"{threshold:.2f}": value.to_dict()
+            for threshold, value in sweep.items()
+        },
+        "device": hardware.to_dict(),
+        "model_version": model.config.model_version,
+        "checkpoint_epoch": payload.get("epoch"),
+    }
 
 
 def infer_input(checkpoint: str | Path, input_path: str | Path, output_directory: str | Path, *, device_request: str = "auto", threshold: float = 0.5) -> dict[str, object]:
@@ -162,7 +259,13 @@ def infer_input(checkpoint: str | Path, input_path: str | Path, output_directory
     for file in files:
         with Image.open(file) as opened:
             image = opened.convert("RGB")
-            tensor = transforms.normalize(transforms.to_tensor(image), mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]).unsqueeze(0)
+            normalized = _percentile_normalize_rgb(image)
+            tensor = torch.from_numpy(normalized)
+            tensor = (
+                tensor
+                - torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+            ) / torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+            tensor = tensor.unsqueeze(0)
         with torch.inference_mode(), torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda"):
             probability = model.probabilities(tensor.to(device, non_blocking=device.type == "cuda"))[0, 0].float().cpu().numpy()
         binary = probability >= threshold

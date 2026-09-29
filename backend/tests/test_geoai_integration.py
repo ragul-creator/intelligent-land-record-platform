@@ -1,7 +1,10 @@
 """Live C.7 PostGIS, worker, version-history, and project-scope coverage."""
 
 import os
+import sys
+import types
 import uuid
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,7 +15,7 @@ from app.core.database import SessionLocal
 from app.core.storage import get_storage_service
 from app.models import Building, File, GeoAIJob, ImageryAsset, LandUseFeature, Parcel, ParcelGeometryVersion, ProcessingJob, Project, ProjectMember, Road, Role, TopologyError, User, UserRole
 from app.services.user_identities import generate_login_id
-from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import
+from app.workers.tasks import process_geoai_buildings, process_geoai_land_use, process_geoai_parcel_delineation, process_geoai_parcel_import, process_geoai_roads
 
 
 pytestmark = pytest.mark.skipif(
@@ -195,6 +198,685 @@ def test_building_job_without_checkpoint_fails_terminally(monkeypatch) -> None:
         get_settings.cache_clear()
 
 
+def test_building_job_replaces_only_same_imagery_unverified_candidates(monkeypatch, tmp_path: Path) -> None:
+    """A rerun replaces its candidates without touching reviewed or unrelated buildings."""
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import Polygon
+
+    from app.core.config import get_settings
+
+    checkpoint = tmp_path / "building-checkpoint.pt"
+    checkpoint.write_bytes(b"test checkpoint marker")
+    monkeypatch.setenv("GEOAI_BUILDING_CHECKPOINT", str(checkpoint))
+    get_settings.cache_clear()
+
+    class Storage:
+        def read_private_object(self, _storage_key: str) -> bytes:
+            return b"GeoTIFF bytes supplied by the private storage boundary"
+
+    first_features = (
+        types.SimpleNamespace(
+            geometry=Polygon([(80.0, 13.0), (80.001, 13.0), (80.001, 13.001), (80.0, 13.001)]),
+            confidence=0.91,
+            model_version="building-test-v1",
+            area_m2=100.0,
+            area_sqft=1076.39104167,
+            processed_at="2026-09-24T00:00:00Z",
+        ),
+        types.SimpleNamespace(
+            geometry=Polygon([(80.002, 13.0), (80.003, 13.0), (80.003, 13.001), (80.002, 13.001)]),
+            confidence=0.89,
+            model_version="building-test-v1",
+            area_m2=90.0,
+            area_sqft=968.751937503,
+            processed_at="2026-09-24T00:00:00Z",
+        ),
+    )
+    second_features = (
+        types.SimpleNamespace(
+            geometry=Polygon([(80.004, 13.0), (80.005, 13.0), (80.005, 13.001), (80.004, 13.001)]),
+            confidence=0.95,
+            model_version="building-test-v2",
+            area_m2=110.0,
+            area_sqft=1184.030145837,
+            processed_at="2026-09-24T00:01:00Z",
+        ),
+    )
+    results = iter(
+        (
+            types.SimpleNamespace(features=first_features, coordinate_space="WORLD", source_crs="EPSG:4326", processing_parameters={"threshold": 0.5}),
+            types.SimpleNamespace(features=second_features, coordinate_space="WORLD", source_crs="EPSG:4326", processing_parameters={"threshold": 0.5}),
+        )
+    )
+    runtime = types.ModuleType("ai.geoai.runtime.buildings")
+    runtime.infer_and_vectorize_geotiff = lambda *_args, **_kwargs: next(results)
+    monkeypatch.setitem(sys.modules, "ai.geoai.runtime.buildings", runtime)
+    monkeypatch.setattr("app.workers.tasks.get_storage_service", lambda: Storage())
+
+    def make_imagery(session, project_id: uuid.UUID, name: str) -> ImageryAsset:
+        source_file = File(
+            project_id=project_id,
+            original_name=f"{name}.tif",
+            category="IMAGERY",
+            mime_type="image/tiff",
+            size_bytes=4096,
+            storage_key=f"projects/{project_id}/originals/{name}-{uuid.uuid4()}.tif",
+            status="UPLOADED",
+        )
+        session.add(source_file)
+        session.flush()
+        asset = ImageryAsset(
+            project_id=project_id,
+            file_id=source_file.id,
+            source_crs="EPSG:4326",
+            coordinate_space="WORLD",
+            metadata_json={"registration_status": "READY"},
+        )
+        session.add(asset)
+        session.flush()
+        return asset
+
+    def make_job(session, project_id: uuid.UUID, asset_id: uuid.UUID, user_id: uuid.UUID) -> uuid.UUID:
+        processing = ProcessingJob(
+            project_id=project_id,
+            job_type="BUILDING_VECTORIZE",
+            idempotency_key=f"building-replacement:{uuid.uuid4()}",
+            status="QUEUED",
+        )
+        session.add(processing)
+        session.flush()
+        session.add(
+            GeoAIJob(
+                id=processing.id,
+                project_id=project_id,
+                requested_by_user_id=user_id,
+                job_type="BUILDING_VECTORIZE",
+                imagery_asset_id=asset_id,
+                parameters_json={},
+            )
+        )
+        session.flush()
+        return processing.id
+
+    def stored_building(
+        session,
+        *,
+        project_id: uuid.UUID,
+        source_reference: str,
+        source: str = "AI_CANDIDATE",
+        status: str = "AI_PRELIMINARY",
+        verification_status: str = "UNVERIFIED",
+    ) -> Building:
+        building = Building(
+            project_id=project_id,
+            geometry=from_shape(
+                Polygon([(79.0, 12.0), (79.001, 12.0), (79.001, 12.001), (79.0, 12.001)]),
+                srid=4326,
+            ),
+            source=source,
+            source_reference=source_reference,
+            status=status,
+            verification_status=verification_status,
+        )
+        session.add(building)
+        session.flush()
+        return building
+
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            other_project = _project(session, surveyor)
+            asset = make_imagery(session, project.id, "target")
+            other_asset = make_imagery(session, project.id, "other")
+            target_reference = f"imagery:{asset.id}"
+
+            stale = stored_building(session, project_id=project.id, source_reference=target_reference)
+            verified = stored_building(
+                session,
+                project_id=project.id,
+                source_reference=target_reference,
+                status="VERIFIED",
+                verification_status="VERIFIED",
+            )
+            manual = stored_building(
+                session,
+                project_id=project.id,
+                source_reference=target_reference,
+                source="MANUAL_DRAWN",
+                status="DRAFT",
+            )
+            other_imagery = stored_building(
+                session,
+                project_id=project.id,
+                source_reference=f"imagery:{other_asset.id}",
+            )
+            other_project_building = stored_building(
+                session,
+                project_id=other_project.id,
+                source_reference=target_reference,
+            )
+            first_job_id = make_job(session, project.id, asset.id, surveyor.id)
+            preserved_ids = {verified.id, manual.id, other_imagery.id, other_project_building.id}
+            stale_id = stale.id
+            project_id, asset_id, user_id = project.id, asset.id, surveyor.id
+            session.commit()
+
+        process_geoai_buildings.run(str(first_job_id))
+
+        with SessionLocal() as session:
+            candidates = session.scalars(
+                select(Building).where(
+                    Building.project_id == project_id,
+                    Building.source == "AI_CANDIDATE",
+                    Building.source_reference == f"imagery:{asset_id}",
+                    Building.status == "AI_PRELIMINARY",
+                    Building.verification_status == "UNVERIFIED",
+                )
+            ).all()
+            assert len(candidates) == 2
+            assert stale_id not in {candidate.id for candidate in candidates}
+            assert {candidate.model_version for candidate in candidates} == {"building-test-v1"}
+            assert all(session.get(Building, building_id) is not None for building_id in preserved_ids)
+            first_candidate_ids = {candidate.id for candidate in candidates}
+            first_job = session.get(ProcessingJob, first_job_id)
+            first_job_detail = session.get(GeoAIJob, first_job_id)
+            assert first_job is not None and first_job.status == "COMPLETED"
+            assert first_job_detail is not None
+            assert first_job_detail.output_refs_json["feature_count"] == 2
+
+            second_job_id = make_job(session, project_id, asset_id, user_id)
+            session.commit()
+
+        process_geoai_buildings.run(str(second_job_id))
+
+        with SessionLocal() as session:
+            candidates = session.scalars(
+                select(Building).where(
+                    Building.project_id == project_id,
+                    Building.source == "AI_CANDIDATE",
+                    Building.source_reference == f"imagery:{asset_id}",
+                    Building.status == "AI_PRELIMINARY",
+                    Building.verification_status == "UNVERIFIED",
+                )
+            ).all()
+            assert len(candidates) == 1
+            assert candidates[0].model_version == "building-test-v2"
+            assert candidates[0].id not in first_candidate_ids
+            assert all(session.get(Building, building_id) is None for building_id in first_candidate_ids)
+            assert all(session.get(Building, building_id) is not None for building_id in preserved_ids)
+            second_job = session.get(ProcessingJob, second_job_id)
+            second_job_detail = session.get(GeoAIJob, second_job_id)
+            assert second_job is not None and second_job.status == "COMPLETED"
+            assert second_job_detail is not None
+            assert second_job_detail.output_refs_json["feature_count"] == 1
+    finally:
+        get_settings.cache_clear()
+
+
+def test_road_job_without_checkpoint_fails_terminally(monkeypatch) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.delenv("GEOAI_ROAD_CHECKPOINT", raising=False)
+    get_settings.cache_clear()
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            processing = ProcessingJob(project_id=project.id, job_type="ROAD_VECTORIZE", idempotency_key=f"h2b5:{uuid.uuid4()}", status="QUEUED")
+            session.add(processing)
+            session.flush()
+            geoai = GeoAIJob(id=processing.id, project_id=project.id, requested_by_user_id=surveyor.id, job_type="ROAD_VECTORIZE", parameters_json={})
+            session.add(geoai)
+            session.commit()
+            job_id, project_id = geoai.id, project.id
+
+        process_geoai_roads.run(str(job_id))
+
+        with SessionLocal() as session:
+            job = session.get(ProcessingJob, job_id)
+            assert job is not None and job.status == "FAILED"
+            assert session.scalar(select(Road).where(Road.project_id == project_id)) is None
+    finally:
+        get_settings.cache_clear()
+
+
+def test_road_job_persists_preliminary_wgs84_features_from_mocked_runtime(monkeypatch, tmp_path) -> None:
+    """The worker persists only the road runtime's real-shaped result, never a placeholder."""
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import LineString
+
+    from app.core.config import get_settings
+
+    checkpoint = tmp_path / "road-checkpoint.pt"
+    checkpoint.write_bytes(b"test checkpoint marker")
+    monkeypatch.setenv("GEOAI_ROAD_CHECKPOINT", str(checkpoint))
+    get_settings.cache_clear()
+
+    class Storage:
+        def read_private_object(self, _storage_key: str) -> bytes:
+            return b"GeoTIFF bytes supplied by the private storage boundary"
+
+    feature = types.SimpleNamespace(
+        geometry=LineString([(77.0, 13.0), (77.001, 13.001)]),
+        confidence=0.82,
+        length_m=155.0,
+        model_version="road-segmentation-h2b5-v1",
+        processed_at="2026-09-22T00:00:00Z",
+    )
+    result = types.SimpleNamespace(
+        features=(feature,),
+        source_crs="EPSG:4326",
+        processing_parameters={"threshold": 0.5},
+    )
+    runtime = types.ModuleType("ai.geoai.runtime.roads")
+    runtime.infer_and_vectorize_geotiff = lambda *_args, **_kwargs: result
+    monkeypatch.setitem(sys.modules, "ai.geoai.runtime.roads", runtime)
+    monkeypatch.setattr("app.workers.tasks.get_storage_service", lambda: Storage())
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            source_file = File(
+                project_id=project.id,
+                original_name="roads.tif",
+                category="IMAGERY",
+                mime_type="image/tiff",
+                size_bytes=4096,
+                storage_key=f"projects/{project.id}/originals/roads.tif",
+                status="UPLOADED",
+            )
+            session.add(source_file)
+            session.flush()
+            asset = ImageryAsset(project_id=project.id, file_id=source_file.id, source_crs="EPSG:4326", coordinate_space="WORLD", metadata_json={"registration_status": "READY"})
+            session.add(asset)
+            session.flush()
+            source_reference = f"imagery:{asset.id}"
+            stale_road = Road(
+                project_id=project.id,
+                geometry=from_shape(
+                    LineString([(77.0, 13.0), (77.0005, 13.0005)]),
+                    srid=4326,
+                ),
+                road_class="ROAD",
+                source="AI_CANDIDATE",
+                source_reference=source_reference,
+                status="AI_PRELIMINARY",
+                verification_status="UNVERIFIED",
+            )
+            verified_road = Road(
+                project_id=project.id,
+                geometry=from_shape(
+                    LineString([(77.01, 13.01), (77.011, 13.011)]),
+                    srid=4326,
+                ),
+                road_class="ROAD",
+                source="AI_CANDIDATE",
+                source_reference=source_reference,
+                status="VERIFIED",
+                verification_status="VERIFIED",
+            )
+            session.add_all((stale_road, verified_road))
+            session.flush()
+            stale_id, verified_id = stale_road.id, verified_road.id
+            processing = ProcessingJob(project_id=project.id, job_type="ROAD_VECTORIZE", idempotency_key=f"h2b5:{uuid.uuid4()}", status="QUEUED")
+            session.add(processing)
+            session.flush()
+            geoai = GeoAIJob(id=processing.id, project_id=project.id, requested_by_user_id=surveyor.id, job_type="ROAD_VECTORIZE", imagery_asset_id=asset.id, parameters_json={})
+            session.add(geoai)
+            session.commit()
+            job_id, project_id, asset_id, user_id = (
+                geoai.id,
+                project.id,
+                asset.id,
+                surveyor.id,
+            )
+
+        process_geoai_roads.run(str(job_id))
+
+        with SessionLocal() as session:
+            job = session.get(ProcessingJob, job_id)
+            candidates = session.scalars(
+                select(Road).where(
+                    Road.project_id == project_id,
+                    Road.source == "AI_CANDIDATE",
+                    Road.source_reference == f"imagery:{asset_id}",
+                    Road.status == "AI_PRELIMINARY",
+                    Road.verification_status == "UNVERIFIED",
+                )
+            ).all()
+            detail = session.get(GeoAIJob, job_id)
+            assert job is not None and job.status == "COMPLETED" and job.progress == 100
+            assert len(candidates) == 1
+            persisted = candidates[0]
+            assert persisted.id != stale_id
+            assert session.get(Road, stale_id) is None
+            assert session.get(Road, verified_id) is not None
+            assert persisted.source == "AI_CANDIDATE"
+            assert persisted.status == "AI_PRELIMINARY"
+            assert persisted.verification_status == "UNVERIFIED"
+            assert persisted.source_reference == f"imagery:{asset_id}"
+            assert persisted.model_version == "road-segmentation-h2b5-v1"
+            assert persisted.confidence == pytest.approx(0.82)
+            assert persisted.length_m == pytest.approx(155.0)
+            assert detail is not None and detail.output_refs_json["road_ids"] == [str(persisted.id)]
+
+            first_candidate_id = persisted.id
+            second_processing = ProcessingJob(
+                project_id=project_id,
+                job_type="ROAD_VECTORIZE",
+                idempotency_key=f"h2b5:{uuid.uuid4()}",
+                status="QUEUED",
+            )
+            session.add(second_processing)
+            session.flush()
+            second_geoai = GeoAIJob(
+                id=second_processing.id,
+                project_id=project_id,
+                requested_by_user_id=user_id,
+                job_type="ROAD_VECTORIZE",
+                imagery_asset_id=asset_id,
+                parameters_json={},
+            )
+            session.add(second_geoai)
+            session.commit()
+            second_job_id = second_processing.id
+
+        process_geoai_roads.run(str(second_job_id))
+
+        with SessionLocal() as session:
+            candidates = session.scalars(
+                select(Road).where(
+                    Road.project_id == project_id,
+                    Road.source == "AI_CANDIDATE",
+                    Road.source_reference == f"imagery:{asset_id}",
+                    Road.status == "AI_PRELIMINARY",
+                    Road.verification_status == "UNVERIFIED",
+                )
+            ).all()
+            assert len(candidates) == 1
+            assert candidates[0].id != first_candidate_id
+            assert session.get(Road, first_candidate_id) is None
+            assert session.get(Road, verified_id) is not None
+    finally:
+        get_settings.cache_clear()
+
+
+def test_parcel_delineation_persists_preliminary_plot_candidates(monkeypatch) -> None:
+    """Road/building evidence becomes explicit non-statutory parcel candidates."""
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import LineString, Polygon
+
+    class Storage:
+        def read_private_object(self, _storage_key: str) -> bytes:
+            return b"GeoTIFF bytes supplied by the private storage boundary"
+
+    candidate = types.SimpleNamespace(
+        geometry=Polygon([
+            (78.0000, 10.0000),
+            (78.0010, 10.0000),
+            (78.0010, 10.0010),
+            (78.0000, 10.0010),
+            (78.0000, 10.0000),
+        ]),
+        confidence=0.78,
+        building_ids=("building-seed",),
+        road_frontage_m=18.5,
+        area_m2=12_100.0,
+        area_sqft=130_243.3,
+        block_index=1,
+        warnings=("AI parcel candidate only; legal boundary requires cadastral/FMB or survey verification.",),
+        boundary_evidence=(
+            types.SimpleNamespace(
+                geometry=LineString([(78.0000, 10.0000), (78.0010, 10.0000)]),
+                evidence_type="ROAD_EDGE",
+                confidence=0.94,
+                length_m=18.5,
+                support_fraction=0.88,
+            ),
+        ),
+    )
+    result = types.SimpleNamespace(
+        candidates=(candidate,),
+        processing_parameters={
+            "engine": "road-block-full-coverage-v3",
+            "candidate_count": 1,
+            "block_count": 1,
+        },
+    )
+    runtime = types.ModuleType("ai.geoai.runtime.parcel_candidates")
+    runtime.MODEL_VERSION = "road-block-full-coverage-parcel-candidate-v3"
+    runtime.SpatialFeature = lambda feature_id, geometry: types.SimpleNamespace(id=feature_id, geometry=geometry)
+    runtime.generate_parcel_candidates = lambda *_args, **_kwargs: result
+    monkeypatch.setitem(sys.modules, "ai.geoai.runtime.parcel_candidates", runtime)
+    monkeypatch.setattr("app.workers.tasks.get_storage_service", lambda: Storage())
+
+    with SessionLocal() as session:
+        surveyor = _user(session, "SURVEYOR")
+        project = _project(session, surveyor)
+        source_file = File(
+            project_id=project.id,
+            original_name="parcel-source.tif",
+            category="IMAGERY",
+            mime_type="image/tiff",
+            size_bytes=4096,
+            storage_key=f"projects/{project.id}/originals/parcel-source.tif",
+            status="UPLOADED",
+        )
+        session.add(source_file)
+        session.flush()
+        asset = ImageryAsset(
+            project_id=project.id,
+            file_id=source_file.id,
+            source_crs="EPSG:4326",
+            coordinate_space="WORLD",
+            metadata_json={"registration_status": "READY"},
+        )
+        session.add(asset)
+        session.flush()
+        imagery_reference = f"imagery:{asset.id}"
+        building = Building(
+            project_id=project.id,
+            geometry=from_shape(Polygon([
+                (78.0003, 10.0003),
+                (78.0005, 10.0003),
+                (78.0005, 10.0005),
+                (78.0003, 10.0005),
+                (78.0003, 10.0003),
+            ]), srid=4326),
+            source="AI_CANDIDATE",
+            source_reference=imagery_reference,
+            confidence=0.91,
+            model_version="building-test",
+            status="AI_PRELIMINARY",
+            verification_status="UNVERIFIED",
+        )
+        road = Road(
+            project_id=project.id,
+            geometry=from_shape(LineString([(78.0, 10.0), (78.002, 10.0)]), srid=4326),
+            road_class="ROAD",
+            source="AI_CANDIDATE",
+            source_reference=imagery_reference,
+            confidence=0.88,
+            model_version="road-test",
+            status="AI_PRELIMINARY",
+            verification_status="UNVERIFIED",
+        )
+        session.add_all([building, road])
+        session.flush()
+        processing = ProcessingJob(
+            project_id=project.id,
+            job_type="PARCEL_DELINEATE",
+            idempotency_key=f"parcel-delineate:{uuid.uuid4()}",
+            status="QUEUED",
+        )
+        session.add(processing)
+        session.flush()
+        geoai = GeoAIJob(
+            id=processing.id,
+            project_id=project.id,
+            requested_by_user_id=surveyor.id,
+            job_type="PARCEL_DELINEATE",
+            imagery_asset_id=asset.id,
+            parameters_json={},
+        )
+        session.add(geoai)
+        session.commit()
+        job_id, project_id = geoai.id, project.id
+
+    process_geoai_parcel_delineation.run(str(job_id))
+
+    with SessionLocal() as session:
+        job = session.get(ProcessingJob, job_id)
+        detail = session.get(GeoAIJob, job_id)
+        parcel = session.scalar(
+            select(Parcel).where(
+                Parcel.project_id == project_id,
+                Parcel.source == "AI_VISIBLE_BOUNDARY",
+            )
+        )
+        assert job is not None and job.status == "COMPLETED" and job.progress == 100
+        assert parcel is not None
+        assert parcel.external_identifier == "P-1001"
+        assert parcel.ai_boundary_status == "AI_PRELIMINARY"
+        assert parcel.requires_survey is True
+        assert parcel.confidence == pytest.approx(0.78)
+        version = session.scalar(
+            select(ParcelGeometryVersion).where(
+                ParcelGeometryVersion.parcel_id == parcel.id,
+                ParcelGeometryVersion.version == 1,
+            )
+        )
+        assert version is not None and version.geometry is not None
+        assert version.created_by_type == "AI"
+        assert version.source_geometry_json["properties"]["road_frontage_m"] == pytest.approx(18.5)
+        assert version.source_geometry_json["properties"]["building_count"] == 1
+        assert version.source_geometry_json["properties"]["candidate_kind"] == "BUILDING_ASSOCIATED"
+        assert version.source_geometry_json["properties"]["method"] == "ROAD_FRONTAGE_STRIPS"
+        assert version.source_geometry_json["properties"]["confidence_tier"] == "MEDIUM"
+        assert version.source_geometry_json["properties"]["frontage_supported"] is True
+        assert detail is not None
+        assert detail.output_refs_json["parcel_identifiers"] == ["P-1001"]
+        assert detail.metrics_json["candidate_count"] == 1
+
+
+def test_land_use_job_persists_preliminary_wgs84_features_from_mocked_runtime(monkeypatch, tmp_path) -> None:
+    """The worker persists SegFormer output as preliminary land-use evidence."""
+    from shapely.geometry import Polygon
+
+    from app.core.config import get_settings
+
+    model_dir = tmp_path / "lulc-model"
+    model_dir.mkdir()
+    monkeypatch.setenv("GEOAI_LULC_MODEL_DIR", str(model_dir))
+    get_settings.cache_clear()
+
+    class Storage:
+        def read_private_object(self, _storage_key: str) -> bytes:
+            return b"GeoTIFF bytes supplied by the private storage boundary"
+
+    feature = types.SimpleNamespace(
+        geometry=Polygon([
+            (78.0, 10.0),
+            (78.01, 10.0),
+            (78.01, 10.01),
+            (78.0, 10.01),
+            (78.0, 10.0),
+        ]),
+        land_use_class="CROPLAND",
+        confidence=0.88,
+        area_m2=1_215_000.0,
+        area_sqft=13_078_151.0,
+        model_version="segformer-b2-worldcover-2021-tamilnadu-v1",
+        processed_at="2026-09-28T00:00:00Z",
+    )
+    result = types.SimpleNamespace(
+        features=(feature,),
+        source_crs="EPSG:4326",
+        processing_parameters={"engine": "segformer-b2", "gsd_m": 9.2, "valid_pixel_count": 1000, "class_distribution": [{"code": 40, "class_name": "CROPLAND", "pixel_count": 750, "proportion": 0.75}, {"code": 10, "class_name": "TREE_COVER", "pixel_count": 250, "proportion": 0.25}]},
+    )
+    runtime = types.ModuleType("ai.geoai.runtime.lulc")
+    runtime.infer_and_vectorize_geotiff = lambda *_args, **_kwargs: result
+    monkeypatch.setitem(sys.modules, "ai.geoai.runtime.lulc", runtime)
+    monkeypatch.setattr("app.workers.tasks.get_storage_service", lambda: Storage())
+
+    try:
+        with SessionLocal() as session:
+            surveyor = _user(session, "SURVEYOR")
+            project = _project(session, surveyor)
+            source_file = File(
+                project_id=project.id,
+                original_name="sentinel-rgbnir.tif",
+                category="IMAGERY",
+                mime_type="image/tiff",
+                size_bytes=4096,
+                storage_key=f"projects/{project.id}/originals/sentinel-rgbnir.tif",
+                status="UPLOADED",
+            )
+            session.add(source_file)
+            session.flush()
+            asset = ImageryAsset(
+                project_id=project.id,
+                file_id=source_file.id,
+                source_crs="EPSG:4326",
+                coordinate_space="WORLD",
+                metadata_json={"registration_status": "READY"},
+            )
+            session.add(asset)
+            session.flush()
+            processing = ProcessingJob(
+                project_id=project.id,
+                job_type="LAND_USE_VECTORIZE",
+                idempotency_key=f"lulc:{uuid.uuid4()}",
+                status="QUEUED",
+            )
+            session.add(processing)
+            session.flush()
+            geoai = GeoAIJob(
+                id=processing.id,
+                project_id=project.id,
+                requested_by_user_id=surveyor.id,
+                job_type="LAND_USE_VECTORIZE",
+                imagery_asset_id=asset.id,
+                parameters_json={},
+            )
+            session.add(geoai)
+            session.commit()
+            job_id, project_id, asset_id = geoai.id, project.id, asset.id
+
+        process_geoai_land_use.run(str(job_id))
+
+        with SessionLocal() as session:
+            job = session.get(ProcessingJob, job_id)
+            detail = session.get(GeoAIJob, job_id)
+            features = session.scalars(
+                select(LandUseFeature).where(
+                    LandUseFeature.project_id == project_id,
+                    LandUseFeature.source_reference == f"imagery:{asset_id}",
+                )
+            ).all()
+            assert job is not None and job.status == "COMPLETED" and job.progress == 100
+            assert len(features) == 1
+            stored = features[0]
+            assert stored.land_use_class == "CROPLAND"
+            assert stored.source == "AI_CANDIDATE"
+            assert stored.status == "AI_PRELIMINARY"
+            assert stored.verification_status == "UNVERIFIED"
+            assert stored.confidence == pytest.approx(0.88)
+            assert stored.area_m2 == pytest.approx(1_215_000.0)
+            assert stored.model_version == "segformer-b2-worldcover-2021-tamilnadu-v1"
+            assert detail is not None
+            assert detail.output_refs_json["land_use_ids"] == [str(stored.id)]
+            assert detail.output_refs_json["classes"] == ["CROPLAND"]
+            stored_asset = session.get(ImageryAsset, asset_id)
+            assert stored_asset is not None
+            assert stored_asset.metadata_json["lulc_valid_pixel_count"] == 1000
+            assert stored_asset.metadata_json["lulc_distribution"][0]["class_name"] == "CROPLAND"
+            assert stored_asset.metadata_json["lulc_distribution"][0]["proportion"] == pytest.approx(0.75)
+    finally:
+        get_settings.cache_clear()
+
+
 def test_legacy_fileless_imagery_is_listed_but_cannot_preview_or_run(monkeypatch) -> None:
     """H.2 metadata-only imagery remains visible without claiming private source bytes exist."""
     from app.main import app
@@ -246,6 +928,9 @@ def test_legacy_fileless_imagery_is_listed_but_cannot_preview_or_run(monkeypatch
     headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
     app.dependency_overrides[get_storage_service] = lambda: PreviewStorage()
     monkeypatch.setattr("app.api.v1.geoai.process_geoai_buildings.apply_async", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.api.v1.geoai.process_geoai_roads.apply_async", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.api.v1.geoai.process_geoai_land_use.apply_async", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.api.v1.geoai.process_geoai_parcel_delineation.apply_async", lambda *args, **kwargs: None)
     try:
         listed = client.get(f"/api/v1/projects/{project_id}/imagery", headers=headers)
         assert listed.status_code == 200
@@ -259,8 +944,14 @@ def test_legacy_fileless_imagery_is_listed_but_cannot_preview_or_run(monkeypatch
         fileless_run = client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "BUILDING_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(legacy_id)})
         assert fileless_run.status_code == 409
         assert fileless_run.json()["error"]["code"] == "IMAGERY_SOURCE_UNAVAILABLE"
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "ROAD_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(legacy_id)}).status_code == 409
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "LAND_USE_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(legacy_id)}).status_code == 409
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "PARCEL_DELINEATE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(legacy_id)}).status_code == 409
 
         assert client.get(f"/api/v1/projects/{project_id}/imagery/{registered_id}/preview-url", headers=headers).status_code == 200
         assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "BUILDING_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(registered_id), "idempotency_key": f"registered:{registered_id}"}).status_code == 202
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "ROAD_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(registered_id), "idempotency_key": f"roads:{registered_id}"}).status_code == 202
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "LAND_USE_VECTORIZE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(registered_id), "idempotency_key": f"land-use:{registered_id}"}).status_code == 202
+        assert client.post(f"/api/v1/projects/{project_id}/geoai/jobs", headers=headers, json={"job_type": "PARCEL_DELINEATE", "source_type": "REGISTERED_IMAGERY", "source_payload": {}, "imagery_asset_id": str(registered_id), "idempotency_key": f"parcels:{registered_id}"}).status_code == 202
     finally:
         app.dependency_overrides.clear()

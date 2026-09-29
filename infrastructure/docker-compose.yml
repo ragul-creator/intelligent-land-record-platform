@@ -141,10 +141,62 @@ services:
       minio:
         condition: service_healthy
 
+  samroad:
+    image: infrastructure-samroad:latest
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.samroad
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      SAMROAD_DEVICE: ${SAMROAD_DEVICE:-auto}
+      SAMROAD_TARGET_GSD_M: "0.8"
+      SAMROAD_MIN_CANVAS_SIZE: "400"
+      SAMROAD_CENTERLINE_THRESHOLD: "0.31"
+      SAMROAD_NORMALIZATION: fixed_range
+      SAMROAD_INPUT_MAX: "2047"
+      SAMROAD_SIMPLIFY_PIXELS: "0.5"
+      SAMROAD_RECENTER_MASK_MIDPOINT: "1"
+      SAMROAD_RECENTER_ONLY_DISAGREEMENT: "1"
+      SAMROAD_RECENTER_MAX_PIXELS: "16"
+      SAMROAD_RECENTER_MAX_SHIFT_PIXELS: "0.5"
+      SAMROAD_MIN_MEDIAN_WIDTH_PIXELS: "0"
+      SAMROAD_NARROW_CONFIDENCE: "0"
+      SAMROAD_GRAPH_SUPPORT_RADIUS_PIXELS: "3"
+      SAMROAD_DISAGREEMENT_GRAPH_THRESHOLD: "0"
+      SAMROAD_DISAGREEMENT_MIN_CONFIDENCE: "1.1"
+      SAMROAD_DISAGREEMENT_FLAG_GRAPH_THRESHOLD: "0.89"
+      SAMROAD_DISAGREEMENT_FLAG_MIN_CONFIDENCE: "0.88"
+      SAMROAD_MODEL_VERSION: sam-road-spacenet-vitb-centerline-v7
+    volumes:
+      - ../data/local/samroad_runtime:/samroad:ro
+    ports:
+      - "8765:8765"
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=5).read()" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
   geoai-worker:
+    command: ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "--loglevel=info", "--queues=geoai", "--concurrency=1", "--prefetch-multiplier=1"]
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.geoai-worker
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     environment:
       APP_ENV: ${APP_ENV}
       DB_HOST: postgres
@@ -164,6 +216,29 @@ services:
       AUTH_ACCESS_TOKEN_LIFETIME_SECONDS: ${AUTH_ACCESS_TOKEN_LIFETIME_SECONDS}
       AUTH_REFRESH_TOKEN_LIFETIME_SECONDS: ${AUTH_REFRESH_TOKEN_LIFETIME_SECONDS}
       GEOAI_BUILDING_CHECKPOINT: ${GEOAI_BUILDING_CHECKPOINT:-}
+      GEOAI_BUILDING_HIGHRES_CHECKPOINT: ${GEOAI_BUILDING_HIGHRES_CHECKPOINT:-}
+      GEOAI_BUILDING_HIGHRES_MAX_GSD_M: ${GEOAI_BUILDING_HIGHRES_MAX_GSD_M:-0.10}
+      GEOAI_BUILDING_THRESHOLD: ${GEOAI_BUILDING_THRESHOLD:-0.5}
+      GEOAI_BUILDING_MOSAIC_THRESHOLD: ${GEOAI_BUILDING_MOSAIC_THRESHOLD:-0.50}
+      GEOAI_BUILDING_MIN_AREA_M2: ${GEOAI_BUILDING_MIN_AREA_M2:-0.25}
+      GEOAI_BUILDING_BLUE_IRREGULAR_FILTER: ${GEOAI_BUILDING_BLUE_IRREGULAR_FILTER:-0}
+      GEOAI_BUILDING_BLUE_EXCESS_THRESHOLD: ${GEOAI_BUILDING_BLUE_EXCESS_THRESHOLD:-0.10}
+      GEOAI_BUILDING_BLUE_RECTANGULARITY_THRESHOLD: ${GEOAI_BUILDING_BLUE_RECTANGULARITY_THRESHOLD:-0.70}
+      GEOAI_BUILDING_STRONG_BLUE_EXCESS_THRESHOLD: ${GEOAI_BUILDING_STRONG_BLUE_EXCESS_THRESHOLD:-0.13}
+      GEOAI_BUILDING_STRONG_BLUE_MIN_CHANNEL: ${GEOAI_BUILDING_STRONG_BLUE_MIN_CHANNEL:-0.48}
+      GEOAI_BUILDING_STRONG_BLUE_MAX_ASPECT: ${GEOAI_BUILDING_STRONG_BLUE_MAX_ASPECT:-2.0}
+      GEOAI_BUILDING_STRONG_BLUE_MAX_AREA_M2: ${GEOAI_BUILDING_STRONG_BLUE_MAX_AREA_M2:-200}
+      GEOAI_BUILDING_HIGHRES_WATER_FILTER: ${GEOAI_BUILDING_HIGHRES_WATER_FILTER:-1}
+      GEOAI_BUILDING_HIGHRES_WATER_RING_M: ${GEOAI_BUILDING_HIGHRES_WATER_RING_M:-2.0}
+      GEOAI_BUILDING_HIGHRES_WATER_DARK_VALUE: ${GEOAI_BUILDING_HIGHRES_WATER_DARK_VALUE:-80}
+      GEOAI_BUILDING_HIGHRES_WATER_DARK_FRACTION: ${GEOAI_BUILDING_HIGHRES_WATER_DARK_FRACTION:-0.95}
+      GEOAI_ROAD_CHECKPOINT: ${GEOAI_ROAD_CHECKPOINT:-}
+      GEOAI_ROAD_THRESHOLD: ${GEOAI_ROAD_THRESHOLD:-0.5}
+      SAMROAD_SERVICE_URL: ${SAMROAD_SERVICE_URL:-}
+      GEOAI_LULC_MODEL_DIR: ${GEOAI_LULC_MODEL_DIR:-/lulc-model}
+      GEOAI_LULC_MIN_AREA_M2: ${GEOAI_LULC_MIN_AREA_M2:-10000}
+      GEOAI_LULC_MIN_GSD_M: ${GEOAI_LULC_MIN_GSD_M:-5}
+      GEOAI_LULC_MAX_GSD_M: ${GEOAI_LULC_MAX_GSD_M:-20}
       GEOAI_DEVICE: ${GEOAI_DEVICE:-auto}
     volumes:
       # Development bind mounts so Python code changes do not require rebuilding.
@@ -171,12 +246,15 @@ services:
       - ../ai:/app/ai
       # Checkpoints are local development artifacts and remain outside Git.
       - ${GEOAI_CHECKPOINT_HOST_PATH:-../data/models/buildings}:/models:ro
+      - ../data/local/lulc_segformer_b2/best_model:/lulc-model:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      samroad:
         condition: service_healthy
 
 volumes:

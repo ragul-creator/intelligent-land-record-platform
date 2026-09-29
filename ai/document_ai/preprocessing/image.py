@@ -18,6 +18,9 @@ class PreprocessingConfig:
     denoise: bool = True
     deskew: bool = True
     threshold: bool = False
+    upscale_small_images: bool = True
+    minimum_ocr_width: int = 1400
+    max_upscale_factor: float = 2.5
     max_deskew_degrees: float = 15.0
 
 
@@ -27,6 +30,15 @@ def preprocess_image(image: Image.Image, config: PreprocessingConfig | None = No
     options = config or PreprocessingConfig()
     normalized = ImageOps.exif_transpose(image).convert("L")
     operations = ["orientation_normalized", "grayscale"]
+
+    if options.upscale_small_images and normalized.width < options.minimum_ocr_width:
+        scale = min(options.max_upscale_factor, options.minimum_ocr_width / max(1, normalized.width))
+        if scale > 1.0:
+            normalized = normalized.resize(
+                (max(1, round(normalized.width * scale)), max(1, round(normalized.height * scale))),
+                Image.Resampling.LANCZOS,
+            )
+            operations.append("upscaled_for_ocr")
 
     if options.enhance_contrast:
         normalized = ImageEnhance.Contrast(normalized).enhance(1.5)

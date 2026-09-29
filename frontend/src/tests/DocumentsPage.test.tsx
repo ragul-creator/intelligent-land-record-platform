@@ -107,8 +107,41 @@ describe("DocumentsPage", () => {
     expect(screen.getByText("LOW CONFIDENCE")).toBeInTheDocument();
     expect(screen.getByText("rules-v1")).toBeInTheDocument();
     expect(screen.getByText("Low-confidence tokens")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Structured land-record fields" })).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "Survey number" })).toBeInTheDocument();
   });
 
+  it("refreshes structured fields automatically after processing completes", async () => {
+    let processed = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/users/me")) return new Response(JSON.stringify(user));
+      if (url.endsWith("/documents")) return new Response(JSON.stringify({ items: [{ id: "doc", project_id: "project", filename: "live.png", content_type: "image/png", size_bytes: 1, status: processed ? "VALIDATED" : "UPLOADED", latest_processing_job_id: null, uploaded_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }] }));
+      if (url.endsWith("/documents/doc/process") && init?.method === "POST") {
+        processed = true;
+        return new Response(JSON.stringify({ id: "job-1", document_id: "doc", status: "QUEUED", progress: 0, processing_version: 1 }), { status: 202, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.endsWith("/documents/doc")) return new Response(JSON.stringify({
+        id: "doc", project_id: "project", filename: "live.png", content_type: "image/png", size_bytes: 1,
+        status: processed ? "VALIDATED" : "UPLOADED", latest_processing_job_id: processed ? "job-1" : null,
+        uploaded_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+        latest_ocr: processed ? { id: "ocr-live", version: 1, confidence: 0.91, requested_languages: ["tam", "eng"], project_tested_languages: ["tam", "eng"], engine: "tesseract", engine_version: "5.4", model_version: null, page_count: 1, processed_at: "2026-01-01T00:00:00Z", payload: { pages: [] } } : null,
+        latest_validation: processed ? { id: "validation-live", version: 1, status: "VALIDATED", report: { issues: [] }, confidence_summary: {}, review_task_id: null } : null,
+      }));
+      if (url.endsWith("/documents/doc/fields")) return new Response(JSON.stringify({ fields: processed ? [{
+        id: "field-live", field_name: "district", original_value: "Chennai", normalized_value: "Chennai", confidence: 0.94, page_number: 1, bounding_box: null, source_id: "doc", model_version: null, extractor_version: "rules-v1", processed_at: "2026-01-01T00:00:00Z", corrections: [],
+      }] : [] }));
+      if (url.endsWith("/documents/doc/source-url")) return new Response(JSON.stringify({ document_id: "doc", source_url: "http://minio.test/live.png?sig=demo", expires_in_seconds: 900 }));
+      if (url.includes("/documents/doc/record-parcel-links")) return new Response(JSON.stringify({ items: [], page: { limit: 100, offset: 0, total: 0 } }));
+      return new Response("{}", { status: 404 });
+    }));
+
+    renderPage("/projects/project/documents?documentId=doc");
+    fireEvent.click(await screen.findByRole("button", { name: "Process" }));
+
+    expect(await screen.findByRole("rowheader", { name: "District" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Chennai" })).toBeInTheDocument();
+  });
   it("integrates validated record evidence with parcel candidates and GIS navigation", async () => {
     installFetch(); renderPage("/projects/project/documents?documentId=doc");
     expect(await screen.findByRole("heading", { name: "record.pdf" })).toBeInTheDocument();

@@ -18,9 +18,10 @@ afterEach(() => {
 describe("App", () => {
   it("renders the H.2 sign-in landing page without a session", () => {
     renderApp();
-    expect(screen.getByRole("heading", { name: /intelligent land record platform/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /bhumi-ai/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByText(/AI outputs are preliminary/i)).toBeInTheDocument();
+    expect(screen.getByText(/Evidence first/i)).toBeInTheDocument();
+    expect(screen.getByText(/Role-based access/i)).toBeInTheDocument();
   });
 
   it("signs in and presents the authorized Tamil Nadu demo project", async () => {
