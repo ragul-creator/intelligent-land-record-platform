@@ -28,14 +28,172 @@ function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Not available";
 }
 
+const documentValidationMetadataKeys = new Set([
+  "document_id",
+  "issue_codes",
+  "confidence_summary",
+  "validation_version",
+  "blocking_issue_codes",
+  "validation_result_id",
+]);
+
 function metadataEntries(metadata: Record<string, unknown>) {
-  return Object.entries(metadata).filter(([, value]) => value !== null && value !== undefined);
+  const hasDocumentValidationSummary = Boolean(metadata.confidence_summary && typeof metadata.confidence_summary === "object");
+  return Object.entries(metadata).filter(([key, value]) =>
+    value !== null
+    && value !== undefined
+    && !(hasDocumentValidationSummary && documentValidationMetadataKeys.has(key)),
+  );
 }
 
 function validationIssueLabel(metadata: Record<string, unknown>) {
   if (metadata.validation_issue_type === "DUPLICATE_RECORD") return "Duplicate record";
   if (metadata.validation_issue_type === "AREA_MISMATCH") return "Area mismatch";
   return "Validation issue";
+}
+
+type ConfidenceField = {
+  band?: string;
+  field_name?: string;
+  candidate_count?: number;
+  representative_confidence?: number | null;
+};
+
+function humanize(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function percent(value: unknown) {
+  return typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "Not available";
+}
+
+function reviewSummary(task: ReviewTask) {
+  if (task.queue_type !== "DOCUMENT" || !task.summary.startsWith("Document extraction review required:")) {
+    return task.summary;
+  }
+  const issueCodes = Array.isArray(task.metadata.issue_codes)
+    ? task.metadata.issue_codes.filter((value): value is string => typeof value === "string")
+    : [];
+  const lowConfidenceCount = issueCodes.filter((code) => code === "LOW_CONFIDENCE").length;
+  const otherCodes = [...new Set(issueCodes.filter((code) => code !== "LOW_CONFIDENCE"))];
+
+  if (lowConfidenceCount > 0 && otherCodes.length === 0) {
+    return `${lowConfidenceCount} extracted field${lowConfidenceCount === 1 ? "" : "s"} need confidence review`;
+  }
+  const findings = [
+    lowConfidenceCount > 0 ? `${lowConfidenceCount} low-confidence field${lowConfidenceCount === 1 ? "" : "s"}` : null,
+    ...otherCodes.map(humanize),
+  ].filter(Boolean);
+  return findings.length ? `Document extraction needs review · ${findings.join(" · ")}` : "Document extraction needs review";
+}
+
+function documentValidationSummary(metadata: Record<string, unknown>) {
+  const raw = metadata.confidence_summary;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const summary = raw as Record<string, unknown>;
+  const fields = Array.isArray(summary.fields)
+    ? summary.fields.filter((field): field is ConfidenceField => Boolean(field && typeof field === "object"))
+    : [];
+  const lowFields = fields.filter((field) => field.band === "LOW" && (field.candidate_count ?? 0) > 0);
+  const missingFields = fields.filter((field) => (field.candidate_count ?? 0) === 0);
+  const detectedFields = fields.filter((field) => (field.candidate_count ?? 0) > 0 && field.band !== "LOW");
+  const issueCodes = Array.isArray(metadata.issue_codes)
+    ? metadata.issue_codes.filter((value): value is string => typeof value === "string")
+    : [];
+  const issueCounts = issueCodes.reduce<Record<string, number>>((counts, code) => {
+    counts[code] = (counts[code] ?? 0) + 1;
+    return counts;
+  }, {});
+  const blockingCodes = Array.isArray(metadata.blocking_issue_codes)
+    ? metadata.blocking_issue_codes.filter((value): value is string => typeof value === "string")
+    : [];
+
+  return (
+    <div className="review-document-validation">
+      <div className="review-confidence-overview">
+        <article>
+          <span>Overall confidence</span>
+          <strong>{percent(summary.value)}</strong>
+          <small className={`confidence-band confidence-${String(summary.band ?? "UNKNOWN").toLowerCase()}`}>
+            {humanize(String(summary.band ?? "UNKNOWN"))}
+          </small>
+        </article>
+        <article><span>Fields needing review</span><strong>{lowFields.length}</strong><small>Below {percent(summary.medium_threshold)}</small></article>
+        <article><span>Detected fields</span><strong>{Number(summary.contributing_field_count ?? detectedFields.length + lowFields.length)}</strong><small>With usable confidence</small></article>
+        <article><span>Not detected</span><strong>{Number(summary.missing_field_count ?? missingFields.length)}</strong><small>Supported schema fields</small></article>
+      </div>
+
+      {Object.keys(issueCounts).length > 0 && (
+        <section className="review-validation-section">
+          <h4>Review findings</h4>
+          <div className="review-finding-chips">
+            {Object.entries(issueCounts).map(([code, count]) => (
+              <span key={code}>{humanize(code)}{count > 1 ? ` × ${count}` : ""}</span>
+            ))}
+            <span className={blockingCodes.length ? "review-finding-blocking" : "review-finding-clear"}>
+              {blockingCodes.length ? `${blockingCodes.length} blocking` : "No blocking issues"}
+            </span>
+          </div>
+        </section>
+      )}
+
+      {lowFields.length > 0 && (
+        <section className="review-validation-section">
+          <h4>Fields needing attention</h4>
+          <div className="review-confidence-fields">
+            {lowFields.map((field) => (
+              <div className="review-confidence-field needs-review" key={field.field_name}>
+                <span>{humanize(field.field_name ?? "Field")}</span>
+                <strong>{percent(field.representative_confidence)}</strong>
+                <small>Low confidence</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {detectedFields.length > 0 && (
+        <details className="review-validation-details">
+          <summary>Other extracted fields ({detectedFields.length})</summary>
+          <div className="review-confidence-fields">
+            {detectedFields.map((field) => (
+              <div className="review-confidence-field" key={field.field_name}>
+                <span>{humanize(field.field_name ?? "Field")}</span>
+                <strong>{percent(field.representative_confidence)}</strong>
+                <small>{humanize(field.band ?? "UNKNOWN")}</small>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {missingFields.length > 0 && (
+        <details className="review-validation-details">
+          <summary>Fields not detected ({missingFields.length})</summary>
+          <div className="review-missing-fields">
+            {missingFields.map((field) => <span key={field.field_name}>{humanize(field.field_name ?? "Field")}</span>)}
+          </div>
+        </details>
+      )}
+
+      <details className="review-technical-details">
+        <summary>Technical provenance</summary>
+        <dl>
+          {typeof metadata.document_id === "string" && <><dt>Document ID</dt><dd>{metadata.document_id}</dd></>}
+          {typeof metadata.validation_result_id === "string" && <><dt>Validation result ID</dt><dd>{metadata.validation_result_id}</dd></>}
+          {typeof metadata.validation_version === "number" && <><dt>Validation version</dt><dd>{metadata.validation_version}</dd></>}
+          {typeof summary.policy_version === "string" && <><dt>Policy</dt><dd>{summary.policy_version}</dd></>}
+          <dt>High-confidence threshold</dt><dd>{percent(summary.high_threshold)}</dd>
+          <dt>Medium-confidence threshold</dt><dd>{percent(summary.medium_threshold)}</dd>
+          <dt>Conflicting fields</dt><dd>{Number(summary.conflict_field_count ?? 0)}</dd>
+          <dt>Unknown-confidence fields</dt><dd>{Number(summary.unknown_confidence_field_count ?? 0)}</dd>
+        </dl>
+      </details>
+    </div>
+  );
 }
 
 function TaskListItem({ task, selected, onSelect }: { task: ReviewTask; selected: boolean; onSelect: () => void }) {
@@ -45,9 +203,13 @@ function TaskListItem({ task, selected, onSelect }: { task: ReviewTask; selected
         <strong>{task.severity}</strong>
         <span>{task.status}</span>
       </span>
-      <span className="review-task-summary">{task.summary}</span>
+      <span className="review-task-summary">{reviewSummary(task)}</span>
       <span className="review-task-meta">
-        {task.target_type === "VALIDATION_ISSUE" ? validationIssueLabel(task.metadata) : task.target_type} · {task.target_id}
+        {task.target_type === "VALIDATION_ISSUE"
+          ? validationIssueLabel(task.metadata)
+          : task.queue_type === "DOCUMENT"
+            ? "Document extraction review"
+            : humanize(task.target_type)}
       </span>
       <span className="review-task-meta">{task.assignee_user_id ? "Assigned" : "Unassigned"}{task.escalated ? " · Escalated" : ""}</span>
     </button>
@@ -350,7 +512,7 @@ export function ReviewPage() {
             <div className="review-detail-heading">
               <div>
                 <p className="eyebrow">{selected.target_type === "VALIDATION_ISSUE" ? "Validation issue" : `${selected.queue_type} review case`}</p>
-                <h2>{selected.summary}</h2>
+                <h2>{reviewSummary(selected)}</h2>
               </div>
               <div className="review-badges">
                 <span className={`severity-${selected.severity.toLowerCase()}`}>{selected.severity}</span>
@@ -374,14 +536,15 @@ export function ReviewPage() {
               <section className="review-evidence">
                 <h3>Evidence & status</h3>
                 <dl>
-                  <dt>Target</dt><dd>{selected.target_type} · {selected.target_id}</dd>
-                  <dt>Assignee</dt><dd>{selected.assignee_user_id ?? "Unassigned"}</dd>
+                  <dt>Case type</dt><dd>{selected.queue_type === "DOCUMENT" ? "Document extraction review" : selected.target_type === "VALIDATION_ISSUE" ? validationIssueLabel(selected.metadata) : humanize(selected.target_type)}</dd>
+                  <dt>Assignee</dt><dd>{selected.assignee_user_id ? "Assigned reviewer" : "Unassigned"}</dd>
                   <dt>Blocking issues</dt><dd>{selected.blocking_issue_count}</dd>
                   <dt>Created</dt><dd>{formatDate(selected.created_at)}</dd>
                   <dt>Updated</dt><dd>{formatDate(selected.updated_at)}</dd>
                   <dt>Resolution</dt><dd>{selected.resolution_action ?? "Pending"}</dd>
                 </dl>
 
+                {selected.queue_type === "DOCUMENT" && <p><Link to={`/projects/${projectId}/documents`}>Inspect document evidence</Link></p>}
                 {selected.queue_type === "GIS" && <p><Link to={`/projects/${projectId}/gis`}>Inspect project GIS evidence</Link></p>}
                 {selected.target_type === "VALIDATION_ISSUE" && (
                   <p>
@@ -390,11 +553,15 @@ export function ReviewPage() {
                   </p>
                 )}
 
+                {selected.queue_type === "DOCUMENT" && documentValidationSummary(selected.metadata)}
+
                 <h3>Source references</h3>
                 {selected.source_refs.length ? <ul className="review-source-list">{selected.source_refs.map((source) => <li key={source}>{source}</li>)}</ul> : <p className="review-muted">No source reference was attached to this case.</p>}
 
-                <h3>Case metadata</h3>
-                {metadataEntries(selected.metadata).length ? <dl>{metadataEntries(selected.metadata).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd></Fragment>)}</dl> : <p className="review-muted">No additional metadata.</p>}
+                {metadataEntries(selected.metadata).length > 0 && <>
+                  <h3>Additional case details</h3>
+                  <dl>{metadataEntries(selected.metadata).map(([key, value]) => <Fragment key={key}><dt>{humanize(key)}</dt><dd>{typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : JSON.stringify(value)}</dd></Fragment>)}</dl>
+                </>}
               </section>
 
               <section className="review-actions">

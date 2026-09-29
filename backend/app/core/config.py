@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     bootstrap_admin_login_id: str | None = None
     geoai_building_checkpoint: str | None = None
     geoai_road_checkpoint: str | None = None
+    samroad_service_url: str | None = None
+    geoai_lulc_model_dir: str | None = None
+    geoai_lulc_min_area_m2: float = Field(default=10000.0, ge=0.0)
+    geoai_lulc_min_gsd_m: float = Field(default=5.0, gt=0.0)
+    geoai_lulc_max_gsd_m: float = Field(default=20.0, gt=0.0)
     geoai_device: str = "auto"
     geoai_road_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 

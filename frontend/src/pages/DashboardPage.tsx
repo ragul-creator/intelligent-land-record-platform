@@ -50,9 +50,14 @@ export function DashboardPage() {
 
   return <main className="dashboard-shell">
     <header className="dashboard-header">
-      <div><p className="eyebrow">Combined SIH12 + SIH18 workflow</p><h1>{data.project.name}</h1><p>{data.project.description || "Project operational dashboard"}</p><div className="dashboard-badges"><span>{data.project.state}</span><span>{data.project_role}</span></div></div>
+      <div className="dashboard-title-block">
+        <p className="eyebrow">Land intelligence workspace</p>
+        <h1>{data.project.name}</h1>
+        <p>{data.project.description || "Document intelligence and geospatial analysis in one auditable workspace."}</p>
+        <div className="dashboard-badges"><span>{data.project.state}</span><span>{data.project_role}</span></div>
+      </div>
       <nav className="dashboard-nav" aria-label="Project workspace navigation">
-        <Link to="/">Platform home</Link>
+        <Link to="/">Home</Link>
         {canDocuments && <Link to={`/projects/${projectId}/documents`}>Documents</Link>}
         {canGis && <Link to={`/projects/${projectId}/gis`}>Web-GIS</Link>}
         {canReview && <Link to={`/projects/${projectId}/review`}>Review workspace</Link>}
@@ -60,9 +65,27 @@ export function DashboardPage() {
         {canProjectRead && <Link to={`/projects/${projectId}/jobs`}>Jobs</Link>}
         {canExport && <Link to={`/projects/${projectId}/exports`}>Exports</Link>}
         {canAudit && <Link to={`/projects/${projectId}/audit`}>Audit</Link>}
-        {canAdmin && <Link to={`/projects/${projectId}/admin`}>Project admin</Link>}
+        {canAdmin && <Link to={`/projects/${projectId}/admin`}>Admin</Link>}
       </nav>
     </header>
+
+    <section className="dashboard-launch-grid" aria-label="Primary demo workspaces">
+      {canDocuments && <Link className="dashboard-launch-card" to={`/projects/${projectId}/documents`}>
+        <span className="dashboard-launch-index">01</span>
+        <div><p className="eyebrow">Document intelligence</p><h2>OCR & land records</h2><p>Upload a land document, inspect OCR evidence, structured fields, confidence, and provenance.</p></div>
+        <strong>Open Document AI →</strong>
+      </Link>}
+      {canGis && <Link className="dashboard-launch-card" to={`/projects/${projectId}/gis`}>
+        <span className="dashboard-launch-index">02</span>
+        <div><p className="eyebrow">Spatial intelligence</p><h2>Web-GIS & GeoAI</h2><p>Inspect imagery, detected buildings, roads, preliminary parcel candidates, and visible boundary evidence.</p></div>
+        <strong>Open Web-GIS →</strong>
+      </Link>}
+      {canReview && <Link className="dashboard-launch-card dashboard-launch-card-secondary" to={`/projects/${projectId}/review`}>
+        <span className="dashboard-launch-index">03</span>
+        <div><p className="eyebrow">Human oversight</p><h2>Review workspace</h2><p>Resolve low-confidence or conflicting evidence while preserving source provenance and audit history.</p></div>
+        <strong>Open Review →</strong>
+      </Link>}
+    </section>
 
     {data.project_role === "REVIEWER" && <p className="dashboard-role-note">Reviewer focus: {data.reviews.open} open tasks, {data.reviews.assigned_to_me} assigned to you.</p>}
     {data.project_role === "SURVEYOR" && <p className="dashboard-role-note">Surveyor focus: {data.geo.parcels} parcels and {data.geo.geoai_jobs} GeoAI jobs are visible in the GIS workflow.</p>}
@@ -88,7 +111,14 @@ export function DashboardPage() {
       <section><h2>Visibility policy</h2><p>{visibilityNotice}</p><p>Draft/preliminary labels and verification state are preserved in UI, search, and exports.</p></section>
     </div>
 
-    <section className="demo-flow" aria-label="End to end demo flow"><div><p className="eyebrow">H.2 guided demo path</p><h2>From source evidence to auditable workflow association</h2><p>Follow the persisted vertical slice without bypassing human review or legal safeguards.</p></div><ol>{canDocuments && <li><Link to={`/projects/${projectId}/documents`}>1. Upload/process a land-record document</Link><span>OCR → extraction → validation with provenance and confidence.</span></li>}{canGis && <li><Link to={`/projects/${projectId}/gis`}>2. Inspect cadastral and GeoAI evidence</Link><span>Parcels remain draft/preliminary; buildings stay separate from parcel boundaries.</span></li>}{canReview && <li><Link to={`/projects/${projectId}/review`}>3. Resolve human-review work</Link><span>Use the canonical reviewer actions for document/GIS/link cases.</span></li>}<li><strong>4. Confirm the Record ↔ Parcel workflow association</strong><span>Confirmation is auditable workflow evidence, not statutory ownership proof.</span></li></ol></section>
+    <section className="demo-flow" aria-label="Demo presentation guide">
+      <div><p className="eyebrow">Demo presentation</p><h2>Two focused capabilities</h2><p>Present document intelligence and spatial intelligence as separate, production-oriented workflows. Cross-validation is intentionally outside this demo scope.</p></div>
+      <ol>
+        {canDocuments && <li><Link to={`/projects/${projectId}/documents`}>1. Document AI / OCR</Link><span>Upload the demo land deed and show OCR evidence, structured extraction, confidence, and provenance.</span></li>}
+        {canGis && <li><Link to={`/projects/${projectId}/gis`}>2. Web-GIS / GeoAI</Link><span>Use the prepared imagery to show detected buildings, roads, preliminary parcels, and visible-boundary evidence.</span></li>}
+        {canReview && <li><Link to={`/projects/${projectId}/review`}>Optional: human review</Link><span>Use only if needed to demonstrate governance and auditable corrections.</span></li>}
+      </ol>
+    </section>
 
     <p className="dashboard-disclaimer">AI cadastral outputs remain preliminary until authorized verification. Dashboard counts are derived from persisted project data; no synthetic progress score is used.</p>
   </main>;

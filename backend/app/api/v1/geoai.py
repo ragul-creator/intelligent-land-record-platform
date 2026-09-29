@@ -38,7 +38,7 @@ from app.schemas.geoai import (
 from app.services.geoai import ParcelVersionConflict, GeoAIServiceError, create_human_parcel_version, current_version, geometry_geojson
 from app.services.processing_jobs import InvalidJobTransition, create_or_get_job, mark_job_cancelled
 from app.services.project_access import get_project_for_user
-from app.workers.tasks import process_geoai_buildings, process_geoai_parcel_import, process_geoai_roads, process_imagery_registration
+from app.workers.tasks import process_geoai_buildings, process_geoai_land_use, process_geoai_parcel_delineation, process_geoai_parcel_import, process_geoai_roads, process_imagery_registration
 
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["geoai"])
@@ -68,7 +68,9 @@ def _imagery_response(session: Session, asset: ImageryAsset) -> ImageryAssetResp
 
 
 def _version_response(version: ParcelGeometryVersion) -> ParcelVersionResponse:
-    return ParcelVersionResponse(id=version.id, version=version.version, geometry=geometry_geojson(version.geometry), source=version.source, source_reference=version.source_reference, coordinate_space=version.coordinate_space, source_crs=version.source_crs, area_m2=version.area_m2, area_sqft=version.area_sqft, change_reason=version.change_reason, validation_status=version.validation_status, created_by_user_id=version.created_by_user_id, created_by_type=version.created_by_type, processed_at=version.processed_at, created_at=version.created_at)
+    source_payload = version.source_geometry_json if isinstance(version.source_geometry_json, dict) else {}
+    properties = source_payload.get("properties") if isinstance(source_payload.get("properties"), dict) else {}
+    return ParcelVersionResponse(id=version.id, version=version.version, geometry=geometry_geojson(version.geometry), source=version.source, source_reference=version.source_reference, coordinate_space=version.coordinate_space, source_crs=version.source_crs, area_m2=version.area_m2, area_sqft=version.area_sqft, change_reason=version.change_reason, validation_status=version.validation_status, properties=properties, created_by_user_id=version.created_by_user_id, created_by_type=version.created_by_type, processed_at=version.processed_at, created_at=version.created_at)
 
 
 def _parcel_response(session: Session, parcel: Parcel) -> ParcelResponse:
@@ -80,7 +82,7 @@ def _parcel_response(session: Session, parcel: Parcel) -> ParcelResponse:
 def create_geoai_job(project_id: uuid.UUID, request: GeoAIJobCreateRequest, session: Session = Depends(get_db_session), user: User = Depends(get_current_user)) -> GeoAIJobResponse:
     project = get_project_for_user(session, user, project_id, "geoai:process")
     imagery_asset = None
-    if request.job_type in {"BUILDING_VECTORIZE", "ROAD_VECTORIZE"}:
+    if request.job_type in {"BUILDING_VECTORIZE", "ROAD_VECTORIZE", "LAND_USE_VECTORIZE", "PARCEL_DELINEATE"}:
         if request.imagery_asset_id is None:
             raise ApiError(status.HTTP_422_UNPROCESSABLE_CONTENT, "IMAGERY_ASSET_REQUIRED", "Imagery GeoAI processing requires a registered imagery asset.")
         imagery_asset = session.get(ImageryAsset, request.imagery_asset_id)
@@ -100,10 +102,14 @@ def create_geoai_job(project_id: uuid.UUID, request: GeoAIJobCreateRequest, sess
         session.commit()
         if request.job_type == "PARCEL_IMPORT":
             process_geoai_parcel_import.delay(str(geoai_job.id))
+        elif request.job_type == "PARCEL_DELINEATE":
+            process_geoai_parcel_delineation.apply_async(args=[str(geoai_job.id)], queue="geoai")
         elif request.job_type == "BUILDING_VECTORIZE":
             process_geoai_buildings.apply_async(args=[str(geoai_job.id)], queue="geoai")
         elif request.job_type == "ROAD_VECTORIZE":
             process_geoai_roads.apply_async(args=[str(geoai_job.id)], queue="geoai")
+        elif request.job_type == "LAND_USE_VECTORIZE":
+            process_geoai_land_use.apply_async(args=[str(geoai_job.id)], queue="geoai")
     elif geoai_job is None:
         raise ApiError(status.HTTP_409_CONFLICT, "GEOAI_IDEMPOTENCY_CONFLICT", "The idempotency key belongs to another processing workflow.")
     return _job_response(geoai_job, processing)

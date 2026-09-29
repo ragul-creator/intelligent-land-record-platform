@@ -149,6 +149,24 @@ const FIELD_LABELS: Record<string, string> = {
   land_classification: "Land classification",
   mutation_records: "Mutation records",
   registration_information: "Registration information",
+  seller: "Seller / Vendor",
+  buyer: "Buyer / Purchaser",
+  seller_address: "Seller address",
+  buyer_address: "Buyer address",
+  deed_type: "Deed type",
+  deed_date: "Deed date",
+  certificate_number: "Certificate number",
+  certificate_issued_date: "Certificate issued date",
+  unique_document_reference: "Unique document reference",
+  consideration_amount: "Consideration amount",
+  stamp_duty_amount: "Stamp duty amount",
+  stamp_duty_paid_by: "Stamp duty paid by",
+  boundary_north: "North boundary",
+  boundary_south: "South boundary",
+  boundary_east: "East boundary",
+  boundary_west: "West boundary",
+  notary: "Notary",
+  witnesses: "Witnesses",
 };
 
 function structuredValue(field: DocumentField) {
@@ -156,8 +174,9 @@ function structuredValue(field: DocumentField) {
   if (corrected) return corrected;
   if (typeof field.normalized_value === "string") return field.normalized_value;
   if (field.normalized_value && typeof field.normalized_value === "object") {
-    const area = field.normalized_value as { value?: number | string; unit?: string };
-    if (area.value !== undefined && area.unit) return `${area.value} ${area.unit.replaceAll("_", " ")}`;
+    const structured = field.normalized_value as { value?: number | string; unit?: string; entries?: Array<{ value?: string }> };
+    if (structured.value !== undefined && structured.unit) return `${structured.value} ${structured.unit.replaceAll("_", " ")}`;
+    if (structured.entries?.length) return structured.entries.map((entry) => entry.value).filter(Boolean).join("; ");
     return JSON.stringify(field.normalized_value);
   }
   return field.original_value;

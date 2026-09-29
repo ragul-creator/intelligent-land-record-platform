@@ -68,10 +68,10 @@ export function HomePage() {
     <header className="home-hero">
       <div>
         <p className="eyebrow">Tamil Nadu demo · SIH12 + SIH18</p>
-        <h1>Intelligent Land Record Platform</h1>
-        <p>One auditable workflow for digitized land records, human verification, cadastral GIS, and evidence-backed record ↔ parcel association.</p>
+        <h1>Bhumi-AI</h1>
+        <p>Professional land-record intelligence with two focused capabilities: document OCR and evidence extraction, plus Web-GIS and GeoAI analysis.</p>
       </div>
-      <aside className="home-safety-note"><strong>Demo boundary</strong><span>AI outputs are preliminary. Parcel associations are workflow evidence, not statutory ownership proof.</span></aside>
+      <aside className="home-safety-note"><strong>Demo boundary</strong><span>AI outputs are preliminary. OCR fields and GeoAI parcel candidates remain evidence for human review, not statutory land determinations.</span></aside>
     </header>
 
     {!loggedIn && <section className="login-card" aria-label="Sign in">
@@ -118,12 +118,10 @@ export function HomePage() {
       </section>
 
       <section className="home-demo-path">
-        <div><p className="eyebrow">Suggested judging path</p><h2>Show the vertical slice in four moves</h2></div>
+        <div><p className="eyebrow">Suggested judging path</p><h2>Two clear demo workflows</h2><p>Keep the live walkthrough focused and easy to follow.</p></div>
         <ol>
-          <li><strong>Document AI</strong><span>Open OCR, structured fields, confidence, and validation evidence.</span></li>
-          <li><strong>Human review</strong><span>Show low-confidence or conflicting evidence entering the review queue.</span></li>
-          <li><strong>Web-GIS</strong><span>Inspect draft parcels separately from buildings, roads, and land-use layers.</span></li>
-          <li><strong>Record ↔ Parcel</strong><span>Show the auditable association and its provenance without claiming statutory ownership.</span></li>
+          <li><strong>Document AI / OCR</strong><span>Upload the prepared land deed and show OCR evidence, extracted fields, confidence, and provenance.</span></li>
+          <li><strong>Web-GIS / GeoAI</strong><span>Open the prepared imagery and show detected buildings, roads, parcel candidates, and visible-boundary evidence.</span></li>
         </ol>
       </section>
     </>}

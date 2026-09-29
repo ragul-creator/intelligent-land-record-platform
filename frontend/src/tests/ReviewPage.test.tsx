@@ -25,7 +25,33 @@ const documentTask = {
   status: "OPEN",
   summary: "Survey number requires verification",
   source_refs: ["file:legacy-register-12/page:3"],
-  metadata: { field_name: "survey_number", confidence: 0.61 },
+  metadata: {
+    field_name: "survey_number",
+    confidence: 0.61,
+    document_id: "983ed020-ebab-452d-b262-ffc4c6efa875",
+    issue_codes: ["LOW_CONFIDENCE", "LOW_CONFIDENCE", "LOW_CONFIDENCE"],
+    blocking_issue_codes: [],
+    validation_version: 2,
+    validation_result_id: "6a1db91f-f9f2-48d9-a74a-d786b3367cbb",
+    confidence_summary: {
+      band: "LOW",
+      value: 0.7066666666666667,
+      fields: [
+        { band: "MEDIUM", field_name: "survey_number", candidate_count: 1, unknown_confidence_count: 0, representative_confidence: 0.83 },
+        { band: "LOW", field_name: "seller", candidate_count: 1, unknown_confidence_count: 0, representative_confidence: 0.706857142857143 },
+        { band: "LOW", field_name: "buyer", candidate_count: 1, unknown_confidence_count: 0, representative_confidence: 0.7440000000000001 },
+        { band: "LOW", field_name: "unique_document_reference", candidate_count: 1, unknown_confidence_count: 0, representative_confidence: 0.7066666666666667 },
+        { band: "UNKNOWN", field_name: "khasra_number", candidate_count: 0, unknown_confidence_count: 0, representative_confidence: null },
+      ],
+      high_threshold: 0.9,
+      medium_threshold: 0.75,
+      missing_field_count: 1,
+      conflict_field_count: 0,
+      contributing_field_count: 4,
+      unknown_confidence_field_count: 0,
+      policy_version: "document-validation-mvp-v1",
+    },
+  },
   blocking_issue_count: 0,
   assignee_user_id: null,
   created_by_user_id: null,
@@ -160,6 +186,13 @@ describe("ReviewPage", () => {
     expect(await screen.findByText("Survey number requires verification")).toBeInTheDocument();
     expect(await screen.findByText("file:legacy-register-12/page:3")).toBeInTheDocument();
     expect(screen.getByText("survey_number")).toBeInTheDocument();
+    expect(screen.getByText("Overall confidence")).toBeInTheDocument();
+    expect(screen.getAllByText("70.7%").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Low Confidence × 3")).toBeInTheDocument();
+    expect(screen.getByText("No blocking issues")).toBeInTheDocument();
+    expect(screen.getByText("Seller")).toBeInTheDocument();
+    expect(screen.getByText("Buyer")).toBeInTheDocument();
+    expect(screen.getByText("Unique Document Reference")).toBeInTheDocument();
     expect(screen.getByText("review.task_created")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /assign to me/i })).toBeEnabled();
   });
@@ -186,7 +219,7 @@ describe("ReviewPage", () => {
 
     expect(await screen.findByText(/Potential duplicate record/i)).toBeInTheDocument();
     expect((await screen.findAllByText("Duplicate record")).length).toBeGreaterThan(0);
-    expect(screen.getByText("123/4")).toBeInTheDocument();
+    expect(await screen.findByText("123/4")).toBeInTheDocument();
     expect((await screen.findAllByText(/Exact identifier reuse is a review flag only/i)).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /run validation checks/i }));

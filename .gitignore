@@ -43,7 +43,16 @@ ai/geoai/checkpoints/
 *.safetensors
 *.onnx
 data/models/tesseract/
+data/models/buildings/
 data/raw/document_ai/
 .pytest-tmp/
 .pytest-tmp-*/
 .docker-*.log
+
+# Local assistant/test workspaces
+.demo-recorder/
+.test-cache/
+.test-tmp/
+.worktrees/
+.venv-geoai/
+models/

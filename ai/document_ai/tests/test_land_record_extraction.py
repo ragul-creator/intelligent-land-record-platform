@@ -211,3 +211,55 @@ def test_noisy_footer_does_not_create_an_official_identifier() -> None:
     result = extract_land_record_fields(_document(("Footer note:", "Survey No", "123/4"), ("Unrelated footer text", "123/4")))
 
     assert result.fields["survey_number"] == ()
+
+
+def test_llm_fallback_accepts_only_ocr_grounded_evidence() -> None:
+    from ai.document_ai.extraction.llm_extractor import OllamaEvidenceExtractor
+
+    class StubExtractor(OllamaEvidenceExtractor):
+        def _generate(self, text: str):
+            return {
+                "survey_number": {"value": "123/4B", "evidence": "Survey No. 123/4B"},
+                "village": {"value": "Invented Village", "evidence": "Invented Village"},
+            }
+
+    document = _document(("land consisting in", "Survey No.", "123/4B", "situated at", "Kovilpalayam Village"))
+    result = StubExtractor().extract(document)
+    assert _field(result, "survey_number").normalized_value == "123/4B"
+    assert _field(result, "survey_number").source.bounding_box is not None
+    assert result.fields["village"] == ()
+
+
+def test_merge_uses_llm_only_for_fields_missing_from_rules() -> None:
+    from ai.document_ai.extraction.llm_extractor import OllamaEvidenceExtractor, merge_missing_fields
+
+    class StubExtractor(OllamaEvidenceExtractor):
+        def _generate(self, text: str):
+            return {"district": {"value": "Coimbatore", "evidence": "Coimbatore District"}}
+
+    document = _document(("Survey No:", "123/4B"), ("situated at", "Coimbatore District"))
+    primary = extract_land_record_fields(document)
+    merged = merge_missing_fields(primary, StubExtractor().extract(document))
+    assert _field(merged, "survey_number").extractor_version.startswith("land-record-rule")
+    assert _field(merged, "district").normalized_value == "Coimbatore"
+
+
+def test_llm_extended_deed_fields_are_grounded() -> None:
+    from ai.document_ai.extraction.llm_extractor import OllamaEvidenceExtractor
+
+    class StubExtractor(OllamaEvidenceExtractor):
+        def _generate(self, text: str):
+            return {
+                "seller": {"value": "RAMESH K", "evidence": "First Party : RAMESH K"},
+                "buyer": {"value": "SURESH KUMAR", "evidence": "Second Party : SURESH KUMAR"},
+                "certificate_number": {"value": "IN-TN12345678901234V", "evidence": "Certificate No. : IN-TN12345678901234V"},
+                "boundary_south": {"value": "20 feet Road", "evidence": "South : 20 feet Road"},
+            }
+
+    document = _document(("First Party :", "RAMESH K"), ("Second Party :", "SURESH KUMAR"),
+                         ("Certificate No. :", "IN-TN12345678901234V"), ("South :", "20 feet Road"))
+    result = StubExtractor().extract(document)
+    assert _field(result, "seller").normalized_value == "RAMESH K"
+    assert _field(result, "buyer").normalized_value == "SURESH KUMAR"
+    assert _field(result, "certificate_number").normalized_value == "IN-TN12345678901234V"
+    assert _field(result, "boundary_south").normalized_value == "20 feet Road"

@@ -94,6 +94,20 @@ def test_no_visible_evidence_never_generates_a_guessed_polygon() -> None:
     assert parcel_feature_collection(parcel)["features"][0]["geometry"] is None
 
 
+def test_geometry_only_review_candidate_keeps_explicit_draft_geometry() -> None:
+    parcel = create_parcel(
+        "AI_VISIBLE_BOUNDARY",
+        {"geometry": PROJECTED_POLYGON, "evidence_type": "GEOMETRY_ONLY", "confidence": 0.42},
+        source_crs="EPSG:32618",
+    )
+
+    assert parcel.geometry is not None
+    assert parcel.status == "DRAFT"
+    assert parcel.verification_status == "UNVERIFIED"
+    assert parcel.evidence_type.value == "GEOMETRY_ONLY"
+    assert parcel.requires_survey is True
+
+
 def test_fmb_import_and_source_geometry_are_not_mutated() -> None:
     payload = {"type": "Feature", "geometry": PROJECTED_POLYGON, "source_reference": "fmb-georeferenced-v1"}
     original = copy.deepcopy(payload)

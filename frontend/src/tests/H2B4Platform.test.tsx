@@ -95,7 +95,8 @@ describe("H.2B.4 platform workspaces", () => {
           project_id: "project-1",
           disclaimer: "Draft or unverified data remains explicitly labelled and is not statutory boundary certification.",
           items: [
-            { code: "RECORDS_CSV", label: "Land-record evidence CSV", path: "/api/v1/projects/project-1/exports/records.csv", media_type: "text/csv", description: "Record evidence." },
+            { code: "RECORDS_XLSX", label: "Land-record evidence Excel", path: "/api/v1/projects/project-1/exports/records.xlsx", media_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", description: "Complete record evidence." },
+            { code: "RECORDS_CSV", label: "Compact land-record CSV", path: "/api/v1/projects/project-1/exports/records.csv", media_type: "text/csv", description: "Compact record evidence." },
             { code: "PARCELS_GEOJSON", label: "Parcel GeoJSON", path: "/api/v1/projects/project-1/exports/parcels.geojson", media_type: "application/geo+json", description: "Parcel evidence." },
           ],
         }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -104,10 +105,11 @@ describe("H.2B.4 platform workspaces", () => {
     }));
 
     renderRoute("/projects/project-1/exports", "/projects/:projectId/exports", <ExportsPage />);
-    expect(await screen.findByRole("heading", { name: "Land-record evidence CSV" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Land-record evidence Excel" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Compact land-record CSV" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Parcel GeoJSON" })).toBeInTheDocument();
     expect(screen.getByText(/not statutory boundary certification/i)).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(3);
   });
 
   it("searches evidence and preserves preliminary labels", async () => {
@@ -237,8 +239,10 @@ describe("H.2B.4 platform workspaces", () => {
     }));
 
     renderRoute("/projects/project-1/audit", "/projects/:projectId/audit", <AuditPage />);
-    expect(await screen.findByText("document.validated")).toBeInTheDocument();
-    expect(screen.getByText(/validation_result_id/)).toBeInTheDocument();
+    expect(await screen.findByText("Document validated")).toBeInTheDocument();
+    expect(screen.getByText("Officer (you)")).toBeInTheDocument();
+    expect(screen.getByText("Technical details")).toBeInTheDocument();
+    expect(screen.getByText("Validation Result Id")).toBeInTheDocument();
   });
 
   it("loads archived project settings and can explicitly reactivate them", async () => {

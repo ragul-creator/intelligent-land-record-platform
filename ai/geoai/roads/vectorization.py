@@ -263,7 +263,7 @@ def _line_from_path(
     points: list[tuple[float, float]] = []
 
     for row, col in path:
-        x, y = transform @ (
+        x, y = transform * (
             float(col) + 0.5,
             float(row) + 0.5,
         )

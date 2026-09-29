@@ -1,7 +1,7 @@
 import { sessionFetch } from "./session";
 export type Position = number[];
 export interface Geometry { type: string; coordinates: Position | Position[] | Position[][] | Position[][][]; }
-export interface ParcelGeometryVersion { id: string; version: number; geometry: Geometry | null; source: string; source_reference: string | null; coordinate_space: string; source_crs: string | null; area_m2: number | null; area_sqft: number | null; change_reason: string | null; validation_status: string | null; created_by_user_id: string | null; created_by_type: "SYSTEM" | "AI" | "HUMAN" | "IMPORT"; processed_at: string | null; created_at: string; }
+export interface ParcelGeometryVersion { id: string; version: number; geometry: Geometry | null; source: string; source_reference: string | null; coordinate_space: string; source_crs: string | null; area_m2: number | null; area_sqft: number | null; change_reason: string | null; validation_status: string | null; properties?: Record<string, unknown>; created_by_user_id: string | null; created_by_type: "SYSTEM" | "AI" | "HUMAN" | "IMPORT"; processed_at: string | null; created_at: string; }
 export interface Parcel { id: string; project_id: string; external_identifier: string | null; source: string; source_reference: string | null; status: string; verification_status: string; current_geometry_version: number; coordinate_space: string; source_crs: string | null; confidence: number | null; model_version: string | null; ai_boundary_status: string | null; requires_survey: boolean; current_version: ParcelGeometryVersion; created_at: string; updated_at: string; }
 export interface GeoFeature { id: string; project_id: string; geometry: Geometry; source: string; source_reference: string | null; confidence: number | null; model_version: string | null; status: string; verification_status: string; processed_at: string | null; properties: Record<string, unknown>; }
 export type Building = GeoFeature;
@@ -47,7 +47,7 @@ export function createParcelVersion(projectId: string, parcelId: string, payload
 
 export function loadImageryPreview(projectId: string, assetId: string): Promise<ImageryPreview> { return get<ImageryPreview>(`/projects/${projectId}/imagery/${assetId}/preview-url`); }
 
-export function createGeoAIJob(projectId: string, payload: { job_type: "BUILDING_VECTORIZE" | "ROAD_VECTORIZE" | "PARCEL_IMPORT"; source_type: string; source_payload: Record<string, unknown>; source_crs?: string; source_reference?: string | null; imagery_asset_id?: string; idempotency_key?: string }): Promise<GeoAIJob> {
+export function createGeoAIJob(projectId: string, payload: { job_type: "BUILDING_VECTORIZE" | "ROAD_VECTORIZE" | "LAND_USE_VECTORIZE" | "PARCEL_DELINEATE" | "PARCEL_IMPORT"; source_type: string; source_payload: Record<string, unknown>; source_crs?: string; source_reference?: string | null; imagery_asset_id?: string; idempotency_key?: string }): Promise<GeoAIJob> {
   return request<GeoAIJob>(`/projects/${projectId}/geoai/jobs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
 }
 

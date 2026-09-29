@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ApiError,
@@ -11,27 +12,81 @@ import {
   type ImageryPreview,
 } from "../api/gis";
 
+type ImageryGeoAiJobKind = "BUILDING_VECTORIZE" | "ROAD_VECTORIZE" | "LAND_USE_VECTORIZE" | "PARCEL_DELINEATE";
+
+const geoAiLabel = (kind: ImageryGeoAiJobKind | null) =>
+  kind === "ROAD_VECTORIZE" ? "Road" : kind === "LAND_USE_VECTORIZE" ? "Land-use" : kind === "PARCEL_DELINEATE" ? "Parcel" : "Building";
+
+const LULC_STYLE: Record<string, { label: string; color: string }> = {
+  TREE_COVER: { label: "Tree cover", color: "#006400" },
+  SHRUBLAND: { label: "Shrubland", color: "#ffbb22" },
+  GRASSLAND: { label: "Grassland", color: "#ffff4c" },
+  CROPLAND: { label: "Cropland", color: "#f096ff" },
+  BUILT_UP: { label: "Built-up", color: "#fa0000" },
+  BARE_SPARSE_VEGETATION: { label: "Bare / sparse vegetation", color: "#b4b4b4" },
+  SNOW_ICE: { label: "Snow / ice", color: "#f0f0f0" },
+  PERMANENT_WATER_BODIES: { label: "Permanent water", color: "#0064c8" },
+  HERBACEOUS_WETLAND: { label: "Herbaceous wetland", color: "#0096a0" },
+  MANGROVES: { label: "Mangroves", color: "#00cf75" },
+  MOSS_LICHEN: { label: "Moss / lichen", color: "#fae6a0" },
+};
+
+type LulcDistributionRow = { class_name: string; pixel_count: number; proportion: number; code?: number };
+
+export function geoAiCompletionMessage(
+  kind: ImageryGeoAiJobKind | null,
+  outputReferences: Record<string, unknown>,
+  refreshed: boolean,
+): string {
+  const label = geoAiLabel(kind);
+  const rawCount = outputReferences.feature_count;
+  const count = typeof rawCount === "number" && Number.isFinite(rawCount) && rawCount >= 0
+    ? Math.trunc(rawCount)
+    : null;
+  const suffix = refreshed ? "Imagery and map layers refreshed." : "Refreshing imagery and map layers...";
+
+  if (count === null) return `${label} processing completed. ${suffix}`;
+  if (kind === "ROAD_VECTORIZE") {
+    const result = count === 0 ? "No road candidates detected." : `${count} road candidate${count === 1 ? "" : "s"} detected.`;
+    return `Road processing completed — ${result} ${suffix}`;
+  }
+  if (kind === "LAND_USE_VECTORIZE") {
+    const result = count === 0 ? "No land-use regions detected." : `${count} land-use class region${count === 1 ? "" : "s"} detected.`;
+    return `Land-use processing completed — ${result} ${suffix}`;
+  }
+  if (kind === "PARCEL_DELINEATE") {
+    const result = count === 0 ? "No plot candidates could be generated." : `${count} preliminary plot candidate${count === 1 ? "" : "s"} generated.`;
+    return `Parcel processing completed — ${result} Survey/FMB verification required. ${suffix}`;
+  }
+  const result = count === 0 ? "No building footprints detected." : `${count} building footprint${count === 1 ? "" : "s"} detected.`;
+  return `Building processing completed — ${result} ${suffix}`;
+}
+
 export function ImageryGeoAiPanel({
   projectId,
   assets,
   canUpload,
   canProcess,
+  showLandUseComposition,
   onChanged,
   onPreview,
   onZoomToImagery,
+  fullscreenHost,
 }: {
   projectId: string;
   assets: ImageryAsset[];
   canUpload: boolean;
   canProcess: boolean;
+  showLandUseComposition: boolean;
   onChanged: () => Promise<void>;
   onPreview: (preview: ImageryPreview | null) => void;
   onZoomToImagery: () => void;
+  fullscreenHost?: HTMLElement | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [activeJobKind, setActiveJobKind] = useState<"BUILDING_VECTORIZE" | "ROAD_VECTORIZE" | null>(null);
+  const [activeJobKind, setActiveJobKind] = useState<ImageryGeoAiJobKind | null>(null);
 
   const selected =
     assets.find((asset) => asset.id === selectedId) ??
@@ -65,6 +120,12 @@ export function ImageryGeoAiPanel({
   });
 
   const hasPrivateFile = Boolean(selected?.file_id);
+  const landUseHasFourBands = Number(selected?.metadata.band_count ?? 0) >= 4;
+  const lulcDistribution = Array.isArray(selected?.metadata.lulc_distribution)
+    ? (selected?.metadata.lulc_distribution as LulcDistributionRow[])
+        .filter((row) => row && typeof row.class_name === "string" && Number.isFinite(Number(row.proportion)))
+        .sort((a, b) => Number(b.proportion) - Number(a.proportion))
+    : [];
 
   const preview = useQuery({
     queryKey: ["imagery-preview", projectId, selected?.id],
@@ -88,19 +149,19 @@ export function ImageryGeoAiPanel({
   });
 
   const run = useMutation({
-    mutationFn: (jobType: "BUILDING_VECTORIZE" | "ROAD_VECTORIZE") =>
+    mutationFn: (jobType: ImageryGeoAiJobKind) =>
       createGeoAIJob(projectId, {
         job_type: jobType,
         source_type: "REGISTERED_IMAGERY",
         source_payload: {},
         imagery_asset_id: selected!.id,
         source_reference: `imagery:${selected!.id}`,
-        idempotency_key: `${jobType === "ROAD_VECTORIZE" ? "roads" : "buildings"}:${selected!.id}:${crypto.randomUUID()}`,
+        idempotency_key: `${jobType === "ROAD_VECTORIZE" ? "roads" : jobType === "LAND_USE_VECTORIZE" ? "land-use" : jobType === "PARCEL_DELINEATE" ? "parcels" : "buildings"}:${selected!.id}:${crypto.randomUUID()}`,
       }),
     onSuccess: (createdJob, jobType) => {
       setActiveJobId(createdJob.id);
       setActiveJobKind(jobType);
-      const label = jobType === "ROAD_VECTORIZE" ? "Road" : "Building";
+      const label = geoAiLabel(jobType);
       setMessage(
         `${label} processing ${createdJob.status.toLowerCase()}. Waiting for completion...`,
       );
@@ -135,7 +196,7 @@ export function ImageryGeoAiPanel({
   useEffect(() => {
     if (!job.data) return;
 
-    const label = activeJobKind === "ROAD_VECTORIZE" ? "Road" : "Building";
+    const label = geoAiLabel(activeJobKind);
 
     if (job.data.status === "QUEUED") {
       setMessage(`${label} processing queued...`);
@@ -148,14 +209,16 @@ export function ImageryGeoAiPanel({
     }
 
     if (job.data.status === "COMPLETED") {
-      setMessage(`${label} processing completed. Refreshing imagery and map layers...`);
+      const completedKind = activeJobKind;
+      const outputReferences = job.data.output_references ?? {};
+      setMessage(geoAiCompletionMessage(completedKind, outputReferences, false));
       setActiveJobId(null);
       setActiveJobKind(null);
       void (async () => {
         await onChanged();
         const refreshedPreview = await preview.refetch();
         if (refreshedPreview.data) onPreview(refreshedPreview.data);
-        setMessage(`${label} processing completed. Imagery and map layers refreshed.`);
+        setMessage(geoAiCompletionMessage(completedKind, outputReferences, true));
         onZoomToImagery();
       })();
       return;
@@ -168,9 +231,53 @@ export function ImageryGeoAiPanel({
     }
   }, [activeJobKind, job.data, onChanged, onPreview, onZoomToImagery, preview.refetch]);
 
+  const fullscreenComposition = fullscreenHost && showLandUseComposition && selected && lulcDistribution.length > 0 ? createPortal(
+    <aside className="fullscreen-lulc-composition" aria-label="Fullscreen land-use composition">
+      <div className="fullscreen-lulc-heading">
+        <strong>Land-use proportion</strong>
+        <span>Classified pixels</span>
+      </div>
+      <div className="fullscreen-lulc-list">
+        {lulcDistribution.map((row) => {
+          const style = LULC_STYLE[row.class_name] ?? { label: row.class_name.replaceAll("_", " "), color: "#777777" };
+          return (
+            <div className="fullscreen-lulc-row" key={row.class_name}>
+              <span className="lulc-swatch" style={{ backgroundColor: style.color }} aria-hidden="true" />
+              <span>{style.label}</span>
+              <strong>{(Number(row.proportion) * 100).toFixed(2)}%</strong>
+            </div>
+          );
+        })}
+      </div>
+    </aside>,
+    fullscreenHost,
+  ) : null;
+
+  const fullscreenActions = selected?.metadata.registration_status === "READY" && hasPrivateFile && canProcess ? (
+    <div className="fullscreen-model-actions" aria-label="Fullscreen GeoAI model controls">
+      <span className="fullscreen-control-title">GeoAI models</span>
+      <button type="button" disabled={run.isPending || Boolean(activeJobId)} onClick={() => run.mutate("BUILDING_VECTORIZE")}>
+        {activeJobKind === "BUILDING_VECTORIZE" && activeJobId ? "Building running..." : "Building"}
+      </button>
+      <button type="button" disabled={run.isPending || Boolean(activeJobId)} onClick={() => run.mutate("ROAD_VECTORIZE")}>
+        {activeJobKind === "ROAD_VECTORIZE" && activeJobId ? "Road running..." : "Road"}
+      </button>
+      <button type="button" disabled={run.isPending || Boolean(activeJobId) || !landUseHasFourBands} onClick={() => run.mutate("LAND_USE_VECTORIZE")}>
+        {activeJobKind === "LAND_USE_VECTORIZE" && activeJobId ? "Land use running..." : "Land use"}
+      </button>
+      <button type="button" disabled={run.isPending || Boolean(activeJobId)} onClick={() => run.mutate("PARCEL_DELINEATE")}>
+        {activeJobKind === "PARCEL_DELINEATE" && activeJobId ? "Parcels running..." : "Parcels"}
+      </button>
+      {message && <span className={message.includes("failed") ? "fullscreen-job-status error-copy" : "fullscreen-job-status"} role="status">{message}</span>}
+    </div>
+  ) : null;
+
   return (
-    <section className="imagery-panel" aria-label="Imagery and GeoAI controls">
-      <p className="eyebrow">Imagery, building and road GeoAI</p>
+    <>
+      {fullscreenHost && fullscreenActions ? createPortal(fullscreenActions, fullscreenHost) : null}
+      {fullscreenComposition}
+      <section className="imagery-panel" aria-label="Imagery and GeoAI controls">
+      <p className="eyebrow">Imagery, buildings, roads, land-use and parcel intelligence</p>
       <h2>Registered GeoTIFFs</h2>
 
       {canUpload && (
@@ -235,6 +342,30 @@ export function ImageryGeoAiPanel({
         </dl>
       )}
 
+      {showLandUseComposition && selected && lulcDistribution.length > 0 && (
+        <section className="lulc-composition" aria-label="Land-use composition">
+          <div className="lulc-composition-heading">
+            <strong>Land-use composition</strong>
+            <span>Proportion of valid classified pixels</span>
+          </div>
+          <div className="lulc-composition-table" role="table" aria-label="LULC color and proportion table">
+            <div className="lulc-composition-row lulc-composition-header" role="row">
+              <span role="columnheader">Color</span><span role="columnheader">Class</span><span role="columnheader">Proportion</span>
+            </div>
+            {lulcDistribution.map((row) => {
+              const style = LULC_STYLE[row.class_name] ?? { label: row.class_name.replaceAll("_", " "), color: "#777777" };
+              return (
+                <div className="lulc-composition-row" role="row" key={row.class_name}>
+                  <span role="cell"><span className="lulc-swatch" style={{ backgroundColor: style.color }} aria-label={`${style.label} color`} /></span>
+                  <span role="cell">{style.label}</span>
+                  <strong role="cell">{(Number(row.proportion) * 100).toFixed(2)}%</strong>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {selected && !hasPrivateFile && (
         <p className="panel-note">
           Metadata-only legacy imagery has no private source file, so preview
@@ -266,14 +397,42 @@ export function ImageryGeoAiPanel({
                 ? "Road GeoAI running..."
                 : "Run Road GeoAI"}
             </button>
+            <button
+              type="button"
+              className="primary-action"
+              disabled={run.isPending || Boolean(activeJobId) || !landUseHasFourBands}
+              onClick={() => run.mutate("LAND_USE_VECTORIZE")}
+            >
+              {activeJobKind === "LAND_USE_VECTORIZE" && activeJobId
+                ? "Land-use GeoAI running..."
+                : landUseHasFourBands
+                  ? "Run Land-use GeoAI"
+                  : "Land-use needs RGB+NIR"}
+            </button>
+            <button
+              type="button"
+              className="primary-action"
+              disabled={run.isPending || Boolean(activeJobId)}
+              onClick={() => run.mutate("PARCEL_DELINEATE")}
+            >
+              {activeJobKind === "PARCEL_DELINEATE" && activeJobId
+                ? "Parcel candidates running..."
+                : "Generate Plot Candidates"}
+            </button>
           </div>
         )}
+
+      {selected?.metadata.registration_status === "READY" && hasPrivateFile && canProcess && !landUseHasFourBands && (
+        <p className="panel-note">
+          Land-use GeoAI requires approximately 10 m, four-band RGB+NIR imagery. Building and road GeoAI remain available for this imagery.
+        </p>
+      )}
 
       {selected?.metadata.registration_status === "READY" &&
         hasPrivateFile &&
         !canProcess && (
           <p className="panel-note">
-            `geoai:process` is required to run building or road extraction.
+            `geoai:process` is required to run building, road, land-use, or parcel-candidate processing.
           </p>
         )}
 
@@ -290,9 +449,9 @@ export function ImageryGeoAiPanel({
 
       <p className="panel-note">
         Original imagery remains private. The map uses a time-limited derived
-        preview. Building footprints and road vectors are AI preliminary and
-        require human review; they never define legal parcel boundaries.
+        preview. Building footprints, road vectors, land-use classes, and generated plot candidates are AI preliminary. Plot candidates must be verified against cadastral/FMB or survey evidence before legal use.
       </p>
-    </section>
+      </section>
+    </>
   );
 }

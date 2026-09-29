@@ -3,8 +3,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GisPage, buildingsForActiveImagery } from "../pages/GisPage";
-import type { GeoFeature } from "../api/gis";
+import { GisPage, buildingsForActiveImagery, landUseForActiveImagery, parcelsForActiveImagery } from "../pages/GisPage";
+import { geoAiCompletionMessage } from "../components/ImageryGeoAiPanel";
+import type { GeoFeature, Parcel } from "../api/gis";
 
 vi.mock("../components/GisMap", () => ({
   GisMap: ({ parcels, buildings, roads, landUse, topologyParcelIds, onParcelSelect, onFeatureSelect }: { parcels: Array<{ id: string }>; buildings: unknown[]; roads: Array<{ id: string }>; landUse: unknown[]; topologyParcelIds: string[]; onParcelSelect: (id: string) => void; onFeatureSelect: (kind: "ROAD", id: string) => void }) => (
@@ -16,7 +17,7 @@ vi.mock("../components/GisMap", () => ({
 }));
 
 const page = (items: unknown[]) => ({ items, page: { limit: 500, offset: 0, total: items.length } });
-const parcel = {
+const parcel: Parcel = {
   id: "parcel-1", project_id: "project-1", external_identifier: "Draft parcel A", source: "EXISTING_GIS", source_reference: "survey-2026", status: "DRAFT", verification_status: "UNVERIFIED", current_geometry_version: 1, coordinate_space: "WORLD", source_crs: "EPSG:32643", confidence: 0.82, model_version: null, ai_boundary_status: "NOT_DETERMINED", requires_survey: true, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
   current_version: { id: "version-1", version: 1, geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, source: "EXISTING_GIS", source_reference: "survey-2026", coordinate_space: "WORLD", source_crs: "EPSG:32643", area_m2: 120, area_sqft: 1291.67, change_reason: null, validation_status: "VALID", created_by_user_id: null, created_by_type: "IMPORT", processed_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z" },
 };
@@ -50,6 +51,24 @@ function renderPage() {
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe("GisPage", () => {
+  it("describes valid Road and land-use GeoAI results explicitly", () => {
+    expect(geoAiCompletionMessage("ROAD_VECTORIZE", { feature_count: 0 }, true)).toBe(
+      "Road processing completed — No road candidates detected. Imagery and map layers refreshed.",
+    );
+    expect(geoAiCompletionMessage("ROAD_VECTORIZE", { feature_count: 9 }, true)).toBe(
+      "Road processing completed — 9 road candidates detected. Imagery and map layers refreshed.",
+    );
+    expect(geoAiCompletionMessage("LAND_USE_VECTORIZE", { feature_count: 0 }, true)).toBe(
+      "Land-use processing completed — No land-use regions detected. Imagery and map layers refreshed.",
+    );
+    expect(geoAiCompletionMessage("LAND_USE_VECTORIZE", { feature_count: 8 }, true)).toBe(
+      "Land-use processing completed — 8 land-use class regions detected. Imagery and map layers refreshed.",
+    );
+    expect(geoAiCompletionMessage("PARCEL_DELINEATE", { feature_count: 6 }, true)).toBe(
+      "Parcel processing completed — 6 preliminary plot candidates generated. Survey/FMB verification required. Imagery and map layers refreshed.",
+    );
+  });
+
   it("shows only the active imagery's unverified AI candidates while preserving reviewed and non-AI buildings", () => {
     const building = (id: string, overrides: Partial<GeoFeature> = {}): GeoFeature => ({
       id,
@@ -73,6 +92,57 @@ describe("GisPage", () => {
     ], "imagery-1");
 
     expect(visible.map((item) => item.id)).toEqual(["active", "reviewed", "manual"]);
+  });
+
+  it("filters unverified AI land-use candidates to the active imagery", () => {
+    const landUse = (id: string, overrides: Partial<GeoFeature> = {}): GeoFeature => ({
+      id,
+      project_id: "project-1",
+      geometry: { type: "MultiPolygon", coordinates: [] },
+      source: "AI_CANDIDATE",
+      source_reference: "imagery:imagery-1",
+      confidence: 0.8,
+      model_version: "segformer-b2-worldcover-2021-tamilnadu-v1",
+      status: "AI_PRELIMINARY",
+      verification_status: "UNVERIFIED",
+      processed_at: "2026-09-28T00:00:00Z",
+      properties: { land_use_class: "CROPLAND" },
+      ...overrides,
+    });
+    const visible = landUseForActiveImagery([
+      landUse("active"),
+      landUse("stale", { source_reference: "imagery:imagery-2" }),
+      landUse("reviewed", { source_reference: "imagery:imagery-2", status: "VERIFIED", verification_status: "VERIFIED" }),
+    ], "imagery-1");
+
+    expect(visible.map((item) => item.id)).toEqual(["active", "reviewed"]);
+  });
+
+  it("shows only active imagery AI plot candidates while preserving reviewed parcels", () => {
+    const aiParcel = (id: string, reference: string, overrides: Partial<Parcel> = {}): Parcel => ({
+      ...parcel,
+      id,
+      external_identifier: id,
+      source: "AI_VISIBLE_BOUNDARY",
+      source_reference: reference,
+      ai_boundary_status: "AI_PRELIMINARY",
+      verification_status: "UNVERIFIED",
+      current_version: {
+        ...parcel.current_version,
+        id: `version-${id}`,
+        source: "AI_VISIBLE_BOUNDARY",
+        source_reference: reference,
+      },
+      ...overrides,
+    });
+    const visible = parcelsForActiveImagery([
+      aiParcel("P-1001", "imagery:imagery-1:parcel-candidate"),
+      aiParcel("P-1002", "imagery:imagery-2:parcel-candidate"),
+      aiParcel("P-1003", "imagery:imagery-2:parcel-candidate", { verification_status: "VERIFIED" }),
+      parcel,
+    ], "imagery-1");
+
+    expect(visible.map((item) => item.id)).toEqual(["P-1001", "P-1003", "parcel-1"]);
   });
 
   it("loads separate layer collections and renders selected parcel provenance and topology details", async () => {
@@ -164,6 +234,56 @@ describe("GisPage", () => {
     expect(satellite).toHaveAttribute("aria-pressed", "true");
     expect(street).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("gis-map").parentElement).toHaveClass("map-stage");
+  });
+
+  it("lets an authorized user queue land-use GeoAI for ready private imagery", async () => {
+    const imagery = [{ id: "imagery-1", project_id: "project-1", file_id: "file-1", filename: "sentinel-rgbnir.tif", source_reference: null, source_crs: "EPSG:4326", coordinate_space: "WORLD", metadata: { registration_status: "READY", width: 12000, height: 12000, band_count: 4 }, registration_job_id: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }];
+    installProjectFetch(imagery);
+    renderPage();
+    await screen.findByRole("button", { name: "Run Land-use GeoAI" });
+    fireEvent.click(screen.getByRole("button", { name: "Run Land-use GeoAI" }));
+    expect(await screen.findByText(/Land-use processing queued/i)).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes("/geoai/jobs"))).toBe(true);
+  });
+
+  it("shows LULC color names and TIFF proportions for the active imagery", async () => {
+    const imagery = [{
+      id: "imagery-1", project_id: "project-1", file_id: "file-1", filename: "sentinel-rgbnir.tif",
+      source_reference: null, source_crs: "EPSG:4326", coordinate_space: "WORLD",
+      metadata: {
+        registration_status: "READY", width: 12000, height: 12000, band_count: 4,
+        lulc_distribution: [
+          { code: 20, class_name: "SHRUBLAND", pixel_count: 4945, proportion: 0.4945 },
+          { code: 40, class_name: "CROPLAND", pixel_count: 2929, proportion: 0.2929 },
+          { code: 10, class_name: "TREE_COVER", pixel_count: 982, proportion: 0.0982 },
+        ],
+      },
+      registration_job_id: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+    }];
+    installProjectFetch(imagery);
+    renderPage();
+    expect(await screen.findByRole("region", { name: "Land-use composition" })).toBeInTheDocument();
+    expect(screen.getByText("Shrubland")).toBeInTheDocument();
+    expect(screen.getByText("49.45%")).toBeInTheDocument();
+    expect(screen.getByText("Cropland")).toBeInTheDocument();
+    expect(screen.getByText("29.29%")).toBeInTheDocument();
+    expect(screen.getByLabelText("Shrubland color")).toHaveStyle({ backgroundColor: "#ffbb22" });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "land use" }));
+    expect(screen.queryByRole("region", { name: "Land-use composition" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "land use" }));
+    expect(screen.getByRole("region", { name: "Land-use composition" })).toBeInTheDocument();
+  });
+
+  it("lets an authorized user queue preliminary parcel delineation", async () => {
+    const imagery = [{ id: "imagery-1", project_id: "project-1", file_id: "file-1", filename: "orthomosaic.tif", source_reference: null, source_crs: "EPSG:4326", coordinate_space: "WORLD", metadata: { registration_status: "READY", width: 1000, height: 1000 }, registration_job_id: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }];
+    installProjectFetch(imagery);
+    renderPage();
+    await screen.findByRole("button", { name: "Generate Plot Candidates" });
+    fireEvent.click(screen.getByRole("button", { name: "Generate Plot Candidates" }));
+    expect(await screen.findByText(/Parcel processing queued/i)).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes("/geoai/jobs"))).toBe(true);
   });
 
   it("lets an authorized user queue Road GeoAI for ready private imagery", async () => {

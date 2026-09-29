@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.schemas.common import PageMetadata
 
 
-GeoAIJobType = Literal["PARCEL_IMPORT", "BUILDING_VECTORIZE", "ROAD_VECTORIZE", "ROAD_IMPORT", "LAND_USE_IMPORT", "TOPOLOGY_VALIDATE"]
+GeoAIJobType = Literal["PARCEL_IMPORT", "PARCEL_DELINEATE", "BUILDING_VECTORIZE", "ROAD_VECTORIZE", "LAND_USE_VECTORIZE", "ROAD_IMPORT", "LAND_USE_IMPORT", "TOPOLOGY_VALIDATE"]
 GeoAIJobStatus = Literal["QUEUED", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"]
 
 
@@ -80,6 +80,7 @@ class ParcelVersionResponse(BaseModel):
     area_sqft: float | None
     change_reason: str | None
     validation_status: str | None
+    properties: dict[str, Any]
     created_by_user_id: uuid.UUID | None
     created_by_type: Literal["SYSTEM", "AI", "HUMAN", "IMPORT"]
     processed_at: datetime | None
