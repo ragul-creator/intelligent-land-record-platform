@@ -155,6 +155,7 @@ services:
               count: 1
               capabilities: [gpu]
     environment:
+      SAMROAD_DEVICE: ${SAMROAD_DEVICE:-auto}
       SAMROAD_TARGET_GSD_M: "0.8"
       SAMROAD_MIN_CANVAS_SIZE: "400"
       SAMROAD_CENTERLINE_THRESHOLD: "0.31"

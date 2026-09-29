@@ -245,6 +245,56 @@ describe("H.2B.4 platform workspaces", () => {
     expect(screen.getByText("Validation Result Id")).toBeInTheDocument();
   });
 
+  it("requires the owner to type the project name before permanent deletion", async () => {
+    let deleteUrl = "";
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/users/me")) {
+        return new Response(JSON.stringify({
+          id: "admin",
+          login_id: "ADM-TN-000001",
+          email: "admin@example.invalid",
+          full_name: "Admin",
+          roles: ["ADMIN"],
+          permissions: ["project:update", "project:member_manage", "user:manage"],
+          project_memberships: [{ project_id: "project-1", role: "ADMIN" }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.includes("/projects/project-1?") && init?.method === "DELETE") {
+        deleteUrl = url;
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith("/projects/project-1")) {
+        return new Response(JSON.stringify({
+          id: "project-1", name: "Project One", description: "Fixture", state: "ACTIVE",
+          owner_id: "admin", created_at: "2026-09-20T00:00:00Z", updated_at: "2026-09-20T00:00:00Z",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.includes("/projects/project-1/members?")) {
+        return new Response(JSON.stringify({
+          items: [{ user_id: "admin", login_id: "ADM-TN-000001", full_name: "Admin", is_active: true, role: "ADMIN", created_at: "2026-09-20T00:00:00Z" }],
+          page: { limit: 100, offset: 0, total: 1 },
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.startsWith("/projects")) {
+        return new Response(JSON.stringify({ items: [], page: { limit: 50, offset: 0, total: 0 } }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response("{}", { status: 404 });
+    }));
+
+    renderRoute("/projects/project-1/admin", "/projects/:projectId/admin", <AdminPage />);
+    const deleteButton = await screen.findByRole("button", { name: "Delete project permanently" });
+    expect(deleteButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Confirm project name"), { target: { value: "Project One" } });
+    expect(deleteButton).toBeEnabled();
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => expect(deleteUrl).toContain("confirmation_name=Project+One"));
+    expect(window.confirm).toHaveBeenCalled();
+  });
+
   it("loads archived project settings and can explicitly reactivate them", async () => {
     let patchBody: Record<string, unknown> | null = null;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

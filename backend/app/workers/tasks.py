@@ -966,6 +966,37 @@ def process_document_ai(self, job_id: str) -> None:
                 document.status = "REVIEW_REQUIRED"
             else:
                 document.status = "VALIDATED"
+                if validation.review_task_id is None:
+                    validation_payload = result_validation.to_dict()
+                    review = create_review_task(
+                        session,
+                        project_id=document.project_id,
+                        queue_type="DOCUMENT",
+                        target_type="LAND_RECORD",
+                        target_id=document.id,
+                        severity="INFO",
+                        summary="Document verification review: validation passed",
+                        source_refs=[],
+                        blocking_issue_count=0,
+                        metadata={
+                            "document_id": str(document.id),
+                            "validation_result_id": str(validation.id),
+                            "validation_version": validation.version,
+                            "confidence_summary": validation_payload.get("confidence_summary", {}),
+                            "issue_codes": [],
+                            "blocking_issue_codes": [],
+                            "verification_only": True,
+                        },
+                    )
+                    validation.review_task_id = review.id
+                    record_audit(
+                        session,
+                        "document.verification_review_created",
+                        "document",
+                        document.id,
+                        project_id=document.project_id,
+                        metadata={"review_task_id": str(review.id), "validation_result_id": str(validation.id)},
+                    )
                 record_audit(session, "document.validated", "document", document.id, project_id=document.project_id, metadata={"validation_result_id": str(validation.id)})
             detail.output_refs_json = {"ocr_result_id": str(ocr.id), "validation_result_id": str(validation.id), "document_status": document.status}
             mark_job_completed(session, job)
@@ -1023,6 +1054,37 @@ def revalidate_document(self, job_id: str) -> None:
                 document.status = "REVIEW_REQUIRED"
             else:
                 document.status = "VALIDATED"
+                if validation.review_task_id is None:
+                    validation_payload = result_validation.to_dict()
+                    review = create_review_task(
+                        session,
+                        project_id=document.project_id,
+                        queue_type="DOCUMENT",
+                        target_type="LAND_RECORD",
+                        target_id=document.id,
+                        severity="INFO",
+                        summary="Document verification review: validation passed",
+                        source_refs=[],
+                        blocking_issue_count=0,
+                        metadata={
+                            "document_id": str(document.id),
+                            "validation_result_id": str(validation.id),
+                            "validation_version": validation.version,
+                            "confidence_summary": validation_payload.get("confidence_summary", {}),
+                            "issue_codes": [],
+                            "blocking_issue_codes": [],
+                            "verification_only": True,
+                        },
+                    )
+                    validation.review_task_id = review.id
+                    record_audit(
+                        session,
+                        "document.verification_review_created",
+                        "document",
+                        document.id,
+                        project_id=document.project_id,
+                        metadata={"review_task_id": str(review.id), "validation_result_id": str(validation.id)},
+                    )
             detail.output_refs_json = {"validation_result_id": str(validation.id), "document_status": document.status}
             mark_job_completed(session, job)
             session.commit()

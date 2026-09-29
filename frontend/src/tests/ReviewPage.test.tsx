@@ -238,7 +238,7 @@ describe("ReviewPage", () => {
     await screen.findByText("Survey number requires verification");
 
     fireEvent.change(screen.getByLabelText(/reason \/ comment/i), { target: { value: "Checked against the supplied scan." } });
-    fireEvent.click(screen.getByRole("button", { name: "Apply COMMENT" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply comment" }));
 
     expect(await screen.findByText(/COMMENT recorded successfully/i)).toBeInTheDocument();
     expect(await screen.findByText("review.action_applied")).toBeInTheDocument();

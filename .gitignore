@@ -56,3 +56,5 @@ data/raw/document_ai/
 .worktrees/
 .venv-geoai/
 models/
+
+*.egg-info/

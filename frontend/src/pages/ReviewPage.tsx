@@ -419,7 +419,7 @@ export function ReviewPage() {
         <div>
           <p className="eyebrow">Human verification · H.2B.3</p>
           <h1>Review workspace</h1>
-          <p>Project: {projectId}</p>
+          <p>Review uncertain document, GIS, and validation evidence with source context and auditable decisions.</p>
         </div>
         <nav className="review-nav" aria-label="Project review navigation">
           <Link to={`/projects/${projectId}`}>Dashboard</Link>
@@ -572,7 +572,7 @@ export function ReviewPage() {
                   <button type="button" className="secondary-action" onClick={assignToMe} disabled={mutation.isPending || selected.assignee_user_id === currentUser.data?.id}>Assign to me</button>
                   <label>Action
                     <select value={action} onChange={(event) => setAction(event.target.value as ReviewAction)}>
-                      {actionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                      {actionOptions.map((item) => <option key={item} value={item}>{humanize(item)}</option>)}
                     </select>
                   </label>
 
@@ -595,7 +595,7 @@ export function ReviewPage() {
                     <small>Backend validation requires this user to be a project member with review:act.</small>
                   </label>}
 
-                  <button type="button" className="primary-action" onClick={submitAction} disabled={mutation.isPending || !actionReady}>{mutation.isPending ? "Saving…" : `Apply ${action}`}</button>
+                  <button type="button" className="primary-action" onClick={submitAction} disabled={mutation.isPending || !actionReady}>{mutation.isPending ? "Saving…" : `Apply ${humanize(action).toLowerCase()}`}</button>
                 </>}
                 {mutationError && <div className="review-error" role="alert">{mutationError.message}</div>}
                 {successMessage && <div className="review-success" role="status">{successMessage}</div>}

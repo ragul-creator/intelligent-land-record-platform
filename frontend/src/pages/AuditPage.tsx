@@ -75,10 +75,10 @@ function AuditEventCard({
         <time dateTime={event.created_at}>{new Date(event.created_at).toLocaleString()}</time>
       </div>
 
-      <dl className="audit-summary">
-        <dt>Actor</dt><dd>{actorLabel}</dd>
-        <dt>Target</dt><dd>{targetLabel(event.target_type)}</dd>
-      </dl>
+      <div className="audit-row-context">
+        <span><b>Actor</b>{actorLabel}</span>
+        <span><b>Target</b>{targetLabel(event.target_type)}</span>
+      </div>
 
       <details className="audit-technical-details">
         <summary>Technical details</summary>
@@ -119,8 +119,8 @@ export function AuditPage() {
     <header className="tool-header audit-header">
       <div>
         <p className="eyebrow">H.2B.4 audit trail</p>
-        <h1>Project audit</h1>
-        <p>Immutable workflow events with sanitized metadata.</p>
+        <h1>Audit trail</h1>
+        <p>Trace important project workflow and access events with technical metadata available on demand.</p>
       </div>
       <nav><Link to={`/projects/${projectId}`}>Dashboard</Link><Link to="/">Platform home</Link></nav>
     </header>
@@ -128,7 +128,7 @@ export function AuditPage() {
     <section className="tool-toolbar audit-toolbar" aria-label="Audit filters">
       <label>Action<input value={action} onChange={(event) => setAction(event.target.value)} placeholder="Exact action, e.g. document.validated" /></label>
       <label>Target type<input value={targetType} onChange={(event) => setTargetType(event.target.value)} placeholder="Exact target type" /></label>
-      <button type="button" onClick={() => audit.refetch()}>Refresh</button>
+      <span className="toolbar-meta">{audit.data?.items.length ?? 0} event{(audit.data?.items.length ?? 0) === 1 ? "" : "s"}</span><button type="button" onClick={() => audit.refetch()}>Refresh</button>
     </section>
 
     {audit.isLoading && <p className="audit-state">Loading audit events…</p>}

@@ -50,4 +50,32 @@ DEMONSTRATED_LABELS = (
     FieldLabel("registration_information", "Registration No"),
     FieldLabel("registration_information", "Registration"),
     FieldLabel("registration_information", "பதிவு எண்"),
+    # Common Tamil Nadu e-stamp / deed labels. These remain evidence-grounded:
+    # values are emitted only when OCR regions contain the label and value.
+    FieldLabel("owner_details", "Purchased by"),
+    FieldLabel("deed_type", "Description of Document"),
+    FieldLabel("consideration_amount", "Consideration Price (Rs.)"),
+    FieldLabel("consideration_amount", "Consideration Price"),
+    FieldLabel("seller", "First Party"),
+    FieldLabel("seller", "Fest Party"),  # conservative OCR alias observed on low-resolution scans
+    FieldLabel("buyer", "Second Party"),
+    FieldLabel("certificate_number", "Certificate No."),
+    FieldLabel("certificate_number", "Certificate No"),
+    FieldLabel("certificate_number", "Certificate Number"),
+    FieldLabel("certificate_issued_date", "Certificate Issued Date"),
+    FieldLabel("certificate_issued_date", "Certificate tssued Date"),  # OCR I/t substitution
+    FieldLabel("unique_document_reference", "Unique Doc. Reference"),
+    FieldLabel("unique_document_reference", "Unique Doc Reference"),
+    FieldLabel("unique_document_reference", "Unique Document Reference"),
+    FieldLabel("unique_document_reference", "Doc. Reference"),
+    FieldLabel("stamp_duty_paid_by", "Stamp Duty Paid By"),
+    FieldLabel("stamp_duty_paid_by", "Stamp Duty Pad By"),  # OCR dropped the i
+    FieldLabel("stamp_duty_amount", "Stamp Duty Amount(Rs.)"),
+    FieldLabel("stamp_duty_amount", "Stamp Duty Amount"),
+    FieldLabel("stamp_duty_amount", "Stamp Duty AmountiRs.}"),  # OCR punctuation substitution
+    FieldLabel("plot_area", "Total Extent"),
+    FieldLabel("boundary_north", "North"),
+    FieldLabel("boundary_south", "South"),
+    FieldLabel("boundary_east", "East"),
+    FieldLabel("boundary_west", "West"),
 )

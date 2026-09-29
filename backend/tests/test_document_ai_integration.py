@@ -221,7 +221,12 @@ def test_worker_persists_clean_and_review_results_once_and_reprocesses(monkeypat
         assert len(ocr) == len(fields) == 1 and validation is not None and validation.status == "VALID"
         assert fields[0].source_id == str(document_id) and fields[0].page_number == 1
         assert fields[0].bounding_box_json == {"left": 90, "top": 20, "width": 40, "height": 14}
-        assert session.scalar(select(func.count(ReviewTask.id)).where(ReviewTask.target_id == document_id)) == 0
+        verification_review = session.scalar(select(ReviewTask).where(ReviewTask.target_id == document_id, ReviewTask.queue_type == "DOCUMENT"))
+        assert verification_review is not None
+        assert verification_review.status == "OPEN"
+        assert verification_review.severity == "INFO"
+        assert verification_review.summary == "Document verification review: validation passed"
+        assert validation.review_task_id == verification_review.id
 
     reprocess = client.post(f"/api/v1/projects/{project_id}/documents/{document_id}/reprocess", headers=headers, json={"languages": "tam+eng"})
     assert reprocess.status_code == 202 and reprocess.json()["processing_version"] == 2

@@ -204,3 +204,75 @@ def test_project_membership_job_and_audit_isolation() -> None:
 
     assert client.delete(f"/api/v1/projects/{project_id}/members/{officer_id}", headers=admin_headers).status_code == 204
     assert_error(client.get(f"/api/v1/projects/{project_id}", headers=officer_headers), 404, "PROJECT_NOT_FOUND")
+
+
+def test_project_owner_can_permanently_delete_project_with_exact_name_confirmation() -> None:
+    with SessionLocal() as session:
+        admin = create_user(session, "ADMIN")
+        officer = create_user(session, "OFFICER")
+        session.commit()
+        admin_login_id = admin.login_id
+        officer_login_id = officer.login_id
+        officer_id = officer.id
+
+    client = TestClient(app)
+    admin_headers = headers(login(client, admin_login_id))
+    officer_headers = headers(login(client, officer_login_id))
+    project_name = f"Delete Me {uuid.uuid4().hex}"
+    created = client.post(
+        "/api/v1/projects",
+        json={"name": project_name, "description": "Permanent deletion test"},
+        headers=admin_headers,
+    )
+    assert created.status_code == 201
+    project_id = created.json()["id"]
+
+    added = client.post(
+        f"/api/v1/projects/{project_id}/members",
+        json={"user_id": str(officer_id), "role": "OFFICER"},
+        headers=admin_headers,
+    )
+    assert added.status_code == 201
+
+    with SessionLocal() as session:
+        session.add(
+            ProcessingJob(
+                project_id=uuid.UUID(project_id),
+                job_type="FILE_REGISTERED",
+                idempotency_key=f"delete-project:{uuid.uuid4()}",
+                status="COMPLETED",
+                progress=100,
+            )
+        )
+        session.commit()
+
+    assert_error(
+        client.delete(
+            f"/api/v1/projects/{project_id}",
+            params={"confirmation_name": project_name},
+            headers=officer_headers,
+        ),
+        403,
+        "PROJECT_DELETE_OWNER_REQUIRED",
+    )
+    assert_error(
+        client.delete(
+            f"/api/v1/projects/{project_id}",
+            params={"confirmation_name": "wrong name"},
+            headers=admin_headers,
+        ),
+        422,
+        "PROJECT_DELETE_CONFIRMATION_MISMATCH",
+    )
+
+    deleted = client.delete(
+        f"/api/v1/projects/{project_id}",
+        params={"confirmation_name": project_name},
+        headers=admin_headers,
+    )
+    assert deleted.status_code == 204
+    assert_error(
+        client.get(f"/api/v1/projects/{project_id}", headers=admin_headers),
+        404,
+        "PROJECT_NOT_FOUND",
+    )

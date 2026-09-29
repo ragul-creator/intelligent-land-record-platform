@@ -9,12 +9,12 @@ import { AuditPage } from "./pages/AuditPage";
 import { JobsPage } from "./pages/JobsPage";
 import { SearchPage } from "./pages/SearchPage";
 import { ExportsPage } from "./pages/ExportsPage";
-import { BrandMark } from "./components/BrandMark";
+import { WorkspaceNav } from "./components/WorkspaceNav";
 
 export function App() {
   return (
     <>
-      <BrandMark />
+      <WorkspaceNav />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/projects/:projectId" element={<DashboardPage />} />
