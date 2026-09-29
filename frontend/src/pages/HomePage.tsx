@@ -5,10 +5,13 @@ import { login, logout, loadProjects, hasSession } from "../api/auth";
 import { createProject } from "../api/admin";
 import { loadCurrentUser } from "../api/gis";
 
+const demoIdentifier = import.meta.env.VITE_DEMO_IDENTIFIER ?? "viewer.demo.tn@example.invalid";
+const demoPassword = import.meta.env.VITE_DEMO_PASSWORD ?? "";
+
 export function HomePage() {
   const client = useQueryClient();
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const [identifier, setIdentifier] = useState(demoIdentifier);
+  const [password, setPassword] = useState(demoPassword);
   const [sessionVersion, setSessionVersion] = useState(0);
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
