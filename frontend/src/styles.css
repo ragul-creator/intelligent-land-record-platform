@@ -5057,3 +5057,62 @@ body {
     gap: .8rem;
   }
 }
+
+/* Persistent SIH OCR reference evidence */
+.ocr-demo-snapshot {
+  max-width: 1500px;
+  margin: 0 auto 1rem;
+  padding: 1.1rem;
+  border: 1px solid #dfe7ea;
+  border-radius: 24px;
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 18px 45px rgba(29, 50, 60, .07);
+}
+.ocr-demo-copy, .ocr-demo-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ocr-demo-copy h2 { margin: .15rem 0 .35rem; }
+.ocr-demo-copy p:not(.eyebrow) { margin: 0; max-width: 900px; color: #61727a; line-height: 1.55; }
+.ocr-demo-badge {
+  flex: 0 0 auto;
+  padding: .45rem .65rem;
+  border: 1px solid #c9d9de;
+  border-radius: 999px;
+  background: #f4f8f9;
+  color: #3c5964;
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.ocr-demo-preview {
+  display: block;
+  overflow: hidden;
+  margin-top: 1rem;
+  border: 1px solid #dce5e8;
+  border-radius: 18px;
+  background: #eef3f5;
+}
+.ocr-demo-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ocr-demo-footer {
+  margin-top: .7rem;
+  color: #697b83;
+  font-size: .8rem;
+}
+.ocr-demo-footer strong { color: #294d59; }
+.ocr-demo-disclaimer {
+  margin: .7rem 0 0;
+  padding-top: .7rem;
+  border-top: 1px solid #e8edef;
+  color: #6c7e87;
+  font-size: .78rem;
+}
+@media (max-width: 720px) {
+  .ocr-demo-copy, .ocr-demo-footer { flex-direction: column; }
+}

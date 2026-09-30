@@ -87,6 +87,25 @@ export function DocumentsPage() {
 
     {viewerReadOnly && <p className="viewer-visibility-note" role="status">Viewer policy: preliminary document/OCR evidence is visible in read-only mode. Upload, processing, corrections, validation actions, and review changes remain permission-gated.</p>}
 
+    <section className="ocr-demo-snapshot" aria-label="Saved OCR demonstration">
+      <div className="ocr-demo-copy">
+        <div>
+          <p className="eyebrow">Saved demonstration</p>
+          <h2>Land-record OCR · tested result</h2>
+          <p>This is the preserved Bhumi-AI OCR run used during the SIH walkthrough. It shows the document image that was processed together with the OCR, structured-field and validation output produced by that run.</p>
+        </div>
+        <span className="ocr-demo-badge">REFERENCE RESULT</span>
+      </div>
+      <a className="ocr-demo-preview" href="/demo/ocr-land-record-demo.png" target="_blank" rel="noreferrer" aria-label="Open saved OCR demo at full size">
+        <img src="/demo/ocr-land-record-demo.png" alt="Preserved Bhumi-AI OCR demonstration showing the uploaded land-record document and its extracted evidence" />
+      </a>
+      <div className="ocr-demo-footer">
+        <span>Preserved test evidence · 29 Sep 2026</span>
+        <strong>Open image for full-size evidence →</strong>
+      </div>
+      <p className="ocr-demo-disclaimer">Reference/demo evidence only. Extracted values remain preliminary until human verification against the source land record.</p>
+    </section>
+
     {can("document:upload") && <section className="document-upload"><input aria-label="Choose document" type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" onChange={(event) => setFile(event.target.files?.[0])} /><button disabled={!file || upload.isPending} onClick={() => upload.mutate()}>{upload.isPending ? "Uploading…" : "Upload document"}</button>{upload.error && <p role="alert">Upload failed.</p>}</section>}
 
     <section className="documents-grid">
