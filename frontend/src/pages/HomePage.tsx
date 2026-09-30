@@ -5,9 +5,9 @@ import { login, logout, loadProjects, hasSession } from "../api/auth";
 import { createProject } from "../api/admin";
 import { loadCurrentUser } from "../api/gis";
 
-const demoIdentifier = import.meta.env.VITE_DEMO_IDENTIFIER ?? "viewer.demo.tn@example.invalid";
-const demoPassword = import.meta.env.VITE_DEMO_PASSWORD ?? "";
-const demoMode = Boolean(demoPassword);
+const demoIdentifier = "viewer.demo.tn@example.invalid";
+const demoPassword = "BhumiDemo2026Pass";
+const demoMode = true;
 
 export function HomePage() {
   const client = useQueryClient();
