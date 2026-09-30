@@ -7,6 +7,7 @@ import { loadCurrentUser } from "../api/gis";
 
 const demoIdentifier = import.meta.env.VITE_DEMO_IDENTIFIER ?? "viewer.demo.tn@example.invalid";
 const demoPassword = import.meta.env.VITE_DEMO_PASSWORD ?? "";
+const demoMode = Boolean(demoPassword);
 
 export function HomePage() {
   const client = useQueryClient();
@@ -39,9 +40,9 @@ export function HomePage() {
     retry: false,
   });
   const signIn = useMutation({
-    mutationFn: () => login(identifier.trim(), password),
+    mutationFn: () => login(demoMode ? demoIdentifier : identifier.trim(), demoMode ? demoPassword : password),
     onSuccess: async () => {
-      setPassword("");
+      if (!demoMode) setPassword("");
       setSessionVersion((value) => value + 1);
       await client.invalidateQueries();
     },
