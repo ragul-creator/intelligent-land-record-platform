@@ -6,6 +6,11 @@ export default defineConfig({
   server: {
     allowedHosts: [".railway.app", ".railway.internal"],
   },
+  preview: {
+    host: "0.0.0.0",
+    port: 5173,
+    allowedHosts: [".railway.app", ".railway.internal"],
+  },
   test: {
     environment: "jsdom",
     globals: true,
