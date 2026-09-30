@@ -68,7 +68,13 @@ def login(request: LoginRequest, session: Session = Depends(get_db_session)) -> 
             )
         )
     )
-    if user is None or not user.is_active or not verify_password(request.password, user.password_hash):
+    password_matches = bool(user is not None and verify_password(request.password, user.password_hash))
+    if user is None or not user.is_active or not password_matches:
+        print(
+            f"auth.login_failure diagnostic user_found={user is not None} "
+            f"active={bool(user is not None and user.is_active)} password_match={password_matches}",
+            flush=True,
+        )
         record_audit(
             session,
             action="auth.login_failure",
