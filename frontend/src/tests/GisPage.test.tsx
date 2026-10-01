@@ -28,6 +28,55 @@ const topologyIssue = { id: "topology-1", project_id: "project-1", parcel_id: "p
 function installProjectFetch(imageryAssets: unknown[] = []) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.includes("/demo/webgis-demo-result.json")) {
+      const demoParcel = {
+        ...parcel,
+        id: "saved-parcel-1",
+        external_identifier: "P-1001",
+        source: "AI_VISIBLE_BOUNDARY",
+        source_reference: "imagery:saved-vegas:parcel-candidate",
+        current_version: { ...parcel.current_version, id: "saved-version-1", source: "AI_VISIBLE_BOUNDARY", source_reference: "imagery:saved-vegas:parcel-candidate" },
+      };
+      return new Response(JSON.stringify({
+        project_name: "land-parcelling",
+        captured_at: "2026-09-29T14:07:42Z",
+        display_note: "Preserved run",
+        demos: [
+          {
+            id: "vegas-geoai",
+            title: "Vegas building, road & plot demo",
+            filename: "vegas_building_test.tif",
+            preview_url: "/demo/webgis-vegas-preview.png",
+            source_url: "/demo/webgis-vegas-source.tif",
+            imagery_asset_id: "saved-vegas",
+            corners_wgs84: [[-115.2, 36.1], [-115.1, 36.1], [-115.1, 36.0], [-115.2, 36.0]],
+            metadata: { width: 650, height: 650 },
+            summary: { buildings: 29, roads: 9, parcels: 42 },
+            jobs: [],
+            buildings: Array.from({ length: 29 }, (_, index) => ({ id: `saved-building-${index}`, project_id: "project-1", geometry: { type: "Polygon", coordinates: [] }, source: "AI_CANDIDATE", source_reference: "imagery:saved-vegas", confidence: .9, model_version: "building-segmentation-c2-mixed-v5-hardneg", status: "AI_PRELIMINARY", verification_status: "UNVERIFIED", processed_at: null, properties: {} })),
+            roads: Array.from({ length: 9 }, (_, index) => ({ id: `saved-road-${index}`, project_id: "project-1", geometry: { type: "LineString", coordinates: [] }, source: "AI_CANDIDATE", source_reference: "imagery:saved-vegas", confidence: .9, model_version: "sam-road-spacenet-vitb-centerline-v7", status: "AI_PRELIMINARY", verification_status: "UNVERIFIED", processed_at: null, properties: { road_class: "ROAD" } })),
+            parcels: Array.from({ length: 42 }, (_, index) => ({ ...demoParcel, id: `saved-parcel-${index}`, external_identifier: `P-${1001 + index}` })),
+            landUse: [],
+            topology: [],
+          },
+          {
+            id: "tamilnadu-lulc",
+            title: "Tamil Nadu RGB+NIR land-use demo",
+            filename: "lulc.tif",
+            preview_url: "/demo/webgis-lulc-preview.png",
+            source_url: null,
+            imagery_asset_id: "saved-lulc",
+            corners_wgs84: [[80, 10], [81, 10], [81, 9], [80, 9]],
+            metadata: {},
+            summary: { land_use_regions: 9 },
+            jobs: [],
+            buildings: [], roads: [], parcels: [],
+            landUse: Array.from({ length: 9 }, (_, index) => ({ id: `saved-lulc-${index}`, project_id: "project-1", geometry: { type: "MultiPolygon", coordinates: [] }, source: "AI_CANDIDATE", source_reference: "imagery:saved-lulc", confidence: .8, model_version: "segformer-b2-worldcover-2021-tamilnadu-v1", status: "AI_PRELIMINARY", verification_status: "UNVERIFIED", processed_at: null, properties: { land_use_class: "CROPLAND" } })),
+            topology: [],
+          },
+        ],
+      }), { status: 200 });
+    }
     if (url.includes("/users/me")) return new Response(JSON.stringify(currentUser), { status: 200 });
     if (url.includes("/versions")) return new Response(JSON.stringify(page([parcel.current_version])), { status: 200 });
     if (url.includes("/record-parcel-links")) return new Response(JSON.stringify(page([{ id: "link-1", project_id: "project-1", document_id: "doc-1", document_validation_result_id: "validation-1", parcel_id: "parcel-1", parcel_display_identifier: "Draft parcel A", link_status: "CONFIRMED", link_method: "EXACT_SURVEY_IDENTIFIER", confidence: 0.97, rationale: {}, provenance: {}, review_required: false, review_task_id: null, review_reason: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }])), { status: 200 });
@@ -172,6 +221,22 @@ describe("GisPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /select road/i }));
     expect(await screen.findByRole("heading", { name: "ROAD" })).toBeInTheDocument();
     expect(screen.getByText("155.5 m")).toBeInTheDocument();
+  });
+
+  it("opens the preserved WebGIS run with the actual saved output counts", async () => {
+    installProjectFetch();
+    renderPage();
+    await screen.findByRole("heading", { name: /project cadastral viewer/i });
+    expect(screen.getByRole("region", { name: /saved webgis demonstrations/i })).toBeInTheDocument();
+    expect(screen.getByAltText(/Vegas building, road & plot demo source imagery preview/i)).toHaveAttribute("src", "/demo/webgis-vegas-preview.png");
+    fireEvent.click(screen.getAllByRole("button", { name: /open saved map/i })[0]);
+    await waitFor(() => {
+      expect(screen.getByTestId("gis-map")).toHaveAttribute("data-building-count", "29");
+      expect(screen.getByTestId("gis-map")).toHaveAttribute("data-road-count", "9");
+      expect(screen.getByTestId("gis-map")).toHaveAttribute("data-parcel-count", "42");
+    });
+    expect(screen.getByText(/preserved SIH walkthrough evidence/i)).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /imagery and geoai controls/i })).not.toBeInTheDocument();
   });
 
   it("persists layer visibility per project", async () => {
