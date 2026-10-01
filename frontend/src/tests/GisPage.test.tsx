@@ -263,10 +263,24 @@ describe("GisPage", () => {
     expect(await screen.findByText(/last synced/i)).toBeInTheDocument();
   });
 
-  it("shows a clear unauthorized state", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { message: "Forbidden" } }), { status: 403 })));
+  it("falls back to the preserved WebGIS demo when the live API is unavailable", async () => {
+    installProjectFetch();
+    const demoFetch = vi.mocked(fetch);
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/demo/webgis-demo-result.json")) return demoFetch(input, init);
+      return new Response(JSON.stringify({ error: { message: "Forbidden" } }), { status: 403 });
+    }));
+
     renderPage();
-    expect(await screen.findByText(/do not have permission/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gis-map")).toHaveAttribute("data-building-count", "29");
+      expect(screen.getByTestId("gis-map")).toHaveAttribute("data-road-count", "9");
+      expect(screen.getByTestId("gis-map")).toHaveAttribute("data-parcel-count", "42");
+    });
+    expect(screen.getByText(/preserved SIH walkthrough evidence/i)).toBeInTheDocument();
+    expect(screen.queryByText(/map unavailable/i)).not.toBeInTheDocument();
   });
 
   it("handles an empty project safely", async () => {

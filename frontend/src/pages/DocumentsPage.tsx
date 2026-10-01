@@ -24,7 +24,7 @@ export function DocumentsPage() {
   const { projectId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useQueryClient();
-  const [selected, setSelected] = useState<string | undefined>(() => searchParams.get("documentId") ?? undefined);
+  const [selected, setSelected] = useState<string | undefined>(() => searchParams.get("documentId") ?? SAVED_OCR_DEMO_ID);
   const [file, setFile] = useState<File>();
   const [resolutionReason, setResolutionReason] = useState("");
 

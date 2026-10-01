@@ -305,10 +305,11 @@ export function ReviewPage() {
   const savedReview = useQuery({
     queryKey: ["saved-ocr-review-demo"],
     queryFn: loadSavedOcrReviewDemo,
-    enabled: Boolean(projectId && currentUser.data && canRead && workspaceMode === "DOCUMENT"),
+    enabled: Boolean(projectId && workspaceMode === "DOCUMENT"),
     retry: false,
     staleTime: Infinity,
   });
+  const demoOnlyAccess = Boolean(!canRead && savedReview.data && workspaceMode === "DOCUMENT");
   const liveHasSavedReview = Boolean(
     savedReview.data && reviewTasks.data?.items.some((task) => task.id === savedReview.data?.id),
   );
@@ -318,7 +319,10 @@ export function ReviewPage() {
     && (taskStatus === "ALL" || savedReview.data.status === taskStatus)
     && (severity === "ALL" || savedReview.data.severity === severity),
   );
-  const showSavedReview = workspaceMode === "DOCUMENT" && savedReviewMatchesFilters && !liveHasSavedReview;
+  const showSavedReview = workspaceMode === "DOCUMENT"
+    && savedReviewMatchesFilters
+    && (!canRead || reviewTasks.isFetched)
+    && !liveHasSavedReview;
   const reviewDataWithSavedDemo = useMemo(() => {
     if (!showSavedReview || !savedReview.data) return reviewTasks.data;
     const livePage = reviewTasks.data?.page ?? { limit: 100, offset: 0, total: 0 };
@@ -331,10 +335,14 @@ export function ReviewPage() {
   const activeData = workspaceMode === "VALIDATION" ? validationIssues.data : reviewDataWithSavedDemo;
   const activeLoading = workspaceMode === "VALIDATION"
     ? validationIssues.isLoading
-    : reviewTasks.isLoading || (workspaceMode === "DOCUMENT" && savedReview.isLoading);
+    : demoOnlyAccess
+      ? savedReview.isLoading
+      : reviewTasks.isLoading || (workspaceMode === "DOCUMENT" && savedReview.isLoading);
   const activeFetching = workspaceMode === "VALIDATION"
     ? validationIssues.isFetching
-    : reviewTasks.isFetching || (workspaceMode === "DOCUMENT" && savedReview.isFetching);
+    : demoOnlyAccess
+      ? savedReview.isFetching
+      : reviewTasks.isFetching || (workspaceMode === "DOCUMENT" && savedReview.isFetching);
   const activeError = (workspaceMode === "VALIDATION" ? validationIssues.error : reviewTasks.error) as ReviewApiError | null;
 
   useEffect(() => {
@@ -397,16 +405,16 @@ export function ReviewPage() {
 
   if (!projectId) return <main className="review-state"><h1>Review workspace unavailable</h1></main>;
 
-  if (currentUser.isLoading) {
-    return <main className="review-state"><p className="eyebrow">Human verification · H.2B.3</p><h1>Loading reviewer access…</h1></main>;
+  if (!canRead && !savedReview.data && (currentUser.isLoading || savedReview.isLoading)) {
+    return <main className="review-state"><p className="eyebrow">Human verification · H.2B.3</p><h1>Loading preserved review evidence…</h1></main>;
   }
 
-  if (currentUser.isError || !canRead) {
+  if ((currentUser.isError || !canRead) && !savedReview.data) {
     return (
       <main className="review-state">
         <p className="eyebrow">Human verification · H.2B.3</p>
         <h1>Review workspace unavailable</h1>
-        <p>You need project membership and the <code>review:read</code> permission to open this workspace.</p>
+        <p>The live review service is unavailable and the preserved SIH review evidence could not be loaded.</p>
         <Link to="/">Return to platform</Link>
       </main>
     );
@@ -435,7 +443,9 @@ export function ReviewPage() {
   };
 
   const refreshActive = () => {
-    if (workspaceMode === "VALIDATION") {
+    if (demoOnlyAccess && workspaceMode === "DOCUMENT") {
+      savedReview.refetch();
+    } else if (workspaceMode === "VALIDATION") {
       validationIssues.refetch();
     } else {
       reviewTasks.refetch();
@@ -473,6 +483,13 @@ export function ReviewPage() {
         </nav>
       </header>
 
+      {demoOnlyAccess && (
+        <div className="review-warning" role="status">
+          <strong>Saved SIH review demo</strong>
+          <p>The live backend reviewer session is unavailable on this deployment, so the preserved tested OCR review is shown here as read-only evidence.</p>
+        </div>
+      )}
+
       <section className="review-toolbar" aria-label="Review filters">
         <div className="review-tabs" role="tablist" aria-label="Review queue">
           {([
@@ -486,6 +503,7 @@ export function ReviewPage() {
               role="tab"
               aria-selected={workspaceMode === value}
               className={workspaceMode === value ? "active" : ""}
+              disabled={demoOnlyAccess && value !== "DOCUMENT"}
               onClick={() => setWorkspaceMode(value)}
             >
               {label}
@@ -512,7 +530,7 @@ export function ReviewPage() {
             <option value="AREA_MISMATCH">Area mismatch</option>
           </select>
         </label>}
-        <label className="review-checkbox"><input type="checkbox" checked={assignedToMe} onChange={(event) => setAssignedToMe(event.target.checked)} /> Assigned to me</label>
+        <label className="review-checkbox"><input type="checkbox" checked={assignedToMe} disabled={demoOnlyAccess} onChange={(event) => setAssignedToMe(event.target.checked)} /> Assigned to me</label>
         {workspaceMode === "VALIDATION" && canRunValidation && (
           <button
             type="button"

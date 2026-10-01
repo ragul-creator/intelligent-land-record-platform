@@ -320,11 +320,14 @@ describe("ReviewPage", () => {
     expect(screen.queryByRole("button", { name: /apply comment/i })).not.toBeInTheDocument();
   });
 
-  it("denies the workspace when review:read cannot be verified", async () => {
+  it("falls back to the preserved read-only OCR review when review:read cannot be verified", async () => {
     installFetch({ ...currentUser, permissions: ["project:read"] });
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: /review workspace unavailable/i })).toBeInTheDocument();
-    expect(screen.getByText(/review:read/i)).toBeInTheDocument();
+    expect(await screen.findByText("Saved SIH review demo")).toBeInTheDocument();
+    expect(await screen.findByText("Preserved OCR demo review")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /gis review/i })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: /validation issues/i })).toBeDisabled();
+    expect(screen.queryByRole("heading", { name: /review workspace unavailable/i })).not.toBeInTheDocument();
   });
 });
