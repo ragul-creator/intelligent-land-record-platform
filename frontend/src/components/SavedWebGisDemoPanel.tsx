@@ -93,7 +93,11 @@ export function SavedWebGisDemoPanel({
                   disabled={active && loading}
                   onClick={() => onSelect(card.id)}
                 >
-                  {active && loading ? "Loading saved run…" : active ? "Reload saved map" : "Open saved map"}
+                  {active && loading
+                    ? `Loading saved run — ${card.title}`
+                    : active
+                      ? `Reload saved map — ${card.title}`
+                      : `Open ${card.title} — Open saved map`}
                 </button>
                 {active && error && (
                   <p className="error-copy" role="alert">
@@ -108,8 +112,9 @@ export function SavedWebGisDemoPanel({
 
       {activeId && (
         <p className="demo-fixture-note">
-          Preserved SIH walkthrough evidence from the actual tested run. Preliminary — survey/FMB verification required.
-          Building footprints and AI plot candidates are review evidence, not statutory property boundaries.
+          Preserved SIH walkthrough evidence uses the exact persisted GeoAI run and its source imagery preview.
+          Preliminary — survey/FMB verification required. Building footprints and AI plot candidates are review evidence,
+          not statutory property boundaries.
         </p>
       )}
     </section>

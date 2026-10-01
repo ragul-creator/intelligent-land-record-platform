@@ -229,7 +229,7 @@ describe("GisPage", () => {
     await screen.findByRole("heading", { name: /project cadastral viewer/i });
     expect(screen.getByRole("region", { name: /saved webgis demonstrations/i })).toBeInTheDocument();
     expect(screen.getByAltText(/Vegas building, road & plot demo source imagery preview/i)).toHaveAttribute("src", "/demo/webgis-vegas-preview.png");
-    fireEvent.click(screen.getAllByRole("button", { name: /open saved map/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /open.*vegas building, road & plot demo/i }));
     await waitFor(() => {
       expect(screen.getByTestId("gis-map")).toHaveAttribute("data-building-count", "29");
       expect(screen.getByTestId("gis-map")).toHaveAttribute("data-road-count", "9");
