@@ -102,6 +102,10 @@ export function DocumentsPage() {
 
   if (!projectId) return <main className="app-shell"><h1>Documents route unavailable</h1></main>;
 
+  const visibleDocuments = (documents.data?.items ?? []).filter(
+    (item) => item.filename !== "tn_demo_review_record.pdf" && item.filename !== "tn_demo_validated_record.pdf",
+  );
+
   return <main className="documents-shell">
     <header className="documents-header">
       <div><p className="eyebrow">SIH18 · Document AI</p><h1>Project documents</h1><p>OCR and extracted fields are preliminary evidence, not verified land records.</p></div>
@@ -114,12 +118,12 @@ export function DocumentsPage() {
 
     <section className="documents-grid">
       <aside className="document-index">
-        <div className="document-index-heading"><h2>Documents</h2><span>{(documents.data?.items.length ?? 0) + 1}</span></div>
+        <div className="document-index-heading"><h2>Documents</h2><span>{visibleDocuments.length + 1}</span></div>
         <button className="document-row saved-demo-row" aria-pressed={savedDemoSelected} onClick={() => chooseDocument(SAVED_OCR_DEMO_ID)}>
           <strong>Land record OCR · saved demo</strong>
           <span>Validated · 84.25% · actual source</span>
         </button>
-        {documents.data?.items.map((item) => <button key={item.id} className="document-row" aria-pressed={selected === item.id} onClick={() => chooseDocument(item.id)}><strong>{item.filename}</strong><span>{item.status}</span></button>)}
+        {visibleDocuments.map((item) => <button key={item.id} className="document-row" aria-pressed={selected === item.id} onClick={() => chooseDocument(item.id)}><strong>{item.filename}</strong><span>{item.status}</span></button>)}
       </aside>
       <section className="document-detail">
         {!selected && <div className="document-empty-state"><span aria-hidden="true" /><h2>Select a document</h2><p>Choose an item from the list to inspect OCR evidence, structured fields, confidence, provenance, and parcel associations.</p></div>}
