@@ -6,10 +6,17 @@ import { DocumentsPage } from "../pages/DocumentsPage";
 
 const user = { id: "user", permissions: ["document:read", "document:upload", "document:process", "field:read", "field:correct", "record:read", "validation:run", "validation:resolve"], project_memberships: [{ project_id: "project", role: "OFFICER" }] };
 const link = { id: "link-1", project_id: "project", document_id: "doc", document_validation_result_id: "validation-1", parcel_id: "parcel-1", parcel_display_identifier: "123/4", link_status: "REVIEW_REQUIRED", link_method: "EXACT_SURVEY_IDENTIFIER", confidence: 0.88, rationale: {}, provenance: {}, review_required: true, review_task_id: "review-1", review_reason: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" };
+const savedDemo = {
+  document: { id: "saved-demo", project_id: "saved-project", filename: "e349e794-a12a-4386-9985-92436f5dc446.png", content_type: "image/png", size_bytes: 3197873, status: "VALIDATED", uploaded_at: "2026-09-29T13:28:55Z", updated_at: "2026-09-29T13:29:04Z", source_url: "/demo/ocr-land-record-source.png" },
+  ocr: { id: "saved-ocr", version: 1, confidence: 0.745, requested_languages: ["tam", "eng"], project_tested_languages: ["tam", "eng"], engine: "tesseract", engine_version: "5.5.0", model_version: null, page_count: 1, processed_at: "2026-09-29T13:29:04Z", payload: { pages: [{ page_number: 1, text: "All that place and parcel of land consisting in Survey No. 123/4B", confidence: 0.745, width: 1024, height: 1536, requested_languages: ["tam", "eng"], project_tested_languages: ["tam", "eng"], preprocessing: { operations: ["upscale"], deskew_angle_degrees: 0 }, regions: [], engine: "tesseract", engine_version: "5.5.0", model_version: null, processed_at: "2026-09-29T13:29:04Z" }] } },
+  fields: [{ id: "saved-field", field_name: "survey_number", original_value: "123/4B", normalized_value: "123/4B", confidence: 0.94, page_number: 1, bounding_box: null, source_id: "saved-demo", model_version: null, extractor_version: "land-record-rule-extractor-f2-v4", processed_at: "2026-09-29T13:29:04Z" }],
+  validation: { id: "saved-validation", version: 1, status: "VALID", report: { issues: [] }, confidence_summary: { value: 0.8425, band: "HIGH", fields: [] }, processed_at: "2026-09-29T13:29:04Z" },
+};
 
 function installFetch(readOnly = false, withEvidence = false) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith("/demo/ocr-land-record-result.json")) return new Response(JSON.stringify(savedDemo), { headers: { "Content-Type": "application/json" } });
     if (url.includes("/users/me")) return new Response(JSON.stringify(readOnly ? { ...user, permissions: ["document:read", "field:read", "record:read"] } : user));
     if (url.endsWith("/documents")) return new Response(JSON.stringify({ items: [{ id: "doc", project_id: "project", filename: "record.pdf", content_type: "application/pdf", size_bytes: 1, status: "REVIEW_REQUIRED", latest_processing_job_id: null, uploaded_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }] }));
     if (url.endsWith("/documents/doc")) return new Response(JSON.stringify({
@@ -91,6 +98,17 @@ describe("DocumentsPage", () => {
     expect(await screen.findByText("record.pdf")).toBeInTheDocument();
     expect(screen.getByText("REVIEW_REQUIRED")).toBeInTheDocument();
     expect(screen.getByText(/preliminary evidence/i)).toBeInTheDocument();
+  });
+
+  it("opens the saved OCR demo as an actual document with its preserved extraction", async () => {
+    installFetch(); renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /land record ocr · saved demo/i }));
+    const source = await screen.findByRole("img", { name: /source document/i });
+    expect(source).toHaveAttribute("src", "/demo/ocr-land-record-source.png");
+    expect(screen.getByText(/Survey No\. 123\/4B/)).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "Survey number" })).toBeInTheDocument();
+    expect(screen.getByText("84.25% validation confidence")).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([request]) => String(request).includes("/documents/saved-ocr-land-record-demo"))).toBe(false);
   });
 
   it("hides upload controls for read-only users", async () => {

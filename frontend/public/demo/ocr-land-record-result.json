@@ -1,0 +1,4319 @@
+{
+    "ocr": {
+        "id": "bf602043-7077-4600-ac6f-aef8628cb2d6",
+        "engine": "tesseract",
+        "payload": {
+            "pages": [
+                {
+                    "text": "(S35\n\nMOG,\n\n4\n\nÓ«»Ó»ìÔÇî\n\nTÔäó\n\nAN\n\nSO\n\nRee\n\n(FIVE 4\n\n>\n\n<i\n\nssi\n\n&\n\n#%\n\n┬Ñ\n\neR\n\nÓ««\n\ny\n\n+\n\nÓ«ç?\n\n#\n\noe\n\n┬º\n\n1:22.\n\n2.22\n\nmAh\n\nBS\n\n%\n\nTA,\n\nrad\n\nÓ«│Ó»ìÔÇî\n\n5\n\na\n\n0ÔÇØ\n\nS\n\nÓ«¬Ó»ìÔÇî\n\nai\n\n38\n\nÓ«ƒÓ»ìÔÇî\n\nram\n\nYD)\n\nLeon cont\n\nWa\n\nÓ«ÁÓ»ü\n\n%\n\nite.\n\n=\"\n\n>)\n\nÓ«ç?\n\n4p\n\nÓ»ìÔÇî\n\nÓ«ÁÓ«┐\n\n┬Ñ\n\nH\n\naA\n\npr\n\n> Ca\n\nÓ«©Ó»ü\n\n4): Ó«à\n\n.*..Ó»«:Ó»«.*Ó»«:Ó»«-Ó»«-Ó»«.Ó»½.\n\nÔÇö_____ 4\n\nÓ«ÜÓ«┐Ó«¬Ó«┐?\n\nSe 28 82 6\n\nPY STAMP\n\n28\n\n44\n\nPts\n\n| 2Ó»ª Ó»ìÔÇî\n\nÓ«ƒÓ«¥Ó«░Ó»ìÔÇî\n\naan ea\n\nIT\n\nAE. ee\n\nÓ«â\n\n.\n\nINDIA NON JUDICIAL\n\nARN\n\nGovernment of Tamil Nadu\n\nRS. 100\n\nONE HUNDRED RUPEES\n\nB.Sc, BLL,\n\n| *\n\nADVOCATE & NOTARY | *\n\nwae at\n\ne-Stamp\n\nReg. No. 12348/2022\n\n>}\n\nÔé╣ 100\n\nÓ«ƒÓ»ü)\n\nOF\n\nCertificate No.\n\nIN-TN12345678901234V\n\nLAND DEED\n\nÔÇö\n\nTa\n\nCertificate Issued Date\n\n20-May-2025 11:23 AM\n\nAccount Reference\n\nNONACC (SV) tn123456/ COMBATORE/TN-CBE.\n\nThis Deed of Sale is made on this 204 day of May 2025\n\nSUBIN-TNTN12345678901234V\n\nUnique Doc. Reference\n\nBETWEEN\n\nPurchased by\n\nRAMESH K\n\nDescription of Document\n\nArticle 4 Affidavit\n\n1. RAMESH K\n\nAFFIDAVIT\n\nS/o. Krishnan,\n\nDescription\n\n0\n\nNo. 12, Lakshmi Nagar,\n\nyg\n\na.\n\nConsideration Price a\n\n(Zero).\n\nbesa\n\nCoimbatore - 641 035.\n\nc+┬╗ (SELLER) ..\n\nFirst Party\n\nRAMESH K\n\nSURESH KUMAR\n\nAND\n\nSecond Party\n\nStamp Duty Paid By\n\nRAMESH K\n\n2. SURESH KUMAR\n\nStamp Duty Amount(Rs.)\n\n100\n\nS/o. Subramani,\n\n(One Hundred only)\n\nNo. 45, Gandhi Street,\n\nCoimbatore - 641 001.\n\n.-. (BUYER)\n\nSCHEDULE OF THE PROPERTY\n\nAll that place and parcel of land consisting in Survey No. 123/4B,\n\nDECLARATION\n\nsituated at Kovilpalayam Village, Sulur Taluk, Coimbatore District,\n\nThe Seller hereby declares that the above schedule property is his\n\nTamil Nadu, and bounded as follows:\n\nabsolute property and free from all encumbrances and he has\n\nNorth\n\nProperty of Ravi\n\nabsolute right to sell the same.\n\n20 feet Road\n\n.\n\nSouth\n\nEast\n\nProperty of Murugan\n\nWest\n\nProperty of Sekar\n\nTotal Extent : 2400 Sq.ft (Two Thousand Four Hundred Sq.ft Only)\n\n+\n\nNOTARY SIGNATURE\n\nSELLER\n\nWITNESS\n\nBUYER\n\nÓ«ƒ Ó«ƒÓ«®Ó»ìÔÇî\n\nRamer\n\n20 MAY 2025\n\nSupho\n\nÓ««Ó»ìÔÇî\n\n}\n\nÓ«ñÓ«┐\n\nÓ«Ä",
+                    "width": 1400,
+                    "engine": "tesseract",
+                    "height": 2100,
+                    "regions": [
+                        {
+                            "kind": "word",
+                            "text": "(S35",
+                            "confidence": 0.56,
+                            "bounding_box": {
+                                "top": 9,
+                                "left": 645,
+                                "width": 37,
+                                "height": 21
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "MOG,",
+                            "confidence": 0.31,
+                            "bounding_box": {
+                                "top": 17,
+                                "left": 742,
+                                "width": 44,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "4",
+                            "confidence": 0.25,
+                            "bounding_box": {
+                                "top": 18,
+                                "left": 994,
+                                "width": 19,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«»Ó»ìÔÇî",
+                            "confidence": 0.4,
+                            "bounding_box": {
+                                "top": 26,
+                                "left": 1041,
+                                "width": 17,
+                                "height": 8
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "TÔäó",
+                            "confidence": 0.48,
+                            "bounding_box": {
+                                "top": 3,
+                                "left": 1057,
+                                "width": 36,
+                                "height": 11
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "AN",
+                            "confidence": 0.18,
+                            "bounding_box": {
+                                "top": 12,
+                                "left": 1195,
+                                "width": 62,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "SO",
+                            "confidence": 0.48,
+                            "bounding_box": {
+                                "top": 21,
+                                "left": 1252,
+                                "width": 80,
+                                "height": 11
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ree",
+                            "confidence": 0.71,
+                            "bounding_box": {
+                                "top": 44,
+                                "left": 670,
+                                "width": 59,
+                                "height": 16
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "(FIVE",
+                            "confidence": 0.53,
+                            "bounding_box": {
+                                "top": 6,
+                                "left": 230,
+                                "width": 362,
+                                "height": 74
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "4",
+                            "confidence": 0.53,
+                            "bounding_box": {
+                                "top": 2,
+                                "left": 549,
+                                "width": 43,
+                                "height": 102
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ">",
+                            "confidence": 0.71,
+                            "bounding_box": {
+                                "top": 18,
+                                "left": 573,
+                                "width": 68,
+                                "height": 45
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "<i",
+                            "confidence": 0.36,
+                            "bounding_box": {
+                                "top": 20,
+                                "left": 784,
+                                "width": 50,
+                                "height": 54
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ssi",
+                            "confidence": 0.12,
+                            "bounding_box": {
+                                "top": 90,
+                                "left": 57,
+                                "width": 22,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "&",
+                            "confidence": 0.21,
+                            "bounding_box": {
+                                "top": 82,
+                                "left": 129,
+                                "width": 13,
+                                "height": 14
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "#%",
+                            "confidence": 0.77,
+                            "bounding_box": {
+                                "top": 57,
+                                "left": 1214,
+                                "width": 57,
+                                "height": 34
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "┬Ñ",
+                            "confidence": 0.49,
+                            "bounding_box": {
+                                "top": 113,
+                                "left": 421,
+                                "width": 13,
+                                "height": 16
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "eR",
+                            "confidence": 0.45,
+                            "bounding_box": {
+                                "top": 95,
+                                "left": 422,
+                                "width": 35,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó««",
+                            "confidence": 0.05,
+                            "bounding_box": {
+                                "top": 91,
+                                "left": 489,
+                                "width": 16,
+                                "height": 21
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "y",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 74,
+                                "left": 569,
+                                "width": 44,
+                                "height": 50
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "+",
+                            "confidence": 0.34,
+                            "bounding_box": {
+                                "top": 106,
+                                "left": 934,
+                                "width": 14,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ç?",
+                            "confidence": 0.29,
+                            "bounding_box": {
+                                "top": 107,
+                                "left": 983,
+                                "width": 35,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "#",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 113,
+                                "left": 492,
+                                "width": 14,
+                                "height": 26
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "oe",
+                            "confidence": 0.29,
+                            "bounding_box": {
+                                "top": 133,
+                                "left": 876,
+                                "width": 16,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "┬º",
+                            "confidence": 0.59,
+                            "bounding_box": {
+                                "top": 130,
+                                "left": 912,
+                                "width": 11,
+                                "height": 14
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "1:22.",
+                            "confidence": 0.46,
+                            "bounding_box": {
+                                "top": 114,
+                                "left": 1171,
+                                "width": 35,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "2.22",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 131,
+                                "left": 1173,
+                                "width": 96,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "mAh",
+                            "confidence": 0.24,
+                            "bounding_box": {
+                                "top": 145,
+                                "left": 474,
+                                "width": 29,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "BS",
+                            "confidence": 0.63,
+                            "bounding_box": {
+                                "top": 153,
+                                "left": 881,
+                                "width": 16,
+                                "height": 32
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "%",
+                            "confidence": 0.75,
+                            "bounding_box": {
+                                "top": 169,
+                                "left": 961,
+                                "width": 11,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "TA,",
+                            "confidence": 0.6,
+                            "bounding_box": {
+                                "top": 186,
+                                "left": 303,
+                                "width": 70,
+                                "height": 29
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "rad",
+                            "confidence": 0.14,
+                            "bounding_box": {
+                                "top": 186,
+                                "left": 841,
+                                "width": 55,
+                                "height": 28
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«│Ó»ìÔÇî",
+                            "confidence": 0.06,
+                            "bounding_box": {
+                                "top": 149,
+                                "left": 1310,
+                                "width": 31,
+                                "height": 91
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "5",
+                            "confidence": 0.42,
+                            "bounding_box": {
+                                "top": 227,
+                                "left": 881,
+                                "width": 10,
+                                "height": 12
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "a",
+                            "confidence": 0.27,
+                            "bounding_box": {
+                                "top": 214,
+                                "left": 1086,
+                                "width": 65,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "0ÔÇØ",
+                            "confidence": 0.32,
+                            "bounding_box": {
+                                "top": 259,
+                                "left": 1295,
+                                "width": 31,
+                                "height": 16
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "S",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 215,
+                                "left": 225,
+                                "width": 34,
+                                "height": 69
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«¬Ó»ìÔÇî",
+                            "confidence": 0.18,
+                            "bounding_box": {
+                                "top": 223,
+                                "left": 1313,
+                                "width": 34,
+                                "height": 70
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ai",
+                            "confidence": 0.42,
+                            "bounding_box": {
+                                "top": 264,
+                                "left": 537,
+                                "width": 33,
+                                "height": 52
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "38",
+                            "confidence": 0.5,
+                            "bounding_box": {
+                                "top": 279,
+                                "left": 643,
+                                "width": 31,
+                                "height": 12
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ƒÓ»ìÔÇî",
+                            "confidence": 0.43,
+                            "bounding_box": {
+                                "top": 255,
+                                "left": 50,
+                                "width": 41,
+                                "height": 76
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ram",
+                            "confidence": 0.28,
+                            "bounding_box": {
+                                "top": 335,
+                                "left": 619,
+                                "width": 30,
+                                "height": 7
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "YD)",
+                            "confidence": 0.66,
+                            "bounding_box": {
+                                "top": 318,
+                                "left": 895,
+                                "width": 24,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Leon",
+                            "confidence": 0.41,
+                            "bounding_box": {
+                                "top": 295,
+                                "left": 1046,
+                                "width": 47,
+                                "height": 36
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "cont",
+                            "confidence": 0.44,
+                            "bounding_box": {
+                                "top": 295,
+                                "left": 1105,
+                                "width": 51,
+                                "height": 36
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Wa",
+                            "confidence": 0.63,
+                            "bounding_box": {
+                                "top": 348,
+                                "left": 51,
+                                "width": 24,
+                                "height": 10
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ÁÓ»ü",
+                            "confidence": 0.3,
+                            "bounding_box": {
+                                "top": 348,
+                                "left": 135,
+                                "width": 45,
+                                "height": 11
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "%",
+                            "confidence": 0.36,
+                            "bounding_box": {
+                                "top": 321,
+                                "left": 565,
+                                "width": 27,
+                                "height": 34
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ite.",
+                            "confidence": 0.61,
+                            "bounding_box": {
+                                "top": 340,
+                                "left": 767,
+                                "width": 23,
+                                "height": 11
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "=\"",
+                            "confidence": 0.58,
+                            "bounding_box": {
+                                "top": 378,
+                                "left": 652,
+                                "width": 22,
+                                "height": 7
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ">)",
+                            "confidence": 0.17,
+                            "bounding_box": {
+                                "top": 334,
+                                "left": 898,
+                                "width": 49,
+                                "height": 46
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ç?",
+                            "confidence": 0.49,
+                            "bounding_box": {
+                                "top": 385,
+                                "left": 1131,
+                                "width": 23,
+                                "height": 7
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "4p",
+                            "confidence": 0.76,
+                            "bounding_box": {
+                                "top": 373,
+                                "left": 1219,
+                                "width": 24,
+                                "height": 9
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó»ìÔÇî",
+                            "confidence": 0.39,
+                            "bounding_box": {
+                                "top": 303,
+                                "left": 1370,
+                                "width": 16,
+                                "height": 71
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ÁÓ«┐",
+                            "confidence": 0.32,
+                            "bounding_box": {
+                                "top": 398,
+                                "left": 829,
+                                "width": 55,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "┬Ñ",
+                            "confidence": 0.29,
+                            "bounding_box": {
+                                "top": 393,
+                                "left": 1033,
+                                "width": 9,
+                                "height": 16
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "H",
+                            "confidence": 0.01,
+                            "bounding_box": {
+                                "top": 410,
+                                "left": 1033,
+                                "width": 11,
+                                "height": 9
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "aA",
+                            "confidence": 0.14,
+                            "bounding_box": {
+                                "top": 405,
+                                "left": 1083,
+                                "width": 24,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "pr",
+                            "confidence": 0.22,
+                            "bounding_box": {
+                                "top": 389,
+                                "left": 1352,
+                                "width": 25,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ">",
+                            "confidence": 0.77,
+                            "bounding_box": {
+                                "top": 413,
+                                "left": 458,
+                                "width": 11,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ca",
+                            "confidence": 0.26,
+                            "bounding_box": {
+                                "top": 417,
+                                "left": 462,
+                                "width": 219,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«©Ó»ü",
+                            "confidence": 0.57,
+                            "bounding_box": {
+                                "top": 391,
+                                "left": 797,
+                                "width": 28,
+                                "height": 30
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "4):",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 416,
+                                "left": 1195,
+                                "width": 4,
+                                "height": 8
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«à",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 417,
+                                "left": 1217,
+                                "width": 7,
+                                "height": 10
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ".*..Ó»«:Ó»«.*Ó»«:Ó»«-Ó»«-Ó»«.Ó»½.",
+                            "confidence": 0.03,
+                            "bounding_box": {
+                                "top": 437,
+                                "left": 254,
+                                "width": 149,
+                                "height": 11
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ÔÇö_____",
+                            "confidence": 0.03,
+                            "bounding_box": {
+                                "top": 422,
+                                "left": 716,
+                                "width": 198,
+                                "height": 39
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "4",
+                            "confidence": 0.86,
+                            "bounding_box": {
+                                "top": 442,
+                                "left": 949,
+                                "width": 8,
+                                "height": 9
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ÜÓ«┐Ó«¬Ó«┐?",
+                            "confidence": 0.81,
+                            "bounding_box": {
+                                "top": 451,
+                                "left": 77,
+                                "width": 76,
+                                "height": 34
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Se",
+                            "confidence": 0.21,
+                            "bounding_box": {
+                                "top": 459,
+                                "left": 222,
+                                "width": 59,
+                                "height": 34
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "28",
+                            "confidence": 0.41,
+                            "bounding_box": {
+                                "top": 427,
+                                "left": 299,
+                                "width": 50,
+                                "height": 98
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "82",
+                            "confidence": 0.5,
+                            "bounding_box": {
+                                "top": 427,
+                                "left": 373,
+                                "width": 41,
+                                "height": 98
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "6",
+                            "confidence": 0.67,
+                            "bounding_box": {
+                                "top": 460,
+                                "left": 441,
+                                "width": 29,
+                                "height": 42
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "PY",
+                            "confidence": 0.89,
+                            "bounding_box": {
+                                "top": 458,
+                                "left": 606,
+                                "width": 70,
+                                "height": 38
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "STAMP",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 453,
+                                "left": 697,
+                                "width": 207,
+                                "height": 47
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "28",
+                            "confidence": 0.7,
+                            "bounding_box": {
+                                "top": 465,
+                                "left": 1031,
+                                "width": 69,
+                                "height": 49
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "44",
+                            "confidence": 0.67,
+                            "bounding_box": {
+                                "top": 476,
+                                "left": 1283,
+                                "width": 53,
+                                "height": 35
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Pts",
+                            "confidence": 0.26,
+                            "bounding_box": {
+                                "top": 516,
+                                "left": 64,
+                                "width": 90,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "|",
+                            "confidence": 0.88,
+                            "bounding_box": {
+                                "top": 440,
+                                "left": 472,
+                                "width": 20,
+                                "height": 63
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "2Ó»ª",
+                            "confidence": 0.76,
+                            "bounding_box": {
+                                "top": 436,
+                                "left": 539,
+                                "width": 62,
+                                "height": 71
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó»ìÔÇî",
+                            "confidence": 0.6,
+                            "bounding_box": {
+                                "top": 450,
+                                "left": 708,
+                                "width": 4,
+                                "height": 8
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ƒÓ«¥Ó«░Ó»ìÔÇî",
+                            "confidence": 0.38,
+                            "bounding_box": {
+                                "top": 511,
+                                "left": 483,
+                                "width": 76,
+                                "height": 15
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "aan",
+                            "confidence": 0.51,
+                            "bounding_box": {
+                                "top": 501,
+                                "left": 845,
+                                "width": 15,
+                                "height": 28
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ea",
+                            "confidence": 0.17,
+                            "bounding_box": {
+                                "top": 512,
+                                "left": 864,
+                                "width": 45,
+                                "height": 12
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "IT",
+                            "confidence": 0.59,
+                            "bounding_box": {
+                                "top": 535,
+                                "left": 969,
+                                "width": 120,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "AE.",
+                            "confidence": 0.63,
+                            "bounding_box": {
+                                "top": 511,
+                                "left": 1149,
+                                "width": 51,
+                                "height": 44
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ee",
+                            "confidence": 0.41,
+                            "bounding_box": {
+                                "top": 518,
+                                "left": 1241,
+                                "width": 78,
+                                "height": 29
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«â",
+                            "confidence": 0.3,
+                            "bounding_box": {
+                                "top": 506,
+                                "left": 1356,
+                                "width": 25,
+                                "height": 46
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ".",
+                            "confidence": 0.17,
+                            "bounding_box": {
+                                "top": 625,
+                                "left": 775,
+                                "width": 6,
+                                "height": 4
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "INDIA",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 619,
+                                "left": 336,
+                                "width": 108,
+                                "height": 31
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "NON",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 620,
+                                "left": 455,
+                                "width": 80,
+                                "height": 31
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "JUDICIAL",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 621,
+                                "left": 545,
+                                "width": 168,
+                                "height": 34
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ARN",
+                            "confidence": 0.02,
+                            "bounding_box": {
+                                "top": 615,
+                                "left": 1286,
+                                "width": 71,
+                                "height": 35
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Government",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 676,
+                                "left": 355,
+                                "width": 156,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 677,
+                                "left": 520,
+                                "width": 26,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Tamil",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 677,
+                                "left": 552,
+                                "width": 69,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Nadu",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 678,
+                                "left": 631,
+                                "width": 63,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "RS.",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 667,
+                                "left": 911,
+                                "width": 43,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "100",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 667,
+                                "left": 964,
+                                "width": 39,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ONE",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 709,
+                                "left": 843,
+                                "width": 46,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "HUNDRED",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 709,
+                                "left": 895,
+                                "width": 109,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "RUPEES",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 708,
+                                "left": 1011,
+                                "width": 80,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "B.Sc,",
+                            "confidence": 0.64,
+                            "bounding_box": {
+                                "top": 698,
+                                "left": 1247,
+                                "width": 35,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "BLL,",
+                            "confidence": 0.65,
+                            "bounding_box": {
+                                "top": 698,
+                                "left": 1287,
+                                "width": 24,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "|",
+                            "confidence": 0.89,
+                            "bounding_box": {
+                                "top": 716,
+                                "left": 1167,
+                                "width": 2,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "*",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 711,
+                                "left": 1178,
+                                "width": 17,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ADVOCATE",
+                            "confidence": 0.77,
+                            "bounding_box": {
+                                "top": 726,
+                                "left": 1213,
+                                "width": 131,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "&",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 720,
+                                "left": 1284,
+                                "width": 7,
+                                "height": 35
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "NOTARY",
+                            "confidence": 0.4,
+                            "bounding_box": {
+                                "top": 726,
+                                "left": 1299,
+                                "width": 45,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "|",
+                            "confidence": 0.89,
+                            "bounding_box": {
+                                "top": 720,
+                                "left": 1351,
+                                "width": 4,
+                                "height": 35
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "*",
+                            "confidence": 0.06,
+                            "bounding_box": {
+                                "top": 724,
+                                "left": 1363,
+                                "width": 10,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "wae",
+                            "confidence": 0.43,
+                            "bounding_box": {
+                                "top": 739,
+                                "left": 62,
+                                "width": 47,
+                                "height": 51
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "at",
+                            "confidence": 0.28,
+                            "bounding_box": {
+                                "top": 739,
+                                "left": 121,
+                                "width": 27,
+                                "height": 51
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "e-Stamp",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 726,
+                                "left": 475,
+                                "width": 102,
+                                "height": 31
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Reg.",
+                            "confidence": 0.78,
+                            "bounding_box": {
+                                "top": 745,
+                                "left": 1216,
+                                "width": 31,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "No.",
+                            "confidence": 0.88,
+                            "bounding_box": {
+                                "top": 745,
+                                "left": 1251,
+                                "width": 18,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "12348/2022",
+                            "confidence": 0.46,
+                            "bounding_box": {
+                                "top": 751,
+                                "left": 1274,
+                                "width": 63,
+                                "height": 21
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ">}",
+                            "confidence": 0.2,
+                            "bounding_box": {
+                                "top": 770,
+                                "left": 1352,
+                                "width": 29,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ôé╣",
+                            "confidence": 0.77,
+                            "bounding_box": {
+                                "top": 793,
+                                "left": 72,
+                                "width": 13,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "100",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 793,
+                                "left": 100,
+                                "width": 36,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ƒÓ»ü)",
+                            "confidence": 0.09,
+                            "bounding_box": {
+                                "top": 783,
+                                "left": 1346,
+                                "width": 32,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "OF",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 823,
+                                "left": 1234,
+                                "width": 30,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Certificate",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 836,
+                                "left": 58,
+                                "width": 85,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "No.",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 836,
+                                "left": 150,
+                                "width": 26,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "IN-TN12345678901234V",
+                            "confidence": 0.79,
+                            "bounding_box": {
+                                "top": 836,
+                                "left": 325,
+                                "width": 212,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "LAND",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 820,
+                                "left": 981,
+                                "width": 57,
+                                "height": 52
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "DEED",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 820,
+                                "left": 1054,
+                                "width": 62,
+                                "height": 52
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "ÔÇö",
+                            "confidence": 0.73,
+                            "bounding_box": {
+                                "top": 856,
+                                "left": 1253,
+                                "width": 20,
+                                "height": 5
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ta",
+                            "confidence": 0.31,
+                            "bounding_box": {
+                                "top": 809,
+                                "left": 1270,
+                                "width": 95,
+                                "height": 52
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Certificate",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 868,
+                                "left": 58,
+                                "width": 85,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Issued",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 867,
+                                "left": 150,
+                                "width": 50,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Date",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 867,
+                                "left": 207,
+                                "width": 38,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "20-May-2025",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 867,
+                                "left": 326,
+                                "width": 110,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "11:23",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 868,
+                                "left": 442,
+                                "width": 44,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "AM",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 868,
+                                "left": 492,
+                                "width": 28,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Account",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 899,
+                                "left": 58,
+                                "width": 70,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Reference",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 898,
+                                "left": 134,
+                                "width": 81,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "NONACC",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 898,
+                                "left": 326,
+                                "width": 79,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "(SV)",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 898,
+                                "left": 411,
+                                "width": 34,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "tn123456/",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 899,
+                                "left": 450,
+                                "width": 81,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "COMBATORE/TN-CBE.",
+                            "confidence": 0.31,
+                            "bounding_box": {
+                                "top": 899,
+                                "left": 535,
+                                "width": 179,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "This",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 799,
+                                "width": 42,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Deed",
+                            "confidence": 0.89,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 851,
+                                "width": 34,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 892,
+                                "width": 13,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Sale",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 917,
+                                "width": 34,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "is",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 891,
+                                "left": 957,
+                                "width": 11,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "made",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 980,
+                                "width": 34,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "on",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 1021,
+                                "width": 18,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "this",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 1046,
+                                "width": 30,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "204",
+                            "confidence": 0.79,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 1085,
+                                "width": 25,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "day",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 1118,
+                                "width": 25,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 891,
+                                "left": 1151,
+                                "width": 16,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "May",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 892,
+                                "left": 1175,
+                                "width": 29,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "2025",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 886,
+                                "left": 1211,
+                                "width": 39,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "SUBIN-TNTN12345678901234V",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 929,
+                                "left": 326,
+                                "width": 268,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Unique",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 930,
+                                "left": 59,
+                                "width": 58,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Doc.",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 929,
+                                "left": 124,
+                                "width": 36,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Reference",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 928,
+                                "left": 167,
+                                "width": 82,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "BETWEEN",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 943,
+                                "left": 1013,
+                                "width": 98,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Purchased",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 961,
+                                "left": 60,
+                                "width": 90,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "by",
+                            "confidence": 0.97,
+                            "bounding_box": {
+                                "top": 962,
+                                "left": 157,
+                                "width": 18,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "RAMESH",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 961,
+                                "left": 327,
+                                "width": 78,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "K",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 961,
+                                "left": 413,
+                                "width": 12,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Description",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 994,
+                                "left": 59,
+                                "width": 92,
+                                "height": 21
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 993,
+                                "left": 157,
+                                "width": 15,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Document",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 994,
+                                "left": 179,
+                                "width": 78,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Article",
+                            "confidence": 0.74,
+                            "bounding_box": {
+                                "top": 994,
+                                "left": 326,
+                                "width": 53,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "4",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 994,
+                                "left": 385,
+                                "width": 10,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Affidavit",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 994,
+                                "left": 402,
+                                "width": 67,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "1.",
+                            "confidence": 0.88,
+                            "bounding_box": {
+                                "top": 986,
+                                "left": 805,
+                                "width": 15,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "RAMESH",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 986,
+                                "left": 830,
+                                "width": 113,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "K",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 982,
+                                "left": 930,
+                                "width": 17,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "AFFIDAVIT",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1024,
+                                "left": 326,
+                                "width": 99,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "S/o.",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1016,
+                                "left": 828,
+                                "width": 34,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Krishnan,",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1016,
+                                "left": 870,
+                                "width": 84,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Description",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1025,
+                                "left": 60,
+                                "width": 94,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "0",
+                            "confidence": 0.9,
+                            "bounding_box": {
+                                "top": 1056,
+                                "left": 328,
+                                "width": 10,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "No.",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1045,
+                                "left": 828,
+                                "width": 30,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "12,",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1045,
+                                "left": 868,
+                                "width": 23,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Lakshmi",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 1045,
+                                "left": 898,
+                                "width": 72,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Nagar,",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1045,
+                                "left": 976,
+                                "width": 54,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "yg",
+                            "confidence": 0.43,
+                            "bounding_box": {
+                                "top": 1099,
+                                "left": 0,
+                                "width": 25,
+                                "height": 12
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "a.",
+                            "confidence": 0.22,
+                            "bounding_box": {
+                                "top": 1073,
+                                "left": 0,
+                                "width": 26,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Consideration",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 1058,
+                                "left": 59,
+                                "width": 111,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Price",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1058,
+                                "left": 177,
+                                "width": 41,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "a",
+                            "confidence": 0.24,
+                            "bounding_box": {
+                                "top": 1057,
+                                "left": 224,
+                                "width": 36,
+                                "height": 46
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "(Zero).",
+                            "confidence": 0.59,
+                            "bounding_box": {
+                                "top": 1083,
+                                "left": 335,
+                                "width": 52,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "besa",
+                            "confidence": 0.17,
+                            "bounding_box": {
+                                "top": 1097,
+                                "left": 567,
+                                "width": 46,
+                                "height": 3
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Coimbatore",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1074,
+                                "left": 828,
+                                "width": 104,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "-",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 1085,
+                                "left": 938,
+                                "width": 9,
+                                "height": 2
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "641",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1075,
+                                "left": 954,
+                                "width": 29,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "035.",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1075,
+                                "left": 992,
+                                "width": 36,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "c+┬╗",
+                            "confidence": 0.27,
+                            "bounding_box": {
+                                "top": 1084,
+                                "left": 1254,
+                                "width": 21,
+                                "height": 4
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "(SELLER)",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 1068,
+                                "left": 1284,
+                                "width": 86,
+                                "height": 28
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "..",
+                            "confidence": 0.79,
+                            "bounding_box": {
+                                "top": 1079,
+                                "left": 1383,
+                                "width": 17,
+                                "height": 26
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "First",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 1116,
+                                "left": 61,
+                                "width": 35,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Party",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 1115,
+                                "left": 103,
+                                "width": 43,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "RAMESH",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1115,
+                                "left": 328,
+                                "width": 79,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "K",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1116,
+                                "left": 414,
+                                "width": 12,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "SURESH",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1146,
+                                "left": 328,
+                                "width": 74,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "KUMAR",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1147,
+                                "left": 409,
+                                "width": 66,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "AND",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1128,
+                                "left": 1040,
+                                "width": 47,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Second",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1142,
+                                "left": 56,
+                                "width": 60,
+                                "height": 30
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Party",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1142,
+                                "left": 126,
+                                "width": 45,
+                                "height": 30
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Stamp",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1178,
+                                "left": 60,
+                                "width": 162,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Duty",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1174,
+                                "left": 115,
+                                "width": 37,
+                                "height": 31
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Paid",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1174,
+                                "left": 161,
+                                "width": 35,
+                                "height": 31
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "By",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1174,
+                                "left": 203,
+                                "width": 21,
+                                "height": 31
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "RAMESH",
+                            "confidence": 0.9,
+                            "bounding_box": {
+                                "top": 1178,
+                                "left": 328,
+                                "width": 79,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "K",
+                            "confidence": 0.9,
+                            "bounding_box": {
+                                "top": 1178,
+                                "left": 414,
+                                "width": 11,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "2.",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1174,
+                                "left": 803,
+                                "width": 16,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "SURESH",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1174,
+                                "left": 828,
+                                "width": 84,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "KUMAR",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1174,
+                                "left": 920,
+                                "width": 82,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Stamp",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1210,
+                                "left": 60,
+                                "width": 52,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Duty",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1210,
+                                "left": 119,
+                                "width": 38,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Amount(Rs.)",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 1209,
+                                "left": 163,
+                                "width": 100,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "100",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1209,
+                                "left": 330,
+                                "width": 30,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "S/o.",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 1204,
+                                "left": 828,
+                                "width": 35,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Subramani,",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 1204,
+                                "left": 871,
+                                "width": 98,
+                                "height": 21
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "(One",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1238,
+                                "left": 333,
+                                "width": 41,
+                                "height": 21
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Hundred",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1238,
+                                "left": 381,
+                                "width": 70,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "only)",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1238,
+                                "left": 458,
+                                "width": 39,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "No.",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 1235,
+                                "left": 829,
+                                "width": 30,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "45,",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1235,
+                                "left": 867,
+                                "width": 26,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Gandhi",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1234,
+                                "left": 901,
+                                "width": 61,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Street,",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1234,
+                                "left": 969,
+                                "width": 53,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Coimbatore",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1263,
+                                "left": 828,
+                                "width": 104,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "-",
+                            "confidence": 0.9,
+                            "bounding_box": {
+                                "top": 1273,
+                                "left": 937,
+                                "width": 10,
+                                "height": 3
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "641",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1263,
+                                "left": 953,
+                                "width": 29,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "001.",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1263,
+                                "left": 990,
+                                "width": 36,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ".-.",
+                            "confidence": 0.3,
+                            "bounding_box": {
+                                "top": 1273,
+                                "left": 1254,
+                                "width": 21,
+                                "height": 3
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "(BUYER)",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1258,
+                                "left": 1286,
+                                "width": 82,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "SCHEDULE",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1311,
+                                "left": 194,
+                                "width": 110,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "OF",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1311,
+                                "left": 310,
+                                "width": 28,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "THE",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1311,
+                                "left": 343,
+                                "width": 43,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "PROPERTY",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1311,
+                                "left": 392,
+                                "width": 109,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "All",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1356,
+                                "left": 61,
+                                "width": 23,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "that",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1356,
+                                "left": 92,
+                                "width": 32,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "place",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1355,
+                                "left": 133,
+                                "width": 42,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "and",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1355,
+                                "left": 184,
+                                "width": 30,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "parcel",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 1355,
+                                "left": 222,
+                                "width": 49,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1355,
+                                "left": 280,
+                                "width": 18,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "land",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1355,
+                                "left": 303,
+                                "width": 34,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "consisting",
+                            "confidence": 0.9,
+                            "bounding_box": {
+                                "top": 1356,
+                                "left": 345,
+                                "width": 82,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "in",
+                            "confidence": 0.9,
+                            "bounding_box": {
+                                "top": 1356,
+                                "left": 435,
+                                "width": 14,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Survey",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1356,
+                                "left": 456,
+                                "width": 55,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "No.",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1356,
+                                "left": 519,
+                                "width": 26,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "123/4B,",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 1356,
+                                "left": 555,
+                                "width": 65,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "DECLARATION",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1348,
+                                "left": 982,
+                                "width": 149,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "situated",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1386,
+                                "left": 61,
+                                "width": 67,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "at",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1388,
+                                "left": 135,
+                                "width": 15,
+                                "height": 16
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Kovilpalayam",
+                            "confidence": 0.92,
+                            "bounding_box": {
+                                "top": 1386,
+                                "left": 159,
+                                "width": 113,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Village,",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1386,
+                                "left": 281,
+                                "width": 63,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Sulur",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1386,
+                                "left": 353,
+                                "width": 43,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Taluk,",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1386,
+                                "left": 402,
+                                "width": 50,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Coimbatore",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1386,
+                                "left": 458,
+                                "width": 94,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "District,",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1387,
+                                "left": 558,
+                                "width": 66,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "The",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 802,
+                                "width": 33,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Seller",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 844,
+                                "width": 48,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "hereby",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 898,
+                                "width": 55,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "declares",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 958,
+                                "width": 67,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "that",
+                            "confidence": 0.97,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 1030,
+                                "width": 30,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "the",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 1067,
+                                "width": 24,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "above",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 1097,
+                                "width": 48,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "schedule",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 1151,
+                                "width": 70,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "property",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1394,
+                                "left": 1227,
+                                "width": 65,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "is",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1392,
+                                "left": 1299,
+                                "width": 12,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "his",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1391,
+                                "left": 1318,
+                                "width": 22,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Tamil",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1415,
+                                "left": 61,
+                                "width": 48,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Nadu,",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1415,
+                                "left": 115,
+                                "width": 49,
+                                "height": 21
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "and",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1415,
+                                "left": 172,
+                                "width": 29,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "bounded",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1415,
+                                "left": 207,
+                                "width": 70,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "as",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1420,
+                                "left": 283,
+                                "width": 17,
+                                "height": 14
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "follows:",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 1414,
+                                "left": 306,
+                                "width": 64,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "absolute",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1420,
+                                "left": 804,
+                                "width": 72,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "property",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1424,
+                                "left": 887,
+                                "width": 73,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "and",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1420,
+                                "left": 970,
+                                "width": 30,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "free",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 1420,
+                                "left": 1011,
+                                "width": 31,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "from",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1420,
+                                "left": 1052,
+                                "width": 39,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "all",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1421,
+                                "left": 1100,
+                                "width": 19,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "encumbrances",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1421,
+                                "left": 1128,
+                                "width": 118,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "and",
+                            "confidence": 0.94,
+                            "bounding_box": {
+                                "top": 1421,
+                                "left": 1252,
+                                "width": 28,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "he",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1421,
+                                "left": 1289,
+                                "width": 18,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "has",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1421,
+                                "left": 1315,
+                                "width": 26,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "North",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1451,
+                                "left": 59,
+                                "width": 55,
+                                "height": 20
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Property",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1452,
+                                "left": 190,
+                                "width": 74,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.97,
+                            "bounding_box": {
+                                "top": 1452,
+                                "left": 269,
+                                "width": 18,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ravi",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1452,
+                                "left": 292,
+                                "width": 37,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "absolute",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1449,
+                                "left": 804,
+                                "width": 72,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "right",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1449,
+                                "left": 883,
+                                "width": 39,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "to",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1453,
+                                "left": 929,
+                                "width": 17,
+                                "height": 15
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "sell",
+                            "confidence": 0.93,
+                            "bounding_box": {
+                                "top": 1449,
+                                "left": 953,
+                                "width": 27,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "the",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1449,
+                                "left": 986,
+                                "width": 25,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "same.",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1454,
+                                "left": 1017,
+                                "width": 48,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "20",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1483,
+                                "left": 190,
+                                "width": 21,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "feet",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1482,
+                                "left": 218,
+                                "width": 31,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Road",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1482,
+                                "left": 255,
+                                "width": 43,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ".",
+                            "confidence": 0.79,
+                            "bounding_box": {
+                                "top": 1489,
+                                "left": 1260,
+                                "width": 7,
+                                "height": 7
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "South",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1482,
+                                "left": 60,
+                                "width": 55,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "East",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1513,
+                                "left": 60,
+                                "width": 40,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Property",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1513,
+                                "left": 189,
+                                "width": 76,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1512,
+                                "left": 271,
+                                "width": 20,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Murugan",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1513,
+                                "left": 295,
+                                "width": 73,
+                                "height": 24
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "West",
+                            "confidence": 0.88,
+                            "bounding_box": {
+                                "top": 1544,
+                                "left": 59,
+                                "width": 46,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Property",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1544,
+                                "left": 190,
+                                "width": 75,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "of",
+                            "confidence": 0.97,
+                            "bounding_box": {
+                                "top": 1543,
+                                "left": 271,
+                                "width": 19,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Sekar",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1543,
+                                "left": 294,
+                                "width": 49,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Total",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1582,
+                                "left": 59,
+                                "width": 49,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Extent",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 1582,
+                                "left": 114,
+                                "width": 60,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": ":",
+                            "confidence": 0.89,
+                            "bounding_box": {
+                                "top": 1588,
+                                "left": 180,
+                                "width": 4,
+                                "height": 13
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "2400",
+                            "confidence": 0.95,
+                            "bounding_box": {
+                                "top": 1583,
+                                "left": 197,
+                                "width": 44,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Sq.ft",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1582,
+                                "left": 248,
+                                "width": 38,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "(Two",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1583,
+                                "left": 292,
+                                "width": 41,
+                                "height": 22
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Thousand",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1582,
+                                "left": 337,
+                                "width": 81,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Four",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1583,
+                                "left": 426,
+                                "width": 37,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Hundred",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1582,
+                                "left": 469,
+                                "width": 70,
+                                "height": 19
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Sq.ft",
+                            "confidence": 0.89,
+                            "bounding_box": {
+                                "top": 1582,
+                                "left": 545,
+                                "width": 39,
+                                "height": 25
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Only)",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1583,
+                                "left": 589,
+                                "width": 46,
+                                "height": 23
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "+",
+                            "confidence": 0.13,
+                            "bounding_box": {
+                                "top": 1599,
+                                "left": 670,
+                                "width": 5,
+                                "height": 6
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "NOTARY",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1616,
+                                "left": 1161,
+                                "width": 78,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "SIGNATURE",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1616,
+                                "left": 1244,
+                                "width": 105,
+                                "height": 18
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "SELLER",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1650,
+                                "left": 103,
+                                "width": 70,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "WITNESS",
+                            "confidence": 0.91,
+                            "bounding_box": {
+                                "top": 1650,
+                                "left": 472,
+                                "width": 87,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "BUYER",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1648,
+                                "left": 813,
+                                "width": 63,
+                                "height": 17
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ƒ",
+                            "confidence": 0.42,
+                            "bounding_box": {
+                                "top": 1658,
+                                "left": 1166,
+                                "width": 80,
+                                "height": 53
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ƒÓ«®Ó»ìÔÇî",
+                            "confidence": 0.28,
+                            "bounding_box": {
+                                "top": 1647,
+                                "left": 1270,
+                                "width": 108,
+                                "height": 72
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ramer",
+                            "confidence": 0.0,
+                            "bounding_box": {
+                                "top": 1694,
+                                "left": 55,
+                                "width": 181,
+                                "height": 61
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "20",
+                            "confidence": 0.89,
+                            "bounding_box": {
+                                "top": 1728,
+                                "left": 1220,
+                                "width": 31,
+                                "height": 29
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "MAY",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1728,
+                                "left": 1262,
+                                "width": 42,
+                                "height": 28
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "2025",
+                            "confidence": 0.96,
+                            "bounding_box": {
+                                "top": 1725,
+                                "left": 1315,
+                                "width": 53,
+                                "height": 29
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Supho",
+                            "confidence": 0.21,
+                            "bounding_box": {
+                                "top": 1701,
+                                "left": 460,
+                                "width": 132,
+                                "height": 67
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó««Ó»ìÔÇî",
+                            "confidence": 0.02,
+                            "bounding_box": {
+                                "top": 1768,
+                                "left": 1032,
+                                "width": 8,
+                                "height": 7
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "}",
+                            "confidence": 0.52,
+                            "bounding_box": {
+                                "top": 2036,
+                                "left": 0,
+                                "width": 3,
+                                "height": 6
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«ñÓ«┐",
+                            "confidence": 0.56,
+                            "bounding_box": {
+                                "top": 2053,
+                                "left": 433,
+                                "width": 31,
+                                "height": 33
+                            }
+                        },
+                        {
+                            "kind": "word",
+                            "text": "Ó«Ä",
+                            "confidence": 0.51,
+                            "bounding_box": {
+                                "top": 2056,
+                                "left": 1215,
+                                "width": 17,
+                                "height": 22
+                            }
+                        }
+                    ],
+                    "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+                    "confidence": 0.745015015015015,
+                    "page_number": 1,
+                    "processed_at": "2026-09-29T13:29:04.191090Z",
+                    "model_version": null,
+                    "preprocessing": {
+                        "operations": [
+                            "orientation_normalized",
+                            "grayscale",
+                            "upscaled_for_ocr",
+                            "contrast_enhanced",
+                            "denoised"
+                        ],
+                        "deskew_angle_degrees": null
+                    },
+                    "engine_version": "5.5.0",
+                    "requested_languages": [
+                        "tam",
+                        "eng"
+                    ],
+                    "project_tested_languages": [
+                        "tam",
+                        "eng"
+                    ]
+                }
+            ],
+            "engine": "tesseract",
+            "status": "OCR_PRELIMINARY",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "processed_at": "2026-09-29T13:29:04.191102Z",
+            "model_version": null,
+            "engine_version": "5.5.0",
+            "requested_languages": [
+                "tam",
+                "eng"
+            ],
+            "project_tested_languages": [
+                "tam",
+                "eng"
+            ]
+        },
+        "version": 1,
+        "confidence": 0.745015015015015,
+        "page_count": 1,
+        "processed_at": "2026-09-29T13:29:04.191102+00:00",
+        "model_version": null,
+        "engine_version": "5.5.0",
+        "requested_languages": [
+            "tam",
+            "eng"
+        ],
+        "project_tested_languages": [
+            "tam",
+            "eng"
+        ]
+    },
+    "fields": [
+        {
+            "id": "8d6a792d-d1df-44c2-84b0-e860578a4b40",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9400000000000002,
+            "field_name": "survey_number",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1356,
+                "left": 555,
+                "width": 65,
+                "height": 22
+            },
+            "processed_at": "2026-09-29T13:29:04.336687+00:00",
+            "model_version": null,
+            "original_value": "123/4B",
+            "normalized_value": "123/4B",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "1a2c47a2-28b1-43fc-8a5e-7979640dd530",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9437500000000002,
+            "field_name": "owner_details",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 961,
+                "left": 327,
+                "width": 98,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.245507+00:00",
+            "model_version": null,
+            "original_value": "RAMESH K",
+            "normalized_value": "RAMESH K",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "9f19894f-82bf-4807-85b5-4055c7045151",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9625,
+            "field_name": "plot_area",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1582,
+                "left": 197,
+                "width": 438,
+                "height": 25
+            },
+            "processed_at": "2026-09-29T13:29:04.327392+00:00",
+            "model_version": null,
+            "original_value": "2400 Sq.ft (Two Thousand Four Hundred Sq.ft Only)",
+            "normalized_value": {
+                "unit": "sq_ft",
+                "value": 2400
+            },
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "5af1c0cc-a292-4c22-8b35-85bd5b4e5d78",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9400000000000002,
+            "field_name": "village",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1386,
+                "left": 159,
+                "width": 113,
+                "height": 24
+            },
+            "processed_at": "2026-09-29T13:29:04.336903+00:00",
+            "model_version": null,
+            "original_value": "Kovilpalayam",
+            "normalized_value": "Kovilpalayam",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "de26f197-2c77-40b9-8f6b-20b658331a3d",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9475000000000001,
+            "field_name": "tehsil",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1386,
+                "left": 353,
+                "width": 43,
+                "height": 19
+            },
+            "processed_at": "2026-09-29T13:29:04.337295+00:00",
+            "model_version": null,
+            "original_value": "Sulur",
+            "normalized_value": "Sulur",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "82a9968b-fa41-4734-875c-3b78dfd6e830",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9700000000000001,
+            "field_name": "district",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1386,
+                "left": 458,
+                "width": 94,
+                "height": 19
+            },
+            "processed_at": "2026-09-29T13:29:04.337518+00:00",
+            "model_version": null,
+            "original_value": "Coimbatore",
+            "normalized_value": "Coimbatore",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "54365e31-7955-4d92-85fe-6fa41e701fcb",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9475000000000001,
+            "field_name": "seller",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1115,
+                "left": 328,
+                "width": 98,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.255863+00:00",
+            "model_version": null,
+            "original_value": "RAMESH K",
+            "normalized_value": "RAMESH K",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "f1905eb1-8afe-4250-bcc5-3cdc9873b127",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9500000000000001,
+            "field_name": "buyer",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1146,
+                "left": 328,
+                "width": 147,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.302452+00:00",
+            "model_version": null,
+            "original_value": "SURESH KUMAR",
+            "normalized_value": "SURESH KUMAR",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "e6fb5e70-82c3-4cf7-a060-9ecf5f8d0ba0",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.8950000000000001,
+            "field_name": "deed_type",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 994,
+                "left": 326,
+                "width": 143,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.245988+00:00",
+            "model_version": null,
+            "original_value": "Article 4 Affidavit",
+            "normalized_value": "Article 4 Affidavit",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "51f50c9e-5a6c-41a8-be5f-7fff7c2330f6",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.8425000000000001,
+            "field_name": "certificate_number",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 836,
+                "left": 325,
+                "width": 212,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.236535+00:00",
+            "model_version": null,
+            "original_value": "IN-TN12345678901234V",
+            "normalized_value": "IN-TN12345678901234V",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "0e771562-b108-4067-bd1d-854a7768bd41",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9700000000000001,
+            "field_name": "certificate_issued_date",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 867,
+                "left": 326,
+                "width": 194,
+                "height": 22
+            },
+            "processed_at": "2026-09-29T13:29:04.23839+00:00",
+            "model_version": null,
+            "original_value": "20-May-2025 11:23 AM",
+            "normalized_value": "20-May-2025 11:23 AM",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "50d8f95e-4ec3-4d6e-bab4-27305e09e5ad",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9325000000000001,
+            "field_name": "unique_document_reference",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 929,
+                "left": 326,
+                "width": 268,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.243414+00:00",
+            "model_version": null,
+            "original_value": "SUBIN-TNTN12345678901234V",
+            "normalized_value": "SUBIN-TNTN12345678901234V",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "319da358-289e-42d8-9510-c5fe6849dcfc",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9250000000000002,
+            "field_name": "consideration_amount",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1056,
+                "left": 328,
+                "width": 10,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.250167+00:00",
+            "model_version": null,
+            "original_value": "0",
+            "normalized_value": "0",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "48427086-a47c-428d-a9c7-cd36cce563b9",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9700000000000001,
+            "field_name": "stamp_duty_amount",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1209,
+                "left": 330,
+                "width": 30,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.306016+00:00",
+            "model_version": null,
+            "original_value": "100",
+            "normalized_value": "100",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "f713053e-7f5c-4e35-9fa2-79f1ed3d2f18",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9250000000000002,
+            "field_name": "stamp_duty_paid_by",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1178,
+                "left": 328,
+                "width": 97,
+                "height": 17
+            },
+            "processed_at": "2026-09-29T13:29:04.304404+00:00",
+            "model_version": null,
+            "original_value": "RAMESH K",
+            "normalized_value": "RAMESH K",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "42ae4873-5a97-43ab-8c81-a1365a9f5055",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9700000000000001,
+            "field_name": "boundary_north",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1452,
+                "left": 190,
+                "width": 139,
+                "height": 23
+            },
+            "processed_at": "2026-09-29T13:29:04.321414+00:00",
+            "model_version": null,
+            "original_value": "Property of Ravi",
+            "normalized_value": "Property of Ravi",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "60a06638-45b3-4aab-b39d-be5729c099a3",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9700000000000001,
+            "field_name": "boundary_south",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1482,
+                "left": 190,
+                "width": 108,
+                "height": 18
+            },
+            "processed_at": "2026-09-29T13:29:04.323558+00:00",
+            "model_version": null,
+            "original_value": "20 feet Road",
+            "normalized_value": "20 feet Road",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "634e6f37-af87-4d0c-a6d5-3a3a1cad9ca6",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9700000000000001,
+            "field_name": "boundary_east",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1512,
+                "left": 189,
+                "width": 179,
+                "height": 25
+            },
+            "processed_at": "2026-09-29T13:29:04.325364+00:00",
+            "model_version": null,
+            "original_value": "Property of Murugan",
+            "normalized_value": "Property of Murugan",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        },
+        {
+            "id": "3df17143-070d-4335-9ba4-37bedde55ae1",
+            "source_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+            "confidence": 0.9725,
+            "field_name": "boundary_west",
+            "page_number": 1,
+            "bounding_box": {
+                "top": 1543,
+                "left": 190,
+                "width": 153,
+                "height": 24
+            },
+            "processed_at": "2026-09-29T13:29:04.326434+00:00",
+            "model_version": null,
+            "original_value": "Property of Sekar",
+            "normalized_value": "Property of Sekar",
+            "extractor_version": "land-record-rule-extractor-f2-v4"
+        }
+    ],
+    "document": {
+        "id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+        "status": "VALIDATED",
+        "filename": "e349e794-a12a-4386-9985-92436f5dc446.png",
+        "project_id": "6c8c3fd6-fc5b-4f77-b5a9-7cbbbdf9dac6",
+        "size_bytes": 3197777,
+        "source_url": "/demo/ocr-land-record-source.png",
+        "updated_at": "2026-09-29T13:28:58.890918+00:00",
+        "uploaded_at": "2026-09-29T13:28:55.792678+00:00",
+        "content_type": "image/png"
+    },
+    "validation": {
+        "id": "922686db-bff6-4ff7-ae7c-f3fa2f90e27b",
+        "report": {
+            "issues": [
+            ],
+            "status": "VALID",
+            "processed_at": "2026-09-29T13:29:04.344269Z"
+        },
+        "status": "VALID",
+        "version": 1,
+        "processed_at": "2026-09-29T13:29:04.344271+00:00",
+        "confidence_summary": {
+            "band": "MEDIUM",
+            "value": 0.8425000000000001,
+            "fields": [
+                {
+                    "band": "HIGH",
+                    "field_name": "survey_number",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9400000000000002
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "khasra_number",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "khata_number",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "owner_details",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9437500000000002
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "plot_area",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9625
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "village",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9400000000000002
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "tehsil",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9475000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "district",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9700000000000001
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "land_classification",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "mutation_records",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "registration_information",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "seller",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9475000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "buyer",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9500000000000001
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "seller_address",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "buyer_address",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "MEDIUM",
+                    "field_name": "deed_type",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.8950000000000001
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "deed_date",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "MEDIUM",
+                    "field_name": "certificate_number",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.8425000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "certificate_issued_date",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9700000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "unique_document_reference",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9325000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "consideration_amount",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9250000000000002
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "stamp_duty_amount",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9700000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "stamp_duty_paid_by",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9250000000000002
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "boundary_north",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9700000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "boundary_south",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9700000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "boundary_east",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9700000000000001
+                },
+                {
+                    "band": "HIGH",
+                    "field_name": "boundary_west",
+                    "candidate_count": 1,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": 0.9725
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "notary",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                },
+                {
+                    "band": "UNKNOWN",
+                    "field_name": "witnesses",
+                    "candidate_count": 0,
+                    "unknown_confidence_count": 0,
+                    "representative_confidence": null
+                }
+            ],
+            "high_threshold": 0.9,
+            "policy_version": "document-validation-mvp-v1",
+            "medium_threshold": 0.75,
+            "missing_field_count": 10,
+            "conflict_field_count": 0,
+            "contributing_field_count": 19,
+            "unknown_confidence_field_count": 0
+        }
+    }
+}

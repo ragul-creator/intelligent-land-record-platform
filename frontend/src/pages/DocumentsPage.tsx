@@ -5,6 +5,21 @@ import { loadCurrentUser } from "../api/gis";
 import { correctDocumentField, loadDocument, loadDocumentSourceUrl, loadDocuments, loadFields, processDocument, uploadDocument, type DocumentDetail, type DocumentField } from "../api/documents";
 import { loadDocumentRecordLinks, resolveRecordParcelLink, suggestDocumentRecordLinks, type RecordParcelLink } from "../api/recordLinks";
 
+const SAVED_OCR_DEMO_ID = "saved-ocr-land-record-demo";
+
+type SavedOcrDemo = {
+  document: Omit<DocumentDetail, "latest_processing_job_id" | "latest_ocr" | "latest_validation"> & { source_url: string };
+  ocr: NonNullable<DocumentDetail["latest_ocr"]>;
+  fields: Array<Omit<DocumentField, "corrections">>;
+  validation: Omit<NonNullable<DocumentDetail["latest_validation"]>, "review_task_id"> & { processed_at: string };
+};
+
+async function loadSavedOcrDemo(): Promise<SavedOcrDemo> {
+  const response = await fetch("/demo/ocr-land-record-result.json");
+  if (!response.ok) throw new Error("Saved OCR demonstration is unavailable.");
+  return response.json() as Promise<SavedOcrDemo>;
+}
+
 export function DocumentsPage() {
   const { projectId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,21 +39,29 @@ export function DocumentsPage() {
     setSearchParams({ documentId: id });
   };
 
+  const savedDemoSelected = selected === SAVED_OCR_DEMO_ID;
   const user = useQuery({ queryKey: ["current-user"], queryFn: loadCurrentUser, retry: false });
   const documents = useQuery({ queryKey: ["documents", projectId], queryFn: () => loadDocuments(projectId!), enabled: Boolean(projectId), retry: false });
+  const savedDemo = useQuery({
+    queryKey: ["saved-ocr-demo"],
+    queryFn: loadSavedOcrDemo,
+    enabled: savedDemoSelected,
+    retry: false,
+    staleTime: Infinity,
+  });
   const detail = useQuery({
     queryKey: ["document", projectId, selected],
     queryFn: () => loadDocument(projectId!, selected!),
-    enabled: Boolean(projectId && selected),
+    enabled: Boolean(projectId && selected && !savedDemoSelected),
     retry: false,
     refetchInterval: (query) => {
       const status = (query.state.data as DocumentDetail | undefined)?.status;
       return status && ["QUEUED", "PROCESSING", "EXTRACTED", "VALIDATING"].includes(status) ? 1200 : false;
     },
   });
-  const fields = useQuery({ queryKey: ["document-fields", projectId, selected], queryFn: () => loadFields(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
-  const source = useQuery({ queryKey: ["document-source", projectId, selected], queryFn: () => loadDocumentSourceUrl(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false, staleTime: 8 * 60_000 });
-  const links = useQuery({ queryKey: ["record-parcel-links", projectId, selected], queryFn: () => loadDocumentRecordLinks(projectId!, selected!), enabled: Boolean(projectId && selected), retry: false });
+  const fields = useQuery({ queryKey: ["document-fields", projectId, selected], queryFn: () => loadFields(projectId!, selected!), enabled: Boolean(projectId && selected && !savedDemoSelected), retry: false });
+  const source = useQuery({ queryKey: ["document-source", projectId, selected], queryFn: () => loadDocumentSourceUrl(projectId!, selected!), enabled: Boolean(projectId && selected && !savedDemoSelected), retry: false, staleTime: 8 * 60_000 });
+  const links = useQuery({ queryKey: ["record-parcel-links", projectId, selected], queryFn: () => loadDocumentRecordLinks(projectId!, selected!), enabled: Boolean(projectId && selected && !savedDemoSelected), retry: false });
 
   const permissions = user.data?.permissions ?? [];
   const projectMembership = user.data?.project_memberships.find((item) => item.project_id === projectId);
@@ -87,32 +110,21 @@ export function DocumentsPage() {
 
     {viewerReadOnly && <p className="viewer-visibility-note" role="status">Viewer policy: preliminary document/OCR evidence is visible in read-only mode. Upload, processing, corrections, validation actions, and review changes remain permission-gated.</p>}
 
-    <section className="ocr-demo-snapshot" aria-label="Saved OCR demonstration">
-      <div className="ocr-demo-copy">
-        <div>
-          <p className="eyebrow">Saved demonstration</p>
-          <h2>Land-record OCR · tested result</h2>
-          <p>This is the preserved Bhumi-AI OCR run used during the SIH walkthrough. It shows the document image that was processed together with the OCR, structured-field and validation output produced by that run.</p>
-        </div>
-        <span className="ocr-demo-badge">REFERENCE RESULT</span>
-      </div>
-      <a className="ocr-demo-preview" href="/demo/ocr-land-record-demo.png" target="_blank" rel="noreferrer" aria-label="Open saved OCR demo at full size">
-        <img src="/demo/ocr-land-record-demo.png" alt="Preserved Bhumi-AI OCR demonstration showing the uploaded land-record document and its extracted evidence" />
-      </a>
-      <div className="ocr-demo-footer">
-        <span>Preserved test evidence · 29 Sep 2026</span>
-        <strong>Open image for full-size evidence →</strong>
-      </div>
-      <p className="ocr-demo-disclaimer">Reference/demo evidence only. Extracted values remain preliminary until human verification against the source land record.</p>
-    </section>
-
     {can("document:upload") && <section className="document-upload"><input aria-label="Choose document" type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" onChange={(event) => setFile(event.target.files?.[0])} /><button disabled={!file || upload.isPending} onClick={() => upload.mutate()}>{upload.isPending ? "Uploading…" : "Upload document"}</button>{upload.error && <p role="alert">Upload failed.</p>}</section>}
 
     <section className="documents-grid">
-      <aside className="document-index"><div className="document-index-heading"><h2>Documents</h2><span>{documents.data?.items.length ?? 0}</span></div>{documents.data?.items.map((item) => <button key={item.id} className="document-row" aria-pressed={selected === item.id} onClick={() => chooseDocument(item.id)}><strong>{item.filename}</strong><span>{item.status}</span></button>)}{documents.data?.items.length === 0 && <p>No documents have been uploaded.</p>}</aside>
+      <aside className="document-index">
+        <div className="document-index-heading"><h2>Documents</h2><span>{(documents.data?.items.length ?? 0) + 1}</span></div>
+        <button className="document-row saved-demo-row" aria-pressed={savedDemoSelected} onClick={() => chooseDocument(SAVED_OCR_DEMO_ID)}>
+          <strong>Land record OCR · saved demo</strong>
+          <span>Validated · 84.25% · actual source</span>
+        </button>
+        {documents.data?.items.map((item) => <button key={item.id} className="document-row" aria-pressed={selected === item.id} onClick={() => chooseDocument(item.id)}><strong>{item.filename}</strong><span>{item.status}</span></button>)}
+      </aside>
       <section className="document-detail">
         {!selected && <div className="document-empty-state"><span aria-hidden="true" /><h2>Select a document</h2><p>Choose an item from the list to inspect OCR evidence, structured fields, confidence, provenance, and parcel associations.</p></div>}
-        {detail.data && <>
+        {savedDemoSelected && <SavedOcrDemoDetail demo={savedDemo.data} loading={savedDemo.isLoading} error={savedDemo.isError} projectId={projectId} />}
+        {!savedDemoSelected && detail.data && <>
           <h2>{detail.data.filename}</h2>
           <p><strong>Status:</strong> {detail.data.status}</p>
           {detail.data.filename.startsWith("tn_demo_") && <p className="demo-fixture-note">Synthetic H.2 evidence snapshot. Upload a new PDF/image when demonstrating live OCR; seeded evidence is kept stable for the judging walkthrough.</p>}
@@ -150,6 +162,51 @@ export function DocumentsPage() {
       </section>
     </section>
   </main>;
+}
+
+function SavedOcrDemoDetail({ demo, loading, error, projectId }: {
+  demo: SavedOcrDemo | undefined;
+  loading: boolean;
+  error: boolean;
+  projectId: string;
+}) {
+  if (loading) return <p>Loading the preserved OCR demonstration…</p>;
+  if (error || !demo) return <p className="error-copy">The preserved OCR demonstration could not be loaded.</p>;
+
+  const { source_url: sourceUrl, ...document } = demo.document;
+  const detail: DocumentDetail = {
+    ...document,
+    latest_processing_job_id: null,
+    latest_ocr: demo.ocr,
+    latest_validation: { ...demo.validation, review_task_id: null },
+  };
+  const demoFields: DocumentField[] = demo.fields.map((field) => ({ ...field, corrections: [] }));
+  const confidenceValue = demo.validation.confidence_summary.value;
+  const validationConfidence = typeof confidenceValue === "number" ? `${(confidenceValue * 100).toFixed(2)}%` : "Recorded";
+
+  return <>
+    <div className="saved-demo-heading">
+      <div>
+        <p className="eyebrow">Saved OCR demonstration · actual tested run</p>
+        <h2>Land-record OCR</h2>
+        <p>The original uploaded document and the OCR/extraction produced from that exact file are preserved together here.</p>
+      </div>
+      <span className="saved-demo-badge">{validationConfidence} validation confidence</span>
+    </div>
+    <p className="saved-demo-source-name"><strong>Original file:</strong> {detail.filename} · <strong>Status:</strong> {detail.status}</p>
+    <p className="demo-fixture-note">Preserved SIH walkthrough evidence. This is the actual source image from the tested run, not a screenshot of the dashboard. Extracted values remain preliminary until human verification.</p>
+
+    <DocumentEvidenceViewer detail={detail} sourceUrl={sourceUrl} sourceLoading={false} sourceError={false} />
+
+    <section aria-label="Saved demo extracted field evidence">
+      <h3>Structured land-record fields</h3>
+      <p className="panel-note">These {demoFields.length} fields are the stored extraction output from the same OCR run shown above.</p>
+      <StructuredRecord fields={demoFields} />
+      {demoFields.map((field) => <Field key={field.id} field={field} canCorrect={false} onCorrect={() => undefined} />)}
+    </section>
+
+    <DocumentValidationSummary validation={detail.latest_validation!} projectId={projectId} />
+  </>;
 }
 
 function formatConfidence(value: number | null) {

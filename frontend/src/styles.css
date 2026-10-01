@@ -5116,3 +5116,33 @@ body {
 @media (max-width: 720px) {
   .ocr-demo-copy, .ocr-demo-footer { flex-direction: column; }
 }
+
+/* Saved OCR demo: behaves like a real document row and opens the preserved source/result pair. */
+.saved-demo-row {
+  border: 1px solid #c8dce3 !important;
+  background: linear-gradient(135deg, #f4fafb, #eef6f8) !important;
+}
+.saved-demo-row strong { color: #173f4c; }
+.saved-demo-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .65rem;
+}
+.saved-demo-heading h2 { margin: .12rem 0 .3rem; }
+.saved-demo-heading p:not(.eyebrow) { margin: 0; max-width: 760px; color: #61727a; }
+.saved-demo-badge {
+  flex: 0 0 auto;
+  padding: .42rem .62rem;
+  border: 1px solid #bfd3da;
+  border-radius: 999px;
+  background: #f1f8fa;
+  color: #315663;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.saved-demo-source-name { margin: .4rem 0 .75rem; color: #536871; font-size: .82rem; }
+@media (max-width: 720px) { .saved-demo-heading { flex-direction: column; } }
