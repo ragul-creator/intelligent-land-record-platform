@@ -1,0 +1,258 @@
+{
+  "id": "5dd4421d-0d67-4e20-b3cf-0b2a63753d12",
+  "project_id": "6c8c3fd6-fc5b-4f77-b5a9-7cbbbdf9dac6",
+  "queue_type": "DOCUMENT",
+  "target_type": "LAND_RECORD",
+  "target_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+  "severity": "INFO",
+  "status": "OPEN",
+  "summary": "Document verification review: validation passed",
+  "source_refs": [],
+  "metadata": {
+    "document_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+    "issue_codes": [],
+    "verification_only": true,
+    "confidence_summary": {
+      "band": "MEDIUM",
+      "value": 0.8425000000000001,
+      "fields": [
+        {
+          "band": "HIGH",
+          "field_name": "survey_number",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9400000000000002
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "khasra_number",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "khata_number",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "HIGH",
+          "field_name": "owner_details",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9437500000000002
+        },
+        {
+          "band": "HIGH",
+          "field_name": "plot_area",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9625
+        },
+        {
+          "band": "HIGH",
+          "field_name": "village",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9400000000000002
+        },
+        {
+          "band": "HIGH",
+          "field_name": "tehsil",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9475000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "district",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9700000000000001
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "land_classification",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "mutation_records",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "registration_information",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "HIGH",
+          "field_name": "seller",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9475000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "buyer",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9500000000000001
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "seller_address",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "buyer_address",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "MEDIUM",
+          "field_name": "deed_type",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.8950000000000001
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "deed_date",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "MEDIUM",
+          "field_name": "certificate_number",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.8425000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "certificate_issued_date",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9700000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "unique_document_reference",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9325000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "consideration_amount",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9250000000000002
+        },
+        {
+          "band": "HIGH",
+          "field_name": "stamp_duty_amount",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9700000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "stamp_duty_paid_by",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9250000000000002
+        },
+        {
+          "band": "HIGH",
+          "field_name": "boundary_north",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9700000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "boundary_south",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9700000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "boundary_east",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9700000000000001
+        },
+        {
+          "band": "HIGH",
+          "field_name": "boundary_west",
+          "candidate_count": 1,
+          "unknown_confidence_count": 0,
+          "representative_confidence": 0.9725
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "notary",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        },
+        {
+          "band": "UNKNOWN",
+          "field_name": "witnesses",
+          "candidate_count": 0,
+          "unknown_confidence_count": 0,
+          "representative_confidence": null
+        }
+      ],
+      "high_threshold": 0.9,
+      "policy_version": "document-validation-mvp-v1",
+      "medium_threshold": 0.75,
+      "missing_field_count": 10,
+      "conflict_field_count": 0,
+      "contributing_field_count": 19,
+      "unknown_confidence_field_count": 0
+    },
+    "validation_version": 1,
+    "blocking_issue_codes": [],
+    "validation_result_id": "922686db-bff6-4ff7-ae7c-f3fa2f90e27b"
+  },
+  "blocking_issue_count": 0,
+  "assignee_user_id": null,
+  "created_by_user_id": null,
+  "escalated": false,
+  "resolution_action": null,
+  "resolved_at": null,
+  "resolved_by_user_id": null,
+  "created_at": "2026-10-01T09:42:36.241319+00:00",
+  "updated_at": "2026-10-01T09:42:36.241319+00:00",
+  "history": [
+    {
+      "action": "review.task_created",
+      "actor_id": null,
+      "metadata": {
+        "severity": "INFO",
+        "target_id": "6c730411-cd81-4da9-a54b-2bb9b24c7825",
+        "queue_type": "DOCUMENT",
+        "target_type": "LAND_RECORD",
+        "blocking_issue_count": 0
+      },
+      "created_at": "2026-10-01T09:42:36.241319+00:00"
+    }
+  ]
+}

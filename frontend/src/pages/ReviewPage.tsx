@@ -12,6 +12,7 @@ import {
   type ReviewQueueType,
   type ReviewSeverity,
   type ReviewTask,
+  type ReviewTaskDetail,
   type ReviewTaskStatus,
 } from "../api/review";
 import {
@@ -23,6 +24,14 @@ import {
 const severityOrder: ReviewSeverity[] = ["INFO", "LOW", "MEDIUM", "HIGH"];
 const actionOptions: ReviewAction[] = ["APPROVE", "CORRECT", "REJECT", "REPROCESS", "COMMENT", "ESCALATE"];
 type WorkspaceMode = ReviewQueueType | "VALIDATION";
+
+const SAVED_OCR_DEMO_DOCUMENT_ID = "saved-ocr-land-record-demo";
+
+async function loadSavedOcrReviewDemo(): Promise<ReviewTaskDetail> {
+  const response = await fetch("/demo/ocr-land-record-review.json");
+  if (!response.ok) throw new Error("Saved OCR review demonstration is unavailable.");
+  return response.json() as Promise<ReviewTaskDetail>;
+}
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Not available";
@@ -196,7 +205,7 @@ function documentValidationSummary(metadata: Record<string, unknown>) {
   );
 }
 
-function TaskListItem({ task, selected, onSelect }: { task: ReviewTask; selected: boolean; onSelect: () => void }) {
+function TaskListItem({ task, selected, savedDemo = false, onSelect }: { task: ReviewTask; selected: boolean; savedDemo?: boolean; onSelect: () => void }) {
   return (
     <button type="button" className={selected ? "review-task-card selected" : "review-task-card"} onClick={onSelect} aria-pressed={selected}>
       <span className="review-task-card-top">
@@ -205,11 +214,13 @@ function TaskListItem({ task, selected, onSelect }: { task: ReviewTask; selected
       </span>
       <span className="review-task-summary">{reviewSummary(task)}</span>
       <span className="review-task-meta">
-        {task.target_type === "VALIDATION_ISSUE"
-          ? validationIssueLabel(task.metadata)
-          : task.queue_type === "DOCUMENT"
-            ? "Document extraction review"
-            : humanize(task.target_type)}
+        {savedDemo
+          ? "Saved OCR demo · Document verification"
+          : task.target_type === "VALIDATION_ISSUE"
+            ? validationIssueLabel(task.metadata)
+            : task.queue_type === "DOCUMENT"
+              ? "Document extraction review"
+              : humanize(task.target_type)}
       </span>
       <span className="review-task-meta">{task.assignee_user_id ? "Assigned" : "Unassigned"}{task.escalated ? " · Escalated" : ""}</span>
     </button>
@@ -291,9 +302,39 @@ export function ReviewPage() {
     retry: false,
   });
 
-  const activeData = workspaceMode === "VALIDATION" ? validationIssues.data : reviewTasks.data;
-  const activeLoading = workspaceMode === "VALIDATION" ? validationIssues.isLoading : reviewTasks.isLoading;
-  const activeFetching = workspaceMode === "VALIDATION" ? validationIssues.isFetching : reviewTasks.isFetching;
+  const savedReview = useQuery({
+    queryKey: ["saved-ocr-review-demo"],
+    queryFn: loadSavedOcrReviewDemo,
+    enabled: Boolean(projectId && currentUser.data && canRead && workspaceMode === "DOCUMENT"),
+    retry: false,
+    staleTime: Infinity,
+  });
+  const liveHasSavedReview = Boolean(
+    savedReview.data && reviewTasks.data?.items.some((task) => task.id === savedReview.data?.id),
+  );
+  const savedReviewMatchesFilters = Boolean(
+    savedReview.data
+    && !assignedToMe
+    && (taskStatus === "ALL" || savedReview.data.status === taskStatus)
+    && (severity === "ALL" || savedReview.data.severity === severity),
+  );
+  const showSavedReview = workspaceMode === "DOCUMENT" && savedReviewMatchesFilters && !liveHasSavedReview;
+  const reviewDataWithSavedDemo = useMemo(() => {
+    if (!showSavedReview || !savedReview.data) return reviewTasks.data;
+    const livePage = reviewTasks.data?.page ?? { limit: 100, offset: 0, total: 0 };
+    return {
+      items: [...(reviewTasks.data?.items ?? []), savedReview.data],
+      page: { ...livePage, total: livePage.total + 1 },
+    };
+  }, [reviewTasks.data, savedReview.data, showSavedReview]);
+
+  const activeData = workspaceMode === "VALIDATION" ? validationIssues.data : reviewDataWithSavedDemo;
+  const activeLoading = workspaceMode === "VALIDATION"
+    ? validationIssues.isLoading
+    : reviewTasks.isLoading || (workspaceMode === "DOCUMENT" && savedReview.isLoading);
+  const activeFetching = workspaceMode === "VALIDATION"
+    ? validationIssues.isFetching
+    : reviewTasks.isFetching || (workspaceMode === "DOCUMENT" && savedReview.isFetching);
   const activeError = (workspaceMode === "VALIDATION" ? validationIssues.error : reviewTasks.error) as ReviewApiError | null;
 
   useEffect(() => {
@@ -307,10 +348,13 @@ export function ReviewPage() {
     }
   }, [activeData, selectedTaskId]);
 
+  const savedReviewSelected = Boolean(
+    showSavedReview && savedReview.data && selectedTaskId === savedReview.data.id,
+  );
   const detail = useQuery({
     queryKey: ["review-task", selectedTaskId],
     queryFn: () => loadReviewTask(selectedTaskId!),
-    enabled: Boolean(selectedTaskId && canRead),
+    enabled: Boolean(selectedTaskId && canRead && !savedReviewSelected),
     retry: false,
   });
 
@@ -368,7 +412,7 @@ export function ReviewPage() {
     );
   }
 
-  const selected = detail.data;
+  const selected = savedReviewSelected ? savedReview.data : detail.data;
   const mutationError = mutation.error as ReviewApiError | null;
   const validationRunError = validationRun.error as ReviewApiError | null;
   const detailError = detail.error as ReviewApiError | null;
@@ -500,14 +544,22 @@ export function ReviewPage() {
           {activeError && <div className="review-error" role="alert">{activeError.message}</div>}
           {activeData?.items.length === 0 && <p className="review-muted">No cases match the current filters.</p>}
           <div className="review-task-list">
-            {activeData?.items.map((task) => <TaskListItem key={task.id} task={task} selected={task.id === selectedTaskId} onSelect={() => setSelectedTaskId(task.id)} />)}
+            {activeData?.items.map((task) => (
+              <TaskListItem
+                key={task.id}
+                task={task}
+                selected={task.id === selectedTaskId}
+                savedDemo={showSavedReview && task.id === savedReview.data?.id}
+                onSelect={() => setSelectedTaskId(task.id)}
+              />
+            ))}
           </div>
         </aside>
 
         <section className="review-detail-panel" aria-label="Review case details">
           {!selectedTaskId && <div className="review-empty"><h2>No case selected</h2><p>Choose a review case from the queue.</p></div>}
-          {selectedTaskId && detail.isLoading && <p className="review-muted">Loading case details…</p>}
-          {detailError && <div className="review-error" role="alert">{detailError.message}</div>}
+          {selectedTaskId && !savedReviewSelected && detail.isLoading && <p className="review-muted">Loading case details…</p>}
+          {!savedReviewSelected && detailError && <div className="review-error" role="alert">{detailError.message}</div>}
           {selected && <>
             <div className="review-detail-heading">
               <div>
@@ -515,11 +567,19 @@ export function ReviewPage() {
                 <h2>{reviewSummary(selected)}</h2>
               </div>
               <div className="review-badges">
+                {savedReviewSelected && <span>SAVED DEMO</span>}
                 <span className={`severity-${selected.severity.toLowerCase()}`}>{selected.severity}</span>
                 <span>{selected.status}</span>
                 {selected.escalated && <span>ESCALATED</span>}
               </div>
             </div>
+
+            {savedReviewSelected && (
+              <div className="review-warning">
+                <strong>Preserved OCR demo review</strong>
+                <p>This is the real review task backfilled from the preserved 84.25% validation result and exported with its audit entry. It is read-only here so the SIH walkthrough remains stable.</p>
+              </div>
+            )}
 
             {selected.target_type === "VALIDATION_ISSUE" && (
               <div className="review-warning">
@@ -544,7 +604,7 @@ export function ReviewPage() {
                   <dt>Resolution</dt><dd>{selected.resolution_action ?? "Pending"}</dd>
                 </dl>
 
-                {selected.queue_type === "DOCUMENT" && <p><Link to={`/projects/${projectId}/documents`}>Inspect document evidence</Link></p>}
+                {selected.queue_type === "DOCUMENT" && <p><Link to={savedReviewSelected ? `/projects/${projectId}/documents?documentId=${SAVED_OCR_DEMO_DOCUMENT_ID}` : `/projects/${projectId}/documents`}>Inspect document evidence</Link></p>}
                 {selected.queue_type === "GIS" && <p><Link to={`/projects/${projectId}/gis`}>Inspect project GIS evidence</Link></p>}
                 {selected.target_type === "VALIDATION_ISSUE" && (
                   <p>
@@ -566,9 +626,10 @@ export function ReviewPage() {
 
               <section className="review-actions">
                 <h3>Reviewer actions</h3>
-                {!canAct && <p className="review-warning">You have read-only review access. A reviewer with <code>review:act</code> must take action.</p>}
-                {canAct && selected.status === "RESOLVED" && <p className="review-muted">This case is resolved and cannot be changed.</p>}
-                {canAct && selected.status === "OPEN" && <>
+                {savedReviewSelected && <p className="review-muted">Saved demo review is preserved as read-only evidence. Use a live review case to record a new reviewer decision.</p>}
+                {!savedReviewSelected && !canAct && <p className="review-warning">You have read-only review access. A reviewer with <code>review:act</code> must take action.</p>}
+                {!savedReviewSelected && canAct && selected.status === "RESOLVED" && <p className="review-muted">This case is resolved and cannot be changed.</p>}
+                {!savedReviewSelected && canAct && selected.status === "OPEN" && <>
                   <button type="button" className="secondary-action" onClick={assignToMe} disabled={mutation.isPending || selected.assignee_user_id === currentUser.data?.id}>Assign to me</button>
                   <label>Action
                     <select value={action} onChange={(event) => setAction(event.target.value as ReviewAction)}>

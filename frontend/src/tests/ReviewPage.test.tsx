@@ -107,11 +107,50 @@ const detail = {
   ],
 };
 
+const savedReviewTask = {
+  ...documentTask,
+  id: "saved-review-task",
+  project_id: "saved-project",
+  target_id: "saved-demo-document",
+  severity: "INFO",
+  summary: "Document verification review: validation passed",
+  source_refs: [],
+  metadata: {
+    document_id: "saved-demo-document",
+    validation_result_id: "saved-demo-validation",
+    validation_version: 1,
+    issue_codes: [],
+    blocking_issue_codes: [],
+    verification_only: true,
+    confidence_summary: {
+      band: "MEDIUM",
+      value: 0.8425,
+      fields: [],
+      high_threshold: 0.9,
+      medium_threshold: 0.75,
+      missing_field_count: 0,
+      conflict_field_count: 0,
+      contributing_field_count: 19,
+      unknown_confidence_field_count: 0,
+      policy_version: "document-validation-mvp-v1",
+    },
+  },
+  created_at: "2026-10-01T09:42:36Z",
+  updated_at: "2026-10-01T09:42:36Z",
+  history: [{
+    action: "review.task_created",
+    actor_id: null,
+    metadata: { severity: "INFO", target_type: "LAND_RECORD" },
+    created_at: "2026-10-01T09:42:36Z",
+  }],
+};
+
 const page = (items: unknown[]) => ({ items, page: { limit: 100, offset: 0, total: items.length } });
 
 function installFetch(user = currentUser) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith("/demo/ocr-land-record-review.json")) return new Response(JSON.stringify(savedReviewTask), { status: 200 });
     if (url.includes("/users/me")) return new Response(JSON.stringify(user), { status: 200 });
 
 
@@ -195,6 +234,26 @@ describe("ReviewPage", () => {
     expect(screen.getByText("Unique Document Reference")).toBeInTheDocument();
     expect(screen.getByText("review.task_created")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /assign to me/i })).toBeEnabled();
+  });
+
+  it("shows the preserved OCR demo review and links back to its exact saved document", async () => {
+    installFetch();
+    renderPage();
+    await screen.findByText("Survey number requires verification");
+
+    const savedDemoLabel = await screen.findByText("Saved OCR demo · Document verification");
+    fireEvent.click(savedDemoLabel.closest("button")!);
+
+    expect(await screen.findByText("Preserved OCR demo review")).toBeInTheDocument();
+    expect(screen.getAllByText("84.3%").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Verification Only")).toBeInTheDocument();
+    expect(screen.getByText("true")).toBeInTheDocument();
+    expect(screen.getByText("review.task_created")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /inspect document evidence/i })).toHaveAttribute(
+      "href",
+      "/projects/project-1/documents?documentId=saved-ocr-land-record-demo",
+    );
+    expect(screen.queryByRole("button", { name: /assign to me/i })).not.toBeInTheDocument();
   });
 
   it("switches between document and GIS queues and exposes GIS evidence navigation", async () => {
