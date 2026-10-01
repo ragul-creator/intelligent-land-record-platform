@@ -137,8 +137,8 @@ dl { display: grid; grid-template-columns: 9rem 1fr; gap: .4rem .7rem; margin: 1
 .document-evidence-heading > span { color: #526d72; font-size: .8rem; }
 .document-evidence-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
 .document-source-pane, .document-ocr-pane { min-width: 0; padding: .8rem; border: 1px solid #d5ddd6; border-radius: .45rem; background: #fffef9; }
-.document-source-pane iframe, .document-source-pane img { display: block; width: 100%; min-height: 34rem; max-height: 52rem; border: 1px solid #c7d1ca; background: #f4f4f1; object-fit: contain; }
-.document-source-pane img { min-height: auto; }
+.document-source-pane iframe { display: block; width: 100%; min-height: 34rem; max-height: 52rem; border: 1px solid #c7d1ca; background: #f4f4f1; }
+.document-source-pane img { display: block; width: 100%; height: clamp(28rem, 62vh, 46rem); border: 1px solid #c7d1ca; background: #f4f4f1; object-fit: contain; object-position: center; }
 .evidence-pane-heading { margin-bottom: .6rem; }
 .evidence-pane-heading a { color: #1f5360; font-weight: 700; }
 .ocr-page-tabs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .65rem; }
