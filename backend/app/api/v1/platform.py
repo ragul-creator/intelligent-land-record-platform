@@ -32,6 +32,7 @@ from app.schemas.platform import (
 )
 from app.services.geoai import current_version, geometry_geojson
 from app.services.project_access import get_project_for_user
+from app.services.record_exports import build_records_xlsx
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["platform hardening"])
 
@@ -206,11 +207,18 @@ def export_manifest(
         project_id=project.id,
         items=[
             ExportDescriptor(
+                code="RECORDS_XLSX",
+                label="Land-record evidence Excel",
+                path=f"/api/v1/projects/{project.id}/exports/records.xlsx",
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                description="Clear workbook with record summary, all structured extracted fields, confidence/provenance, corrections, and raw OCR page text.",
+            ),
+            ExportDescriptor(
                 code="RECORDS_CSV",
-                label="Land-record evidence CSV",
+                label="Compact land-record CSV",
                 path=f"/api/v1/projects/{project.id}/exports/records.csv",
                 media_type="text/csv",
-                description="Current document workflow status plus selected extracted/corrected record fields.",
+                description="Compact compatibility export with selected record fields.",
             ),
             ExportDescriptor(
                 code="PARCELS_GEOJSON",
@@ -220,6 +228,36 @@ def export_manifest(
                 description="Persisted parcel geometries with draft and verification labels preserved.",
             ),
         ],
+    )
+
+
+@router.get("/exports/records.xlsx")
+def export_records_xlsx(
+    project_id: uuid.UUID,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    project = get_project_for_user(session, user, project_id, "export:read")
+    content, counts = build_records_xlsx(
+        session,
+        project_id=project.id,
+        project_name=project.name,
+        permissions=user_permissions(session, user.id),
+    )
+    record_audit(
+        session,
+        "project.export_records_xlsx",
+        "project",
+        project.id,
+        actor_id=user.id,
+        project_id=project.id,
+        metadata=counts,
+    )
+    session.commit()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="project-{project.id}-records.xlsx"'},
     )
 
 

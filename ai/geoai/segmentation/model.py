@@ -82,8 +82,19 @@ def load_checkpoint(path: str | Path, *, device: torch.device) -> tuple[Building
         pathlib.WindowsPath = original_windows_path
 
     config = ModelConfig(**payload["model_config"])
-    model = create_model(config, device=device)
+    # A checkpoint already contains the complete backbone weights.  Do not
+    # ask torchvision to download ImageNet weights again just because the
+    # training metadata says the run originally used a pretrained backbone.
+    load_config = ModelConfig(
+        architecture=config.architecture,
+        encoder=config.encoder,
+        model_version=config.model_version,
+        pretrained_backbone=False,
+    )
+    model = create_model(load_config, device=device)
     model.load_state_dict(payload["model_state"])
+    # Preserve the checkpoint's original model metadata after construction.
+    model.config = config
     # Inference tensors are float32; normalize checkpoint parameters to the
     # same dtype so Windows-trained checkpoints cannot leave the Linux
     # runtime with float64 parameters.

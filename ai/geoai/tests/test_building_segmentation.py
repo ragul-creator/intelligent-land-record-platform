@@ -5,9 +5,15 @@ import pytest
 from PIL import Image
 import torch
 
-from ai.geoai.segmentation.building_dataset import DatasetValidationError, WHUBuildingDataset, validate_whu_dataset
-from ai.geoai.segmentation.metrics import binary_confusion, binary_metrics
+from ai.geoai.segmentation.building_dataset import (
+    DatasetValidationError,
+    WHUBuildingDataset,
+    _percentile_normalize_rgb,
+    validate_whu_dataset,
+)
+from ai.geoai.segmentation.metrics import SegmentationMetrics, binary_confusion, binary_metrics
 from ai.geoai.segmentation.model import create_model, load_checkpoint, save_checkpoint
+from ai.geoai.segmentation.pipeline import _best_threshold
 
 
 def write_whu_sample(root: Path, split: str, name: str, *, mask_value: int = 255) -> None:
@@ -62,6 +68,35 @@ def test_metrics_cover_simple_and_empty_masks() -> None:
 def test_thresholding_behavior_is_explicit() -> None:
     counts = binary_confusion(torch.tensor([[[[0.49, 0.50]]]]), torch.tensor([[[[0.0, 1.0]]]]), threshold=0.5)
     assert counts == (1, 0, 0)
+
+def test_percentile_preprocessing_stretches_each_rgb_band() -> None:
+    values = np.arange(100, dtype=np.uint8).reshape(10, 10)
+    image = Image.fromarray(
+        np.stack((values, values + 20, values + 40), axis=-1),
+        mode="RGB",
+    )
+
+    normalized = _percentile_normalize_rgb(image)
+
+    assert normalized.shape == (3, 10, 10)
+    assert np.all(normalized >= 0.0)
+    assert np.all(normalized <= 1.0)
+    assert normalized[:, 0, 0].max() == pytest.approx(0.0)
+    assert normalized[:, -1, -1].min() == pytest.approx(1.0)
+
+
+def test_threshold_selection_prefers_best_validation_iou() -> None:
+    sweep = {
+        0.4: SegmentationMetrics(0.70, 0.82, 0.80, 0.84),
+        0.5: SegmentationMetrics(0.76, 0.86, 0.88, 0.84),
+        0.6: SegmentationMetrics(0.72, 0.84, 0.93, 0.77),
+    }
+
+    threshold, metrics = _best_threshold(sweep)
+
+    assert threshold == 0.5
+    assert metrics.iou == pytest.approx(0.76)
+
 
 
 def test_cpu_model_probability_and_checkpoint_round_trip(tmp_path: Path) -> None:

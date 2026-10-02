@@ -95,7 +95,8 @@ describe("H.2B.4 platform workspaces", () => {
           project_id: "project-1",
           disclaimer: "Draft or unverified data remains explicitly labelled and is not statutory boundary certification.",
           items: [
-            { code: "RECORDS_CSV", label: "Land-record evidence CSV", path: "/api/v1/projects/project-1/exports/records.csv", media_type: "text/csv", description: "Record evidence." },
+            { code: "RECORDS_XLSX", label: "Land-record evidence Excel", path: "/api/v1/projects/project-1/exports/records.xlsx", media_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", description: "Complete record evidence." },
+            { code: "RECORDS_CSV", label: "Compact land-record CSV", path: "/api/v1/projects/project-1/exports/records.csv", media_type: "text/csv", description: "Compact record evidence." },
             { code: "PARCELS_GEOJSON", label: "Parcel GeoJSON", path: "/api/v1/projects/project-1/exports/parcels.geojson", media_type: "application/geo+json", description: "Parcel evidence." },
           ],
         }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -104,10 +105,11 @@ describe("H.2B.4 platform workspaces", () => {
     }));
 
     renderRoute("/projects/project-1/exports", "/projects/:projectId/exports", <ExportsPage />);
-    expect(await screen.findByRole("heading", { name: "Land-record evidence CSV" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Land-record evidence Excel" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Compact land-record CSV" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Parcel GeoJSON" })).toBeInTheDocument();
     expect(screen.getByText(/not statutory boundary certification/i)).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(3);
   });
 
   it("searches evidence and preserves preliminary labels", async () => {
@@ -237,8 +239,60 @@ describe("H.2B.4 platform workspaces", () => {
     }));
 
     renderRoute("/projects/project-1/audit", "/projects/:projectId/audit", <AuditPage />);
-    expect(await screen.findByText("document.validated")).toBeInTheDocument();
-    expect(screen.getByText(/validation_result_id/)).toBeInTheDocument();
+    expect(await screen.findByText("Document validated")).toBeInTheDocument();
+    expect(screen.getByText("Officer (you)")).toBeInTheDocument();
+    expect(screen.getByText("Technical details")).toBeInTheDocument();
+    expect(screen.getByText("Validation Result Id")).toBeInTheDocument();
+  });
+
+  it("requires the owner to type the project name before permanent deletion", async () => {
+    let deleteUrl = "";
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/users/me")) {
+        return new Response(JSON.stringify({
+          id: "admin",
+          login_id: "ADM-TN-000001",
+          email: "admin@example.invalid",
+          full_name: "Admin",
+          roles: ["ADMIN"],
+          permissions: ["project:update", "project:member_manage", "user:manage"],
+          project_memberships: [{ project_id: "project-1", role: "ADMIN" }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.includes("/projects/project-1?") && init?.method === "DELETE") {
+        deleteUrl = url;
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith("/projects/project-1")) {
+        return new Response(JSON.stringify({
+          id: "project-1", name: "Project One", description: "Fixture", state: "ACTIVE",
+          owner_id: "admin", created_at: "2026-09-20T00:00:00Z", updated_at: "2026-09-20T00:00:00Z",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.includes("/projects/project-1/members?")) {
+        return new Response(JSON.stringify({
+          items: [{ user_id: "admin", login_id: "ADM-TN-000001", full_name: "Admin", is_active: true, role: "ADMIN", created_at: "2026-09-20T00:00:00Z" }],
+          page: { limit: 100, offset: 0, total: 1 },
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.startsWith("/projects")) {
+        return new Response(JSON.stringify({ items: [], page: { limit: 50, offset: 0, total: 0 } }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response("{}", { status: 404 });
+    }));
+
+    renderRoute("/projects/project-1/admin", "/projects/:projectId/admin", <AdminPage />);
+    const deleteButton = await screen.findByRole("button", { name: "Delete project permanently" });
+    expect(deleteButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Confirm project name"), { target: { value: "Project One" } });
+    expect(deleteButton).toBeEnabled();
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => expect(deleteUrl).toContain("confirmation_name=Project+One"));
+    expect(window.confirm).toHaveBeenCalled();
   });
 
   it("loads archived project settings and can explicitly reactivate them", async () => {

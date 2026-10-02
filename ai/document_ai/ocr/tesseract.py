@@ -29,9 +29,18 @@ class TesseractOcrEngine:
 
     name = "tesseract"
 
-    def __init__(self, *, command: str | None = None, backend: TesseractBackend | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        command: str | None = None,
+        backend: TesseractBackend | None = None,
+        sparse_layout_fallback: bool = True,
+        sparse_layout_confidence_threshold: float = 0.80,
+    ) -> None:
         self._command = command
         self._backend = backend
+        self._sparse_layout_fallback = sparse_layout_fallback
+        self._sparse_layout_confidence_threshold = sparse_layout_confidence_threshold
 
     def recognize(self, image: Image.Image, *, languages: Sequence[str]) -> EnginePageResult:
         requested = validate_language_codes(languages)
@@ -43,23 +52,26 @@ class TesseractOcrEngine:
                 "Tesseract language data is missing for: " + ", ".join(missing) + ". Install the matching traineddata files; no English fallback was used."
             )
 
-        configuration = "--oem 3 --psm 3"
         language = "+".join(requested)
         try:
-            data = backend.image_to_data(image, language=language, config=configuration)
-            text = backend.image_to_string(image, language=language, config=configuration).strip()
+            primary = _recognize_configuration(backend, image, language=language, configuration="--oem 3 --psm 3")
+            selected = primary
+            if self._sparse_layout_fallback and (
+                primary.confidence is None or primary.confidence < self._sparse_layout_confidence_threshold
+            ):
+                sparse = _recognize_configuration(backend, image, language=language, configuration="--oem 3 --psm 11")
+                if _prefer_sparse_layout(primary, sparse):
+                    selected = sparse
             engine_version = backend.get_version()
         except OcrEngineError:
             raise
         except Exception as error:
             raise OcrEngineError(f"Tesseract OCR failed: {error}") from error
 
-        regions = _regions_from_data(data)
-        confidences = [region.confidence for region in regions if region.confidence is not None]
         return EnginePageResult(
-            text=text,
-            confidence=sum(confidences) / len(confidences) if confidences else None,
-            regions=tuple(regions),
+            text=selected.text,
+            confidence=selected.confidence,
+            regions=selected.regions,
             engine=self.name,
             engine_version=engine_version,
             model_version=None,
@@ -126,6 +138,43 @@ def _regions_from_data(data: dict[str, list[Any]]) -> list[OcrRegion]:
             bounding_box = BoundingBox(left, top, width, height)
         regions.append(OcrRegion(text=text, confidence=confidence, bounding_box=bounding_box))
     return regions
+
+
+def _recognize_configuration(
+    backend: TesseractBackend,
+    image: Image.Image,
+    *,
+    language: str,
+    configuration: str,
+) -> EnginePageResult:
+    data = backend.image_to_data(image, language=language, config=configuration)
+    text = backend.image_to_string(image, language=language, config=configuration).strip()
+    regions = tuple(_regions_from_data(data))
+    confidences = [region.confidence for region in regions if region.confidence is not None]
+    return EnginePageResult(
+        text=text,
+        confidence=sum(confidences) / len(confidences) if confidences else None,
+        regions=regions,
+        engine="tesseract",
+        engine_version=None,
+        model_version=None,
+    )
+
+
+def _prefer_sparse_layout(primary: EnginePageResult, sparse: EnginePageResult) -> bool:
+    """Prefer sparse text mode only when it recovers materially more evidence without a confidence collapse."""
+
+    if not sparse.regions or not sparse.text.strip():
+        return False
+    if not primary.regions or not primary.text.strip():
+        return True
+
+    primary_confidence = primary.confidence or 0.0
+    sparse_confidence = sparse.confidence or 0.0
+    confidence_is_credible = sparse_confidence >= primary_confidence - 0.05
+    region_gain = len(sparse.regions) >= max(len(primary.regions) + 3, round(len(primary.regions) * 1.08))
+    text_gain = len(sparse.text.strip()) >= max(len(primary.text.strip()) + 40, round(len(primary.text.strip()) * 1.08))
+    return confidence_is_credible and (region_gain or text_gain)
 
 
 def normalize_confidence(value: object) -> float | None:

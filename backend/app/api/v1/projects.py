@@ -1,5 +1,6 @@
 """Project, membership, summary, workflow, and project-audit API endpoints."""
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, Query, status
@@ -11,6 +12,7 @@ from app.audit.service import record_audit, sanitize_audit_metadata
 from app.core.auth import get_current_user, require_permission, user_roles
 from app.core.errors import ApiError, forbidden, not_found
 from app.core.database import get_db_session
+from app.core.storage import PrivateObjectStorage, get_storage_service
 from app.models import AuditLog, File, ProcessingJob, Project, ProjectMember, Role, User, UserRole
 from app.schemas.common import PageMetadata
 from app.schemas.projects import (
@@ -30,7 +32,9 @@ from app.schemas.projects import (
     StatusCount,
 )
 from app.services.project_access import get_effective_project_role, get_project_for_user
+from app.services.project_deletion import delete_project_data, project_storage_keys
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 CANONICAL_WORKFLOW_STATES = (
@@ -188,6 +192,49 @@ def update_project(
         raise ApiError(status.HTTP_409_CONFLICT, "PROJECT_CONFLICT", "A project with this name already exists.") from error
     session.refresh(project)
     return _project_response(project)
+
+
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    project_id: uuid.UUID,
+    confirmation_name: str = Query(min_length=1, max_length=255),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+    storage: PrivateObjectStorage = Depends(get_storage_service),
+) -> None:
+    project = get_project_for_user(session, user, project_id, "project:update")
+    if project.owner_id != user.id:
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN,
+            "PROJECT_DELETE_OWNER_REQUIRED",
+            "Only the project owner can permanently delete this project.",
+        )
+    if confirmation_name != project.name:
+        raise ApiError(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "PROJECT_DELETE_CONFIRMATION_MISMATCH",
+            "Type the exact project name to confirm permanent deletion.",
+        )
+
+    storage_keys = project_storage_keys(session, project.id)
+    record_audit(
+        session,
+        "project.deleted",
+        "project",
+        project.id,
+        actor_id=user.id,
+        project_id=project.id,
+        metadata={"project_name": project.name, "storage_object_count": len(storage_keys)},
+    )
+    session.flush()
+    delete_project_data(session, project.id)
+    session.commit()
+
+    for storage_key in storage_keys:
+        try:
+            storage.delete_private_object(storage_key)
+        except Exception:
+            logger.warning("Project storage cleanup failed for a deleted project object.", exc_info=True)
 
 
 @router.get("/{project_id}/members", response_model=ProjectMemberListResponse)

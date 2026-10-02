@@ -87,12 +87,31 @@ export function DocumentsPage() {
 
     {viewerReadOnly && <p className="viewer-visibility-note" role="status">Viewer policy: preliminary document/OCR evidence is visible in read-only mode. Upload, processing, corrections, validation actions, and review changes remain permission-gated.</p>}
 
+    <section className="ocr-demo-snapshot" aria-label="Saved OCR demonstration">
+      <div className="ocr-demo-copy">
+        <div>
+          <p className="eyebrow">Saved demonstration</p>
+          <h2>Land-record OCR · tested result</h2>
+          <p>This is the preserved Bhumi-AI OCR run used during the SIH walkthrough. It shows the document image that was processed together with the OCR, structured-field and validation output produced by that run.</p>
+        </div>
+        <span className="ocr-demo-badge">REFERENCE RESULT</span>
+      </div>
+      <a className="ocr-demo-preview" href="/demo/ocr-land-record-demo.png" target="_blank" rel="noreferrer" aria-label="Open saved OCR demo at full size">
+        <img src="/demo/ocr-land-record-demo.png" alt="Preserved Bhumi-AI OCR demonstration showing the uploaded land-record document and its extracted evidence" />
+      </a>
+      <div className="ocr-demo-footer">
+        <span>Preserved test evidence · 29 Sep 2026</span>
+        <strong>Open image for full-size evidence →</strong>
+      </div>
+      <p className="ocr-demo-disclaimer">Reference/demo evidence only. Extracted values remain preliminary until human verification against the source land record.</p>
+    </section>
+
     {can("document:upload") && <section className="document-upload"><input aria-label="Choose document" type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" onChange={(event) => setFile(event.target.files?.[0])} /><button disabled={!file || upload.isPending} onClick={() => upload.mutate()}>{upload.isPending ? "Uploading…" : "Upload document"}</button>{upload.error && <p role="alert">Upload failed.</p>}</section>}
 
     <section className="documents-grid">
-      <aside><h2>Documents</h2>{documents.data?.items.map((item) => <button key={item.id} className="document-row" aria-pressed={selected === item.id} onClick={() => chooseDocument(item.id)}><strong>{item.filename}</strong><span>{item.status}</span></button>)}{documents.data?.items.length === 0 && <p>No documents have been uploaded.</p>}</aside>
+      <aside className="document-index"><div className="document-index-heading"><h2>Documents</h2><span>{documents.data?.items.length ?? 0}</span></div>{documents.data?.items.map((item) => <button key={item.id} className="document-row" aria-pressed={selected === item.id} onClick={() => chooseDocument(item.id)}><strong>{item.filename}</strong><span>{item.status}</span></button>)}{documents.data?.items.length === 0 && <p>No documents have been uploaded.</p>}</aside>
       <section className="document-detail">
-        {!selected && <p>Select a document to inspect its evidence and parcel association.</p>}
+        {!selected && <div className="document-empty-state"><span aria-hidden="true" /><h2>Select a document</h2><p>Choose an item from the list to inspect OCR evidence, structured fields, confidence, provenance, and parcel associations.</p></div>}
         {detail.data && <>
           <h2>{detail.data.filename}</h2>
           <p><strong>Status:</strong> {detail.data.status}</p>
@@ -110,7 +129,7 @@ export function DocumentsPage() {
             {fields.data?.fields.map((field) => <Field key={field.id} field={field} canCorrect={can("field:correct")} onCorrect={(value, reason) => correctDocumentField(projectId, selected!, field.id, value, reason).then(() => client.invalidateQueries({ queryKey: ["document-fields", projectId, selected] }))} />)}
           </section>
 
-          {detail.data.latest_validation && <section><h3>Validation: {detail.data.latest_validation.status}</h3><p>Persisted validation version {detail.data.latest_validation.version}</p><pre>{JSON.stringify(detail.data.latest_validation.confidence_summary, null, 2)}</pre>{detail.data.latest_validation.report.issues?.map((issue) => <p key={`${issue.code}-${issue.message}`}>{issue.severity}: {issue.message}</p>)}{detail.data.latest_validation.review_task_id && <Link to={`/projects/${projectId}/review`}>Open linked review case</Link>}</section>}
+          {detail.data.latest_validation && <DocumentValidationSummary validation={detail.data.latest_validation} projectId={projectId} />}
 
           {(suggest.error || resolve.error) && <p className="error-copy" role="alert">{resolve.error ? "Unable to resolve the parcel association. Rejection requires a reason and confirmed records cannot be replaced implicitly." : "Unable to generate parcel candidates from the persisted validated evidence."}</p>}
           <RecordParcelLinksPanel
@@ -149,15 +168,158 @@ const FIELD_LABELS: Record<string, string> = {
   land_classification: "Land classification",
   mutation_records: "Mutation records",
   registration_information: "Registration information",
+  seller: "Seller / Vendor",
+  buyer: "Buyer / Purchaser",
+  seller_address: "Seller address",
+  buyer_address: "Buyer address",
+  deed_type: "Deed type",
+  deed_date: "Deed date",
+  certificate_number: "Certificate number",
+  certificate_issued_date: "Certificate issued date",
+  unique_document_reference: "Unique document reference",
+  consideration_amount: "Consideration amount",
+  stamp_duty_amount: "Stamp duty amount",
+  stamp_duty_paid_by: "Stamp duty paid by",
+  boundary_north: "North boundary",
+  boundary_south: "South boundary",
+  boundary_east: "East boundary",
+  boundary_west: "West boundary",
+  notary: "Notary",
+  witnesses: "Witnesses",
 };
+
+type ValidationConfidenceField = {
+  band?: string;
+  field_name?: string;
+  candidate_count?: number;
+  representative_confidence?: number | null;
+};
+
+function readableFieldName(value: string) {
+  return FIELD_LABELS[value] ?? value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function validationPercent(value: unknown) {
+  return typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "Not available";
+}
+
+function DocumentValidationSummary({
+  validation,
+  projectId,
+}: {
+  validation: NonNullable<DocumentDetail["latest_validation"]>;
+  projectId: string;
+}) {
+  const summary = validation.confidence_summary;
+  const fields = Array.isArray(summary.fields)
+    ? summary.fields.filter((item): item is ValidationConfidenceField => Boolean(item && typeof item === "object"))
+    : [];
+  const threshold = typeof summary.medium_threshold === "number" ? summary.medium_threshold : 0.75;
+  const detected = fields.filter((field) => (field.candidate_count ?? 0) > 0);
+  const missing = fields.filter((field) => (field.candidate_count ?? 0) === 0);
+  const needsReview = detected.filter((field) =>
+    typeof field.representative_confidence === "number"
+      ? field.representative_confidence < threshold
+      : field.band === "LOW",
+  );
+  const statusLabel = validation.status.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase());
+  const overallBand = typeof summary.band === "string" ? summary.band : "UNKNOWN";
+  const issueCount = validation.report.issues?.length ?? 0;
+
+  return (
+    <section className="document-validation-summary" aria-label="Document validation summary">
+      <div className="document-validation-heading">
+        <div>
+          <p className="eyebrow">Validation</p>
+          <h3>{statusLabel}</h3>
+          <p>Validation version {validation.version} · Human review is required before treating extracted fields as verified evidence.</p>
+        </div>
+        {validation.review_task_id && <Link className="document-validation-review-link" to={`/projects/${projectId}/review`}>Open review case →</Link>}
+      </div>
+
+      <div className="document-validation-metrics">
+        <article>
+          <span>Overall confidence</span>
+          <strong>{validationPercent(summary.value)}</strong>
+          <small className={`confidence-band confidence-${overallBand.toLowerCase()}`}>{overallBand.toLowerCase()}</small>
+        </article>
+        <article>
+          <span>Fields needing review</span>
+          <strong>{needsReview.length}</strong>
+          <small>Below {validationPercent(threshold)}</small>
+        </article>
+        <article>
+          <span>Detected fields</span>
+          <strong>{typeof summary.contributing_field_count === "number" ? summary.contributing_field_count : detected.length}</strong>
+          <small>With extracted evidence</small>
+        </article>
+        <article>
+          <span>Not detected</span>
+          <strong>{typeof summary.missing_field_count === "number" ? summary.missing_field_count : missing.length}</strong>
+          <small>Supported schema fields</small>
+        </article>
+      </div>
+
+      {needsReview.length > 0 && (
+        <section className="document-validation-attention">
+          <div className="document-validation-section-heading">
+            <h4>Fields requiring attention</h4>
+            <span>{needsReview.length} below threshold</span>
+          </div>
+          <div className="document-validation-field-list">
+            {needsReview.map((field) => (
+              <div key={field.field_name ?? "unknown"} className="document-validation-field">
+                <span>{readableFieldName(field.field_name ?? "field")}</span>
+                <strong>{validationPercent(field.representative_confidence)}</strong>
+                <small>Review threshold {validationPercent(threshold)}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {missing.length > 0 && (
+        <details className="document-validation-details">
+          <summary>Fields not detected ({missing.length})</summary>
+          <div className="document-validation-missing">
+            {missing.map((field) => <span key={field.field_name ?? "unknown"}>{readableFieldName(field.field_name ?? "field")}</span>)}
+          </div>
+        </details>
+      )}
+
+      <details className="document-validation-details technical">
+        <summary>Technical validation details</summary>
+        <dl>
+          <dt>Policy</dt><dd>{typeof summary.policy_version === "string" ? summary.policy_version : "Not supplied"}</dd>
+          <dt>High-confidence threshold</dt><dd>{validationPercent(summary.high_threshold)}</dd>
+          <dt>Review threshold</dt><dd>{validationPercent(threshold)}</dd>
+          <dt>Validation findings</dt><dd>{issueCount}</dd>
+          <dt>Conflicting fields</dt><dd>{typeof summary.conflict_field_count === "number" ? summary.conflict_field_count : 0}</dd>
+        </dl>
+        {validation.report.issues && validation.report.issues.length > 0 && (
+          <ul className="document-validation-issue-list">
+            {validation.report.issues.map((issue, index) => (
+              <li key={`${issue.code}-${issue.message}-${index}`}><strong>{issue.severity}</strong><span>{issue.message}</span></li>
+            ))}
+          </ul>
+        )}
+        <details className="document-validation-raw">
+          <summary>Raw validation payload</summary>
+          <pre>{JSON.stringify(validation.confidence_summary, null, 2)}</pre>
+        </details>
+      </details>
+    </section>
+  );
+}
 
 function structuredValue(field: DocumentField) {
   const corrected = field.corrections[field.corrections.length - 1]?.corrected_value;
   if (corrected) return corrected;
   if (typeof field.normalized_value === "string") return field.normalized_value;
   if (field.normalized_value && typeof field.normalized_value === "object") {
-    const area = field.normalized_value as { value?: number | string; unit?: string };
-    if (area.value !== undefined && area.unit) return `${area.value} ${area.unit.replaceAll("_", " ")}`;
+    const structured = field.normalized_value as { value?: number | string; unit?: string; entries?: Array<{ value?: string }> };
+    if (structured.value !== undefined && structured.unit) return `${structured.value} ${structured.unit.replaceAll("_", " ")}`;
+    if (structured.entries?.length) return structured.entries.map((entry) => entry.value).filter(Boolean).join("; ");
     return JSON.stringify(field.normalized_value);
   }
   return field.original_value;

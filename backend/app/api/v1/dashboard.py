@@ -124,8 +124,8 @@ def get_project_dashboard(
                     ProcessingJob.project_id == project.id,
                     ProcessingJob.status == "FAILED",
                     ProcessingJob.job_type.in_((
-                        "DOCUMENT_AI_PROCESS", "DOCUMENT_REVALIDATE", "PARCEL_IMPORT",
-                        "BUILDING_VECTORIZE", "IMAGERY_REGISTER",
+                        "DOCUMENT_AI_PROCESS", "DOCUMENT_REVALIDATE", "PARCEL_IMPORT", "PARCEL_DELINEATE",
+                        "BUILDING_VECTORIZE", "ROAD_VECTORIZE", "LAND_USE_VECTORIZE", "IMAGERY_REGISTER",
                     )),
                 )
             ) or 0,

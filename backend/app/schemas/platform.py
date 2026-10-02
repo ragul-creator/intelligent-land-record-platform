@@ -27,7 +27,7 @@ class ProjectSearchResponse(BaseModel):
 
 
 class ExportDescriptor(BaseModel):
-    code: Literal["RECORDS_CSV", "PARCELS_GEOJSON"]
+    code: Literal["RECORDS_XLSX", "RECORDS_CSV", "PARCELS_GEOJSON"]
     label: str
     path: str
     media_type: str

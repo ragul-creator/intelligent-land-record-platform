@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -158,7 +158,7 @@ def create_parcel(
     source = ParcelSource(source_type)
     source_crs_value = _source_crs(payload, source_crs)
     coordinate_space = _coordinate_space(payload, source_crs_value)
-    processed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    processed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     parcel_id = str(payload.get("parcel_id") or uuid4())
     reference = source_reference if source_reference is not None else payload.get("source_reference")
     if reference is not None and not isinstance(reference, str):

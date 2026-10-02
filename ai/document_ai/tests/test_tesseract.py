@@ -112,3 +112,42 @@ def test_malformed_cli_language_configuration_is_rejected(value: str) -> None:
 def test_malformed_adapter_language_configuration_is_rejected(languages: tuple[str, ...]) -> None:
     with pytest.raises(OcrLanguageConfigurationError):
         validate_language_codes(languages)
+
+
+def test_low_confidence_primary_layout_can_use_sparse_text_fallback() -> None:
+    class LayoutBackend(FakeBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.configs: list[str] = []
+
+        def image_to_data(self, image: Image.Image, *, language: str, config: str) -> dict[str, list[object]]:
+            self.configs.append(config)
+            if config.endswith("--psm 3"):
+                return {
+                    "text": ["Certificate", "No"],
+                    "conf": ["72", "74"],
+                    "left": [5, 70],
+                    "top": [5, 5],
+                    "width": [60, 20],
+                    "height": [12, 12],
+                }
+            return {
+                "text": ["Certificate", "No", "IN-TN123", "Survey", "123/4B"],
+                "conf": ["71", "73", "74", "75", "76"],
+                "left": [5, 70, 100, 5, 70],
+                "top": [5, 5, 5, 30, 30],
+                "width": [60, 20, 80, 50, 60],
+                "height": [12, 12, 12, 12, 12],
+            }
+
+        def image_to_string(self, image: Image.Image, *, language: str, config: str) -> str:
+            if config.endswith("--psm 3"):
+                return "Certificate No"
+            return "Certificate No IN-TN123\nSurvey 123/4B"
+
+    backend = LayoutBackend()
+    result = TesseractOcrEngine(backend=backend).recognize(Image.new("L", (1400, 2000)), languages=("eng",))
+
+    assert backend.configs == ["--oem 3 --psm 3", "--oem 3 --psm 11"]
+    assert "Survey 123/4B" in result.text
+    assert len(result.regions) == 5

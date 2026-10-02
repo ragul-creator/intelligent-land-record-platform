@@ -10,7 +10,12 @@ import torch
 
 from ai.geoai.roads.model import load_checkpoint
 from ai.geoai.roads.vectorization import RoadVectorizationConfig, RoadVectorizationResult, vectorize_roads
-from ai.geoai.runtime.buildings import DIRECT_INFERENCE_MAX_PIXELS, TILE_SIZE, _input_tensor
+from ai.geoai.runtime.buildings import (
+    DIRECT_INFERENCE_MAX_PIXELS,
+    TILE_SIZE,
+    _input_tensor,
+    _valid_inference_mask,
+)
 from ai.geoai.segmentation.runtime import select_device
 from ai.geoai.tiling.raster_tiler import tile_geotiff
 
@@ -18,11 +23,21 @@ from ai.geoai.tiling.raster_tiler import tile_geotiff
 def _infer_dataset(dataset: rasterio.io.DatasetReader, *, model, device: torch.device, threshold: float, min_component_pixels: int, simplify_tolerance: float) -> RoadVectorizationResult:
     if dataset.crs is None:
         raise ValueError("Road inference requires a source GeoTIFF with a CRS.")
-    tensor = _input_tensor(dataset).to(device, non_blocking=device.type == "cuda")
-    with torch.inference_mode(), torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda"):
-        probability = model.probabilities(tensor)[0, 0].float().cpu().numpy()
-    # Do not turn a source NoData region into a candidate road feature.
-    probability[dataset.dataset_mask() == 0] = float("nan")
+    indexes = list(range(1, min(3, dataset.count) + 1))
+    data = dataset.read(indexes)
+    valid = _valid_inference_mask(dataset, data)
+    tensor = _input_tensor(dataset, data=data).to(
+        device, non_blocking=device.type == "cuda"
+    )
+    with torch.inference_mode(), torch.amp.autocast(
+        device_type=device.type, enabled=device.type == "cuda"
+    ):
+        probability = (
+            model.probabilities(tensor)[0, 0].float().cpu().numpy()
+        )
+    # Match building inference validity handling so unmarked white orthomosaic
+    # exterior cannot become a road candidate either.
+    probability[~valid] = float("nan")
     return vectorize_roads(probability, transform=dataset.transform, crs=dataset.crs, model_version=model.config.model_version, config=RoadVectorizationConfig(threshold=threshold, min_component_pixels=min_component_pixels, simplify_tolerance=simplify_tolerance))
 
 

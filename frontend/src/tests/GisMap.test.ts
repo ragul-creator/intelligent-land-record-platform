@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { applyBasemapVisibility, applyOverlayVisibility, canApplyImagery, imageryLayerBeforeId, scheduleMapDataUpdate } from "../components/GisMap";
+import { applyBasemapVisibility, applyOverlayVisibility, canApplyImagery, imageryLayerBeforeId, scheduleMapDataUpdate, selectedBoundaryEvidenceData } from "../components/GisMap";
 
 function mapWithBasemapLayers() {
   return {
@@ -56,10 +56,38 @@ describe("applyBasemapVisibility", () => {
     });
 
     expect(map.setLayoutProperty).toHaveBeenCalledWith("buildings-fill", "visibility", "none");
+    expect(map.setLayoutProperty).toHaveBeenCalledWith("buildings-outline", "visibility", "none");
     expect(map.setLayoutProperty).toHaveBeenCalledWith("roads-line", "visibility", "none");
     expect(map.setLayoutProperty).toHaveBeenCalledWith("land-use-fill", "visibility", "none");
     expect(map.setLayoutProperty).toHaveBeenCalledWith("topology-outline", "visibility", "none");
     expect(map.setLayoutProperty).toHaveBeenCalledWith("parcels-fill", "visibility", "visible");
+    expect(map.setLayoutProperty).toHaveBeenCalledWith("boundary-evidence-line", "visibility", "visible");
+  });
+});
+
+describe("selectedBoundaryEvidenceData", () => {
+  it("shows persisted edge evidence only for the selected parcel", () => {
+    const parcels = [{
+      id: "p1",
+      current_version: {
+        properties: {
+          boundary_evidence: [{
+            evidence_type: "ROAD_EDGE",
+            confidence: 0.96,
+            length_m: 12.5,
+            support_fraction: 0.8,
+            geometry: { type: "LineString", coordinates: [[78, 10], [78.001, 10.001]] },
+          }],
+        },
+      },
+    }] as never;
+
+    const data = selectedBoundaryEvidenceData(parcels, "p1");
+
+    expect(data.features).toHaveLength(1);
+    expect(data.features[0].properties.evidence_type).toBe("ROAD_EDGE");
+    expect(data.features[0].geometry.type).toBe("LineString");
+    expect(selectedBoundaryEvidenceData(parcels, null).features).toHaveLength(0);
   });
 });
 
