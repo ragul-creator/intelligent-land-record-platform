@@ -36,5 +36,5 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test --maxWorkers=2
+      - run: pnpm run test --maxWorkers=2
       - run: pnpm build
