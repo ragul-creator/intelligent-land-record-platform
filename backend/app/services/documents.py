@@ -152,6 +152,7 @@ def persist_validation(session: Session, *, document: Document, ocr: DocumentOcr
 
 
 def create_correction(session: Session, *, document: Document, field: DocumentExtractedField, value: str, reason: str, actor_id: uuid.UUID) -> DocumentFieldCorrection:
+    session.get(DocumentExtractedField, field.id, with_for_update=True)
     version = (session.scalar(select(func.max(DocumentFieldCorrection.version)).where(DocumentFieldCorrection.extracted_field_id == field.id)) or 0) + 1
     correction = DocumentFieldCorrection(document_id=document.id, extracted_field_id=field.id, version=version, corrected_value=value, reason=reason, created_by_user_id=actor_id)
     session.add(correction)

@@ -75,6 +75,7 @@ def test_unsupported_operation_returns_rejected() -> None:
     assert len(res.results) == 1
     assert res.results[0].status == "REJECTED"
     assert res.results[0].error.code == "SYNC_OPERATION_UNSUPPORTED"
+    session.add.assert_not_called()  # Unknown types cannot satisfy the DB check.
 
 
 def test_missing_required_permission_returns_rejected() -> None:
@@ -329,7 +330,8 @@ def test_field_correction_retry_preserves_idempotency() -> None:
         ]
     )
 
-    res = apply_sync_batch(session, project_id=project_id, user=user, batch=batch)
+    with patch("app.services.sync.user_permissions", return_value={"field:correct"}):
+        res = apply_sync_batch(session, project_id=project_id, user=user, batch=batch)
     assert len(res.results) == 1
     result = res.results[0]
     assert result.status == "DUPLICATE"
@@ -339,6 +341,38 @@ def test_field_correction_retry_preserves_idempotency() -> None:
     assert result.result["corrected_value"] == "Corrected Survey No"
     # Ensure no domain mutation was attempted
     session.add.assert_not_called()
+
+
+def test_replay_cannot_read_a_correction_without_current_permission() -> None:
+    session = MagicMock()
+    project_id, op_id, field_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    existing = SyncOperation(id=op_id, project_id=project_id,
+        operation_type="FIELD_CORRECTION_CREATE", entity_id=field_id,
+        status="APPLIED", result_json={"corrected_value": "restricted evidence"})
+    session.get.return_value = existing
+    session.scalar.return_value = 0
+    # Changing the submitted type must not bypass the stored operation's policy.
+    batch = SyncBatchRequest(operations=[SyncOperationItemRequest(
+        operation_id=op_id, operation_type="PARCEL_VERSION_CREATE", entity_id=field_id)])
+    with patch("app.services.sync.user_permissions", return_value={"geo:edit_draft"}):
+        result = apply_sync_batch(session, project_id=project_id, user=MagicMock(id=uuid.uuid4()), batch=batch)
+    assert result.results[0].status == "REJECTED"
+    assert result.results[0].error.code == "SYNC_PERMISSION_DENIED"
+    assert result.results[0].result is None
+    assert existing.result_json == {"corrected_value": "restricted evidence"}
+
+
+def test_unexpected_database_errors_do_not_expose_sql_or_parameters() -> None:
+    session = MagicMock()
+    session.get.return_value = None
+    session.scalar.return_value = 0
+    batch = SyncBatchRequest(operations=[SyncOperationItemRequest(
+        operation_id=uuid.uuid4(), operation_type="PARCEL_VERSION_CREATE", entity_id=uuid.uuid4())])
+    with patch("app.services.sync.user_permissions", return_value={"geo:edit_draft"}), \
+         patch("app.services.sync._handle_parcel_version_create", side_effect=RuntimeError("SQL parameter secret-token")):
+        result = apply_sync_batch(session, project_id=uuid.uuid4(), user=MagicMock(id=uuid.uuid4()), batch=batch)
+    assert result.results[0].error.code == "SYNC_OPERATION_FAILED"
+    assert "secret-token" not in result.model_dump_json()
 
 
 def test_client_id_exceeding_max_length_rejected() -> None:

@@ -42,6 +42,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def mock_revalidation_dispatch(monkeypatch):
+    # These tests exercise database transactions; worker execution is separate.
+    monkeypatch.setattr("app.workers.tasks.revalidate_document.delay", lambda _job_id: None)
+
+
 def _user(session, role_name: str) -> User:
     user = User(
         login_id=generate_login_id(session, role_name),

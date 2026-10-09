@@ -548,13 +548,9 @@ def _handle_field_correction_create(
         reason=reason.strip(),
         actor_id=user.id,
     )
-    try:
-        queue_correction_revalidation(
-            session, document=doc, correction=correction, actor_id=user.id
-        )
-    except Exception:
-        # Revalidation queue failure should not roll back valid field correction
-        pass
+    _, revalidation_job, revalidation_created = queue_correction_revalidation(
+        session, document=doc, correction=correction, actor_id=user.id
+    )
 
     result_dict = {
         "correction_id": str(correction.id),
@@ -562,6 +558,7 @@ def _handle_field_correction_create(
         "corrected_value": correction.corrected_value,
         "field_name": field.field_name,
         "document_id": str(doc.id),
+        "revalidation_job_id": str(revalidation_job.id) if revalidation_created else None,
     }
 
     _persist_sync_operation(
@@ -1104,6 +1101,13 @@ def apply_sync_batch(
             if isinstance(res, SyncOperation):
                 existing = res
         if existing is not None:
+            required_perm = OPERATION_PERMISSIONS.get(existing.operation_type)
+            if required_perm and required_perm not in caller_permissions:
+                results.append(SyncOperationResult(
+                    operation_id=op.operation_id, status="REJECTED", entity_id=op.entity_id,
+                    error=SyncErrorDetail(code="SYNC_PERMISSION_DENIED", message="You are not allowed to retrieve this operation result."),
+                ))
+                continue
             server_version = None
             if existing.result_json:
                 server_version = (
@@ -1128,6 +1132,22 @@ def apply_sync_batch(
                     )
                     if existing.error_code
                     else None,
+                )
+            )
+            continue
+
+        # Step 2: Validate operation type support
+        if op.operation_type not in SUPPORTED_OPERATIONS:
+            results.append(
+                SyncOperationResult(
+                    operation_id=op.operation_id,
+                    status="REJECTED",
+                    entity_type=None,
+                    entity_id=op.entity_id,
+                    error=SyncErrorDetail(
+                        code="SYNC_OPERATION_UNSUPPORTED",
+                        message=f"Operation type '{op.operation_type}' is not supported in offline sync.",
+                    ),
                 )
             )
             continue
@@ -1159,37 +1179,6 @@ def apply_sync_batch(
                     error=SyncErrorDetail(
                         code="SYNC_OPERATION_INVALID",
                         message=payload_err,
-                    ),
-                )
-            )
-            continue
-
-        # Step 2: Validate operation type support
-        if op.operation_type not in SUPPORTED_OPERATIONS:
-            _persist_sync_operation(
-                session,
-                operation_id=op.operation_id,
-                project_id=project_id,
-                user_id=user.id,
-                client_id=batch.client_id,
-                operation_type=op.operation_type,
-                entity_id=op.entity_id,
-                base_version=op.base_version,
-                payload=op.payload,
-                status="REJECTED",
-                error_code="SYNC_OPERATION_UNSUPPORTED",
-                error_message=f"Operation type '{op.operation_type}' is not supported in offline sync.",
-                client_created_at=op.client_created_at,
-            )
-            results.append(
-                SyncOperationResult(
-                    operation_id=op.operation_id,
-                    status="REJECTED",
-                    entity_type=None,
-                    entity_id=op.entity_id,
-                    error=SyncErrorDetail(
-                        code="SYNC_OPERATION_UNSUPPORTED",
-                        message=f"Operation type '{op.operation_type}' is not supported in offline sync.",
                     ),
                 )
             )
@@ -1287,7 +1276,7 @@ def apply_sync_batch(
                 payload=op.payload,
                 status="REJECTED",
                 error_code="SYNC_OPERATION_FAILED",
-                error_message=str(error),
+                error_message="The sync operation could not be applied.",
                 client_created_at=op.client_created_at,
             )
             results.append(
@@ -1298,7 +1287,7 @@ def apply_sync_batch(
                     entity_id=op.entity_id,
                     error=SyncErrorDetail(
                         code="SYNC_OPERATION_FAILED",
-                        message=str(error),
+                        message="The sync operation could not be applied.",
                     ),
                 )
             )

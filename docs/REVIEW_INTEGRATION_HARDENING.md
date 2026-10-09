@@ -39,6 +39,11 @@ before it can be described as a production ledger.
   both redeem the same token.
 - Corrected extraction values use the existing field normalizers before validation,
   retaining area units and identifier structure without altering the original row.
+- Correction version allocation locks the extracted field. Sync revalidation jobs
+  dispatch after commit; failures are no longer silently accepted as success.
+- Sync replay/recovery checks current permissions for the stored operation type.
+  Unsupported types are rejected without violating the database type constraint,
+  and unexpected exceptions cannot expose SQL parameters in public responses.
 - SAMRoad builds without an implicitly prebuilt local image, is optional, and is
   reachable only inside the Compose network. GPU reservations are an override.
 - GitHub Actions runs the non-live backend/document/validation suites, migration SQL
@@ -70,6 +75,22 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastru
 
 Apply `alembic upgrade head` before running the combined application. This advances
 either previous branch head to the shared merge revision.
+
+## Verification on 2026-10-09
+
+| Check | Result |
+| --- | --- |
+| Backend, document AI, validation tests | 245 passed; 48 live-database tests skipped |
+| GeoAI tests in the existing Windows environment | 85 passed; previous four failures fixed |
+| Frontend tests in the Windows worktree | 64 passed |
+| Frontend TypeScript and Vite build | Passed; large bundle warning remains |
+| Alembic history and fresh-install SQL | One head; SQL generation passed |
+| Compose base and SAMRoad/GPU configurations | Both passed `config --quiet` |
+
+These checks validate the changes without modifying the deployment branch or
+applying migrations to a live database. CI is newly added and has not yet run on
+GitHub. The tests do not certify model accuracy, departmental compatibility, or
+legal ownership.
 
 ## Remaining work before production rollout
 

@@ -7,7 +7,8 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, user_permissions
+from app.core.errors import forbidden
 from app.core.database import get_db_session
 from app.models import User
 from app.schemas.sync import (
@@ -18,6 +19,7 @@ from app.schemas.sync import (
 )
 from app.services.project_access import get_project_for_user
 from app.services.sync import (
+    OPERATION_PERMISSIONS,
     apply_sync_batch,
     get_sync_changes,
     get_sync_operation_by_id,
@@ -37,6 +39,12 @@ def sync_batch(
     get_project_for_user(session, user, project_id, "project:read")
     response = apply_sync_batch(session, project_id=project_id, user=user, batch=request)
     session.commit()
+    # Never dispatch a job until its correction and operation result are durable.
+    from app.workers.tasks import revalidate_document
+    for result in response.results:
+        job_id = (result.result or {}).get("revalidation_job_id")
+        if result.status == "APPLIED" and job_id:
+            revalidate_document.delay(str(job_id))
     return response
 
 
@@ -62,4 +70,8 @@ def get_sync_operation(
 ) -> SyncOperationDetailResponse:
     """Retrieve persisted status of a single offline operation for client recovery."""
     get_project_for_user(session, user, project_id, "project:read")
-    return get_sync_operation_by_id(session, project_id=project_id, operation_id=operation_id)
+    operation = get_sync_operation_by_id(session, project_id=project_id, operation_id=operation_id)
+    required = OPERATION_PERMISSIONS.get(operation.operation_type)
+    if required and required not in user_permissions(session, user.id):
+        raise forbidden("SYNC_PERMISSION_DENIED", "You are not allowed to retrieve this operation result.")
+    return operation
