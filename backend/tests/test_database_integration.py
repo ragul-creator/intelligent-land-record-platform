@@ -1,4 +1,5 @@
 import os
+import hashlib
 import uuid
 
 import httpx
@@ -48,6 +49,8 @@ def test_redis_and_private_minio_are_available() -> None:
 
 def test_private_presigned_upload_completion_and_download_flow() -> None:
     unique_suffix = uuid.uuid4().hex
+    source_bytes = b"phase-b2!"
+    checksum = hashlib.sha256(source_bytes).hexdigest()
     with SessionLocal() as session:
         user = User(
             login_id=generate_login_id(session, "OFFICER"),
@@ -82,7 +85,7 @@ def test_private_presigned_upload_completion_and_download_flow() -> None:
             "content_type": "application/pdf",
             "size_bytes": 9,
             "category": "DOCUMENT",
-            "sha256": "b" * 64,
+            "sha256": checksum,
         },
         headers=authorization,
     )
@@ -95,9 +98,10 @@ def test_private_presigned_upload_completion_and_download_flow() -> None:
     get_storage_service().client.put_object(
         Bucket=get_settings().s3_bucket,
         Key=f"projects/{project_id}/originals/{presign_body['file_id']}/private-record.pdf",
-        Body=b"phase-b2!",
+        Body=source_bytes,
         ContentType="application/pdf",
-        Metadata={"sha256": "b" * 64},
+        Metadata={"sha256": checksum},
+        IfNoneMatch="*",
     )
 
     complete = client.post(
@@ -107,6 +111,16 @@ def test_private_presigned_upload_completion_and_download_flow() -> None:
     )
     assert complete.status_code == 200
     assert complete.json()["status"] == "UPLOADED"
+
+    # Provider integration: a replay cannot replace the original object.
+    from botocore.exceptions import ClientError
+    storage = get_storage_service()
+    storage_key = f"projects/{project_id}/originals/{presign_body['file_id']}/private-record.pdf"
+    with pytest.raises(ClientError) as replay_error:
+        storage.client.put_object(Bucket=storage.bucket, Key=storage_key,
+            Body=b"tampered!", ContentType="application/pdf", IfNoneMatch="*")
+    assert replay_error.value.response["Error"]["Code"] in {"PreconditionFailed", "412"}
+    assert storage.object_sha256(storage_key) == checksum
 
     repeated_complete = client.post(
         "/api/v1/files/complete",
