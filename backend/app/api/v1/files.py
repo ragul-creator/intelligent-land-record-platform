@@ -146,6 +146,14 @@ def complete_file_upload(
     if file.sha256 and object_info.metadata.get("sha256", "").lower() != file.sha256:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Uploaded object checksum metadata does not match the registration.")
 
+    try:
+        actual_sha256 = storage.object_sha256(file.storage_key)
+    except StorageObjectNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Uploaded object was not found.") from error
+    if file.sha256 and actual_sha256 != file.sha256:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Uploaded object bytes do not match the registered checksum.")
+    file.sha256 = actual_sha256
+
     file.status = "UPLOADED"
     job, created = create_or_get_job(
         session,

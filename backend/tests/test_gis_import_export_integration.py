@@ -332,7 +332,8 @@ def test_export_manifest_contains_records_csv_parcels_geojson_and_gis_geopackage
 
     # Requirement 1: RECORDS_CSV unchanged
     assert "RECORDS_CSV" in items
-    assert items["RECORDS_CSV"]["label"] == "Land-record evidence CSV"
+    assert items["RECORDS_CSV"]["label"] == "Compact land-record CSV"
+    assert "RECORDS_XLSX" in items
     assert items["RECORDS_CSV"]["path"] == f"/api/v1/projects/{project.id}/exports/records.csv"
     assert items["RECORDS_CSV"]["media_type"] == "text/csv"
 

@@ -32,7 +32,7 @@ class DemoAdapter:
     def validate(self, payload: dict[str, Any]) -> None:
         if payload.get("project_id") is None or not isinstance(payload.get("features"), list):
             raise ValueError("Integration payload requires project_id and features.")
-        if any("password" in str(key).lower() or "secret" in str(key).lower() or "password" in str(value).lower() or "secret" in str(value).lower() for key, value in payload.items()):
+        if _contains_credentials(payload):
             raise ValueError("Integration payload must not include credentials or secrets.")
 
     def execute(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -53,6 +53,18 @@ class DILRMPDemoAdapter(DemoAdapter):
 
 
 _ADAPTERS = {adapter.name: adapter for adapter in (GenericGISAdapter(), LRMSDemoAdapter(), DILRMPDemoAdapter())}
+
+
+def _contains_credentials(value: Any) -> bool:
+    if isinstance(value, dict):
+        return any(
+            any(marker in str(key).casefold() for marker in ("password", "secret", "token", "api_key", "authorization"))
+            or _contains_credentials(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_credentials(item) for item in value)
+    return False
 
 
 def get_adapter(name: str) -> DemoAdapter:

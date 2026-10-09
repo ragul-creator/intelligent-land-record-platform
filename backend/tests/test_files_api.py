@@ -78,6 +78,9 @@ class FakeStorage:
     def get_object_info(self, _storage_key) -> ObjectInfo:
         return ObjectInfo(1024, "application/pdf", {"sha256": "a" * 64})
 
+    def object_sha256(self, _storage_key) -> str:
+        return "a" * 64
+
     def presign_download(self, _storage_key) -> str:
         return "https://signed.example/download"
 
@@ -143,6 +146,25 @@ def test_complete_registers_file_and_creates_processing_job(monkeypatch) -> None
     assert response.json()["status"] == "UPLOADED"
     assert file.status == "UPLOADED"
     assert any(item.__class__.__name__ == "ProcessingJob" for item in session.added)
+
+
+def test_completion_rejects_forged_checksum_metadata(monkeypatch) -> None:
+    file = File(id=uuid.uuid4(), project_id=uuid.uuid4(), original_name="record.pdf",
+        category="DOCUMENT", mime_type="application/pdf", size_bytes=1024,
+        sha256="a" * 64, storage_key="original", status="PENDING_UPLOAD")
+    session = FakeSession(project=Project(id=file.project_id, name="Project", owner_id=uuid.uuid4(), state="ACTIVE"), file=file)
+
+    class ForgedStorage(FakeStorage):
+        def object_sha256(self, _key):
+            return "b" * 64
+
+    app.dependency_overrides[get_db_session] = lambda: session
+    app.dependency_overrides[get_storage_service] = lambda: ForgedStorage()
+    authorize_test_user(session)
+    response = TestClient(app).post("/api/v1/files/complete", json={"file_id": str(file.id)})
+    assert response.status_code == 422
+    assert file.status == "PENDING_UPLOAD"
+    assert not any(isinstance(item, ProcessingJob) for item in session.added)
 
 
 def test_download_rejects_invalid_or_incomplete_file_ids() -> None:

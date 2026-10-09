@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -43,7 +44,7 @@ router = APIRouter(prefix="/projects/{project_id}", tags=["platform hardening"])
 
 
 class IntegrationAction(BaseModel):
-    adapter: str
+    adapter: Literal["generic_gis", "lrms_demo", "dilrmp_demo"]
 
 
 def _integration_payload(session: Session, project_id: uuid.UUID) -> dict[str, object]:

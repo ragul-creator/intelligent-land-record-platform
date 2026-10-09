@@ -1,8 +1,11 @@
-FROM infrastructure-geoai-worker:latest
-USER root
+FROM python:3.12-slim
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libspatialindex8 \
+    && apt-get install -y --no-install-recommends libexpat1 libgl1 libglib2.0-0 libspatialindex8 \
     && rm -rf /var/lib/apt/lists/*
+COPY backend /app/backend
+COPY ai /app/ai
+RUN pip install --no-cache-dir --retries 5 --timeout 120 /app/backend \
+    && pip install --no-cache-dir --retries 5 --timeout 120 -r /app/ai/geoai/requirements.txt
 COPY infrastructure/requirements.samroad.txt /tmp/requirements.samroad.txt
 RUN pip install --no-cache-dir --retries 5 --timeout 120 -r /tmp/requirements.samroad.txt
 WORKDIR /samroad

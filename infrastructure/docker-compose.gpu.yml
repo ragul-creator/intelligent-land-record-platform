@@ -1,0 +1,18 @@
+# Optional GPU reservations. Use with docker-compose.yml on NVIDIA hosts.
+services:
+  geoai-worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  samroad:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

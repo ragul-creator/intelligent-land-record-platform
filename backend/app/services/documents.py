@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ai.document_ai.extraction import DocumentExtractionResult, ExtractedFieldCandidate, FieldEvidence
 from ai.document_ai.models import BoundingBox, DocumentOcrResult
+from ai.document_ai.extraction.normalizers import normalize_field_value
 from ai.document_ai.validation import DocumentValidationResult, validate_document_extraction
 from app.audit.service import record_audit
 from app.models import (
@@ -120,7 +121,7 @@ def extraction_from_records(session: Session, *, document_id: uuid.UUID, ocr: Do
             correction = session.scalar(select(DocumentFieldCorrection).where(DocumentFieldCorrection.extracted_field_id == record.id).order_by(DocumentFieldCorrection.version.desc()))
             if correction:
                 value = correction.corrected_value
-                normalized = correction.corrected_value
+                normalized = normalize_field_value(record.field_name, correction.corrected_value)
         bbox = BoundingBox(**record.bounding_box_json) if record.bounding_box_json else None
         fields.setdefault(record.field_name, []).append(ExtractedFieldCandidate(
             field_name=record.field_name, original_value=value, normalized_value=normalized, confidence=record.confidence,

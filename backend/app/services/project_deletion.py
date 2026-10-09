@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 
 _DELETE_STATEMENTS = (
+    "DELETE FROM gis_import_runs WHERE project_id = :project_id",
     "DELETE FROM record_parcel_links WHERE project_id = :project_id",
     "DELETE FROM document_field_corrections WHERE document_id IN (SELECT id FROM documents WHERE project_id = :project_id)",
     "DELETE FROM document_extracted_fields WHERE document_id IN (SELECT id FROM documents WHERE project_id = :project_id)",
@@ -26,7 +27,6 @@ _DELETE_STATEMENTS = (
     "DELETE FROM imagery_assets WHERE project_id = :project_id",
     "DELETE FROM documents WHERE project_id = :project_id",
     "DELETE FROM processing_jobs WHERE project_id = :project_id",
-    "DELETE FROM immutable_ledger_outbox WHERE project_id = :project_id",
     "DELETE FROM files WHERE project_id = :project_id",
     "DELETE FROM projects WHERE id = :project_id",
 )

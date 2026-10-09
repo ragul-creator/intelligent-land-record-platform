@@ -20,3 +20,10 @@ def test_demo_adapter_validates_and_executes_without_network_or_credentials() ->
 def test_unknown_adapter_is_not_silently_configured() -> None:
     with pytest.raises(ValueError, match="Unknown"):
         get_adapter("live_dilrmp")
+
+
+def test_adapter_checks_nested_credential_keys_without_rejecting_land_names() -> None:
+    adapter = get_adapter("generic_gis")
+    adapter.validate({"project_id": "project-1", "features": [{"name": "Secret Valley"}]})
+    with pytest.raises(ValueError, match="credentials"):
+        adapter.validate({"project_id": "project-1", "features": [{"properties": {"api_key": "never-log-me"}}]})

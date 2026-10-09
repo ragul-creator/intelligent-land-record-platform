@@ -1,5 +1,6 @@
 """Private S3-compatible object storage adapter."""
 
+import hashlib
 import re
 import uuid
 from io import BytesIO
@@ -9,6 +10,7 @@ from typing import Any, BinaryIO
 
 import boto3
 from botocore.client import BaseClient
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from app.core.config import Settings, get_settings
@@ -50,6 +52,7 @@ class PrivateObjectStorage:
             aws_access_key_id=settings.s3_access_key,
             aws_secret_access_key=settings.s3_secret_key,
             region_name=settings.s3_region,
+            config=Config(signature_version="s3v4"),
         )
         public_endpoint = settings.s3_public_endpoint or settings.s3_endpoint
         self.public_client = public_client or (
@@ -61,6 +64,7 @@ class PrivateObjectStorage:
                 aws_access_key_id=settings.s3_access_key,
                 aws_secret_access_key=settings.s3_secret_key,
                 region_name=settings.s3_region,
+                config=Config(signature_version="s3v4"),
             )
         )
 
@@ -106,11 +110,12 @@ class PrivateObjectStorage:
                 "Key": storage_key,
                 "ContentType": content_type,
                 "Metadata": metadata,
+                "IfNoneMatch": "*",
             },
             ExpiresIn=self.expiry_seconds,
             HttpMethod="PUT",
         )
-        headers = {"Content-Type": content_type}
+        headers = {"Content-Type": content_type, "If-None-Match": "*"}
         if checksum:
             headers["x-amz-meta-sha256"] = checksum
         return url, headers
@@ -151,14 +156,39 @@ class PrivateObjectStorage:
                 raise
         else:
             raise StorageObjectAlreadyExistsError(storage_key)
-        self.client.put_object(
-            Bucket=self.bucket,
-            Key=storage_key,
-            Body=body,
-            ContentType=content_type,
-            ContentLength=size_bytes,
-            Metadata={"sha256": checksum},
-        )
+        try:
+            self.client.put_object(
+                Bucket=self.bucket,
+                Key=storage_key,
+                Body=body,
+                ContentType=content_type,
+                ContentLength=size_bytes,
+                Metadata={"sha256": checksum},
+                IfNoneMatch="*",
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {
+                "412", "PreconditionFailed", "409", "ConditionalRequestConflict"
+            }:
+                raise StorageObjectAlreadyExistsError(storage_key) from error
+            raise
+
+    def object_sha256(self, storage_key: str) -> str:
+        """Hash actual source bytes with bounded memory, independently of metadata."""
+        try:
+            response = self.client.get_object(Bucket=self.bucket, Key=storage_key)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                raise StorageObjectNotFoundError(storage_key) from error
+            raise
+        body = response["Body"]
+        digest = hashlib.sha256()
+        try:
+            while chunk := body.read(1024 * 1024):
+                digest.update(chunk)
+        finally:
+            body.close()
+        return digest.hexdigest()
 
     def download_private_file(self, storage_key: str, target_path: str | PurePath) -> None:
         """Stream source bytes directly to disk for workers without buffering large objects in RAM."""

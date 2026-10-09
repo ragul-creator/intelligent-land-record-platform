@@ -46,6 +46,30 @@ def test_extraction_contract_keeps_preliminary_candidates_evidence_grounded() ->
     assert result.fields["owner_details"][0].original_value == "சோதனை நபர்"
 
 
+def test_corrected_area_retains_unit_structure_for_revalidation() -> None:
+    document_id, ocr_id = uuid.uuid4(), uuid.uuid4()
+    record = DocumentExtractedField(
+        id=uuid.uuid4(), document_id=document_id, ocr_result_id=ocr_id, candidate_index=0,
+        field_name="plot_area", original_value="100 sq ft",
+        normalized_value_json={"value": 100, "unit": "sq_ft"}, confidence=0.9,
+        page_number=1, source_id=str(document_id), model_version="tesseract",
+        extractor_version="f2", processed_at=datetime.now(UTC),
+    )
+
+    class CorrectedSession(FakeSession):
+        def scalar(self, _query):
+            return SimpleNamespace(corrected_value="1200 சதுர அடி")
+
+    result = extraction_from_records(
+        CorrectedSession([record]), document_id=document_id,
+        ocr=SimpleNamespace(id=ocr_id, payload_json={}), include_corrections=True,
+    )
+    candidate = result.fields["plot_area"][0]
+    assert candidate.original_value == "1200 சதுர அடி"
+    assert candidate.normalized_value == {"value": 1200, "unit": "sq_ft"}
+    assert record.original_value == "100 sq ft"
+
+
 def test_reprocess_requires_prior_persisted_ocr(monkeypatch) -> None:
     document = Document(
         id=uuid.uuid4(),

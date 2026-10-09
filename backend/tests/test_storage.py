@@ -53,7 +53,8 @@ def test_presigned_urls_are_private_and_expire() -> None:
 
     assert upload_url.startswith("https://signed.example/")
     assert download_url.startswith("https://signed.example/")
-    assert headers == {"Content-Type": "application/pdf", "x-amz-meta-sha256": "a" * 64}
+    assert headers == {"Content-Type": "application/pdf", "x-amz-meta-sha256": "a" * 64, "If-None-Match": "*"}
+    assert client.presign_calls[0]["Params"]["IfNoneMatch"] == "*"
     assert [call["operation"] for call in client.presign_calls] == ["put_object", "get_object"]
     assert all(call["ExpiresIn"] == 900 for call in client.presign_calls)
     assert all("ACL" not in call["Params"] for call in client.presign_calls)
@@ -178,3 +179,41 @@ def test_existing_categories_and_gis_behavior_preserved() -> None:
         category=FileCategory.IMAGERY,
     )
     assert img_meta.category == FileCategory.IMAGERY
+
+
+def test_conditional_write_rejects_an_object_created_after_the_head_check() -> None:
+    from io import BytesIO
+    from botocore.exceptions import ClientError
+    from app.core.storage import StorageObjectAlreadyExistsError
+
+    class RacingClient(FakeS3Client):
+        def put_object(self, **kwargs):
+            assert kwargs["IfNoneMatch"] == "*"
+            raise ClientError({"Error": {"Code": "PreconditionFailed"}}, "PutObject")
+
+    storage = PrivateObjectStorage(Settings(), client=RacingClient())
+    with pytest.raises(StorageObjectAlreadyExistsError):
+        storage.put_private_object("original", BytesIO(b"new"), content_type="text/plain", size_bytes=3, checksum="a" * 64)
+
+
+def test_upload_signature_binds_the_create_only_header() -> None:
+    from urllib.parse import parse_qs, urlparse
+    storage = PrivateObjectStorage(Settings(s3_public_endpoint="http://browser.example"), client=FakeS3Client())
+    url, _ = storage.presign_upload("original", "application/pdf", "a" * 64)
+    assert "if-none-match" in parse_qs(urlparse(url).query)["X-Amz-SignedHeaders"][0].split(";")
+
+
+def test_source_hash_uses_actual_bytes_and_closes_stream() -> None:
+    import hashlib
+    from io import BytesIO
+
+    payload = b"source evidence" * 100000
+    body = BytesIO(payload)
+
+    class SourceClient(FakeS3Client):
+        def get_object(self, **_kwargs):
+            return {"Body": body, "Metadata": {"sha256": "forged"}}
+
+    storage = PrivateObjectStorage(Settings(), client=SourceClient())
+    assert storage.object_sha256("original") == hashlib.sha256(payload).hexdigest()
+    assert body.closed

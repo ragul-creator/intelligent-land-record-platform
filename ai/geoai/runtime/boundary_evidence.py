@@ -86,7 +86,7 @@ def _load_raster_evidence(source_path: str | Path, *, max_dimension: int = 1600)
             array = np.repeat(array, 3, axis=0)
         elif array.shape[0] == 2:
             array = np.concatenate([array, array[1:2]], axis=0)
-        transform = dataset.transform @ Affine.scale(
+        transform = dataset.transform * Affine.scale(
             dataset.width / width,
             dataset.height / height,
         )
@@ -148,7 +148,7 @@ def _sample_image_support(
         fraction = index / max(1, sample_count - 1)
         point = segment_wgs84.interpolate(fraction, normalized=True)
         x, y = to_raster.transform(float(point.x), float(point.y))
-        col_f, row_f = inverse @ (x, y)
+        col_f, row_f = inverse * (x, y)
         row, col = int(round(row_f)), int(round(col_f))
         if not (0 <= row < evidence.gradient.shape[0] and 0 <= col < evidence.gradient.shape[1]):
             continue

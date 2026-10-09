@@ -2,13 +2,13 @@ services:
   frontend:
     build:
       context: ../frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     ports:
       - target: 5173
         published: "${FRONTEND_HOST_PORT}"
         protocol: tcp
         mode: ingress
-    environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
     depends_on:
       backend:
         condition: service_healthy
@@ -142,18 +142,12 @@ services:
         condition: service_healthy
 
   samroad:
+    profiles: ["samroad"]
     image: infrastructure-samroad:latest
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.samroad
     restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     environment:
       SAMROAD_DEVICE: ${SAMROAD_DEVICE:-auto}
       SAMROAD_TARGET_GSD_M: "0.8"
@@ -176,8 +170,8 @@ services:
       SAMROAD_MODEL_VERSION: sam-road-spacenet-vitb-centerline-v7
     volumes:
       - ../data/local/samroad_runtime:/samroad:ro
-    ports:
-      - "8765:8765"
+    expose:
+      - "8765"
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=5).read()" ]
       interval: 10s
@@ -190,13 +184,6 @@ services:
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.geoai-worker
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     environment:
       APP_ENV: ${APP_ENV}
       DB_HOST: postgres
@@ -253,8 +240,6 @@ services:
       redis:
         condition: service_healthy
       minio:
-        condition: service_healthy
-      samroad:
         condition: service_healthy
 
 volumes:

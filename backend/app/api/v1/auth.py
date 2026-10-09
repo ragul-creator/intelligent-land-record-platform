@@ -108,7 +108,9 @@ def refresh(request: RefreshRequest, session: Session = Depends(get_db_session))
     except ValueError as error:
         raise _invalid_credentials() from error
 
-    auth_session = session.get(AuthSession, session_id)
+    auth_session = session.scalar(
+        select(AuthSession).where(AuthSession.id == session_id).with_for_update()
+    )
     user = session.get(User, user_id)
     if (
         auth_session is None
