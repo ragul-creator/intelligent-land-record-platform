@@ -20,6 +20,20 @@ def test_gis_import_file_category_is_defined() -> None:
     assert FileCategory.GIS_IMPORT.value == "GIS_IMPORT"
 
 
+def test_geopackage_job_can_use_the_shared_job_status_response() -> None:
+    import uuid
+    from datetime import datetime, timezone
+    from app.api.v1.geoai import _job_response
+
+    job_id, project_id = uuid.uuid4(), uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    job = foundation.GeoAIJob(id=job_id, project_id=project_id,
+        job_type="GEOPACKAGE_IMPORT", output_refs_json={}, created_at=now, updated_at=now)
+    processing = foundation.ProcessingJob(id=job_id, project_id=project_id,
+        job_type="GEOPACKAGE_IMPORT", status="QUEUED", progress=0, error_json=None)
+    assert _job_response(job, processing).job_type == "GEOPACKAGE_IMPORT"
+
+
 def test_existing_categories_still_work() -> None:
     expected_categories = {"DOCUMENT", "IMAGERY", "GIS", "SUPPORTING", "GIS_IMPORT"}
     actual_categories = {category.value for category in FileCategory}

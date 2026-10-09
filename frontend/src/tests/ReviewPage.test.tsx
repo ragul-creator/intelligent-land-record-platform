@@ -296,7 +296,7 @@ describe("ReviewPage", () => {
     renderPage();
     await screen.findByText("Survey number requires verification");
 
-    fireEvent.change(screen.getByLabelText(/reason \/ comment/i), { target: { value: "Checked against the supplied scan." } });
+    fireEvent.change(await screen.findByLabelText(/reason \/ comment/i), { target: { value: "Checked against the supplied scan." } });
     fireEvent.click(screen.getByRole("button", { name: "Apply comment" }));
 
     expect(await screen.findByText(/COMMENT recorded successfully/i)).toBeInTheDocument();
@@ -316,7 +316,7 @@ describe("ReviewPage", () => {
     renderPage();
 
     expect(await screen.findByText("Survey number requires verification")).toBeInTheDocument();
-    expect(screen.getByText(/read-only review access/i)).toBeInTheDocument();
+    expect(await screen.findByText(/read-only review access/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /apply comment/i })).not.toBeInTheDocument();
   });
 

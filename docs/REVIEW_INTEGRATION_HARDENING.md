@@ -80,16 +80,16 @@ either previous branch head to the shared merge revision.
 
 | Check | Result |
 | --- | --- |
-| Backend, document AI, validation tests | 245 passed; 48 live-database tests skipped |
+| Backend, document AI, validation tests | 246 passed; 48 live-database tests skipped |
 | GeoAI tests in the existing Windows environment | 85 passed; previous four failures fixed |
 | Frontend tests in the Windows worktree | 64 passed |
 | Frontend TypeScript and Vite build | Passed; large bundle warning remains |
-| Alembic history and fresh-install SQL | One head; SQL generation passed |
+| Alembic history and fresh-install SQL | One head; fresh and both previous-head upgrade SQL passed |
 | Compose base and SAMRoad/GPU configurations | Both passed `config --quiet` |
 
 These checks validate the changes without modifying the deployment branch or
-applying migrations to a live database. CI is newly added and has not yet run on
-GitHub. The tests do not certify model accuracy, departmental compatibility, or
+applying migrations to a live database. GitHub CI runs the non-live backend suites,
+frontend tests/build, and migration SQL generation. The tests do not certify model accuracy, departmental compatibility, or
 legal ownership.
 
 ## Remaining work before production rollout
