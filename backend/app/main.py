@@ -22,6 +22,8 @@ from app.api.v1.record_links import router as record_links_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.validation import router as validation_router
 from app.api.v1.platform import router as platform_router
+from app.api.v1.gis_imports import router as gis_imports_router
+from app.api.v1.sync import router as sync_router
 from app.core.errors import ApiError
 
 settings = get_settings()
@@ -44,6 +46,8 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(geoai_router, prefix="/api/v1")
+app.include_router(gis_imports_router, prefix="/api/v1")
+app.include_router(sync_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(record_links_router, prefix="/api/v1")

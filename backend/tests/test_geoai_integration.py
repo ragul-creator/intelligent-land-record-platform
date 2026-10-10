@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from geoalchemy2.shape import from_shape
 from sqlalchemy import select
 
 from app.core.auth import hash_password

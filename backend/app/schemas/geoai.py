@@ -27,7 +27,7 @@ class GeoAIJobCreateRequest(BaseModel):
 class GeoAIJobResponse(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
-    job_type: GeoAIJobType
+    job_type: GeoAIJobType | Literal["GEOPACKAGE_IMPORT"]
     status: GeoAIJobStatus
     progress: int
     has_error: bool

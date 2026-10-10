@@ -62,7 +62,7 @@ def _world_to_pixel_mapper(
 
     def world_to_pixel(x: float, y: float) -> tuple[float, float]:
         source_x, source_y = transformer.transform(x, y)
-        return inverse @ (source_x, source_y)
+        return inverse * (source_x, source_y)
 
     return world_to_pixel
 

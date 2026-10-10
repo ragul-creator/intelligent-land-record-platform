@@ -440,4 +440,12 @@ def resolve_link(session: Session, *, link: RecordParcelLink, actor: User, actio
     if task is not None and task.status == "OPEN":
         apply_review_action(session, task, actor=actor, action="APPROVE" if action == "CONFIRM" else "REJECT", reason=reason)
     record_audit(session, "record_parcel_link.manually_confirmed" if action == "CONFIRM" else "record_parcel_link.rejected", "record_parcel_link", link.id, actor_id=actor.id, project_id=link.project_id, metadata={"document_id": str(link.document_id), "validation_result_id": str(link.document_validation_result_id), "parcel_id": str(link.parcel_id), "confidence": link.confidence, "method": link.link_method, "reason": link.review_reason})
+    from app.services.sync import record_sync_change
+    record_sync_change(
+        session,
+        project_id=link.project_id,
+        entity_type="RECORD_PARCEL_LINK",
+        entity_id=link.id,
+        change_type=link.link_status,
+    )
     return link

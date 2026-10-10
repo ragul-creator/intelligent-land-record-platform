@@ -5,7 +5,7 @@ import hmac
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -108,7 +108,9 @@ def refresh(request: RefreshRequest, session: Session = Depends(get_db_session))
     except ValueError as error:
         raise _invalid_credentials() from error
 
-    auth_session = session.get(AuthSession, session_id)
+    auth_session = session.scalar(
+        select(AuthSession).where(AuthSession.id == session_id).with_for_update()
+    )
     user = session.get(User, user_id)
     if (
         auth_session is None
@@ -140,13 +142,36 @@ def refresh(request: RefreshRequest, session: Session = Depends(get_db_session))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(request: LogoutRequest, session: Session = Depends(get_db_session)) -> None:
-    claims = decode_token(request.refresh_token, "refresh")
-    try:
-        session_id = uuid.UUID(str(claims["sid"]))
-        user_id = uuid.UUID(str(claims["sub"]))
-    except ValueError as error:
-        raise _invalid_credentials() from error
+def logout(
+    request: LogoutRequest | None = None,
+    session: Session = Depends(get_db_session),
+    authorization: str | None = Header(default=None),
+) -> None:
+    session_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+
+    if request is not None and request.refresh_token:
+        claims = decode_token(request.refresh_token, "refresh")
+        try:
+            session_id = uuid.UUID(str(claims["sid"]))
+            user_id = uuid.UUID(str(claims["sub"]))
+        except (ValueError, KeyError) as error:
+            raise _invalid_credentials() from error
+    elif authorization:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            raise _invalid_credentials()
+        claims = decode_token(token, "access")
+        try:
+            if "sid" not in claims:
+                raise _invalid_credentials()
+            session_id = uuid.UUID(str(claims["sid"]))
+            user_id = uuid.UUID(str(claims["sub"]))
+        except (ValueError, KeyError) as error:
+            raise _invalid_credentials() from error
+    else:
+        raise _invalid_credentials()
+
     auth_session = session.get(AuthSession, session_id)
     if auth_session is None or auth_session.user_id != user_id:
         raise _invalid_credentials()

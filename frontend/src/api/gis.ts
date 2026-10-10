@@ -27,16 +27,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const get = <T>(path: string) => request<T>(path);
 
+async function getAll<T>(path: string, limit: number): Promise<T[]> {
+  const items: T[] = [];
+  let offset = 0;
+  while (true) {
+    const result = await get<Page<T>>(`${path}?limit=${limit}&offset=${offset}`);
+    items.push(...result.items);
+    offset += result.items.length;
+    if (offset >= result.page.total) return items;
+    if (result.items.length === 0) {
+      throw new ApiError(502, "INCOMPLETE_PAGE", "GIS data changed while loading. Refresh the project.");
+    }
+  }
+}
+
 export async function loadGisProject(projectId: string) {
   const [parcels, buildings, roads, landUse, topology, imagery] = await Promise.all([
-    get<Page<Parcel>>(`/projects/${projectId}/parcels?limit=100`), get<Page<Building>>(`/projects/${projectId}/buildings?limit=500`), get<Page<Road>>(`/projects/${projectId}/roads?limit=500`), get<Page<LandUseFeature>>(`/projects/${projectId}/land-use?limit=500`), get<Page<TopologyError>>(`/projects/${projectId}/topology-errors?limit=500`),
-    get<Page<ImageryAsset>>(`/projects/${projectId}/imagery?limit=50`),
+    getAll<Parcel>(`/projects/${projectId}/parcels`, 100), getAll<Building>(`/projects/${projectId}/buildings`, 500), getAll<Road>(`/projects/${projectId}/roads`, 500), getAll<LandUseFeature>(`/projects/${projectId}/land-use`, 500), getAll<TopologyError>(`/projects/${projectId}/topology-errors`, 500),
+    getAll<ImageryAsset>(`/projects/${projectId}/imagery`, 50),
   ]);
-  return { parcels: parcels.items, buildings: buildings.items, roads: roads.items, landUse: landUse.items, topology: topology.items, imagery: imagery.items };
+  return { parcels, buildings, roads, landUse, topology, imagery };
 }
 
 export async function loadParcelVersions(projectId: string, parcelId: string): Promise<ParcelGeometryVersion[]> {
-  return (await get<Page<ParcelGeometryVersion>>(`/projects/${projectId}/parcels/${parcelId}/versions?limit=100`)).items;
+  return getAll<ParcelGeometryVersion>(`/projects/${projectId}/parcels/${parcelId}/versions`, 100);
 }
 
 export function loadCurrentUser(): Promise<CurrentUser> { return get<CurrentUser>("/users/me"); }

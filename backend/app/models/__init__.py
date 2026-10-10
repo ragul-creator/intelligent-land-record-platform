@@ -31,6 +31,8 @@ from app.models.documents import (
     DocumentProcessingJob,
     DocumentValidationResultRecord,
 )
+from app.models.gis_imports import GisImportRun
+from app.models.sync import SyncChange, SyncOperation
 
 __all__ = [
     "AuditLog",
@@ -44,6 +46,7 @@ __all__ = [
     "DocumentValidationResultRecord",
     "File",
     "GeoAIJob",
+    "GisImportRun",
     "ImageryAsset",
     "LandUseFeature",
     "Parcel",
@@ -57,6 +60,8 @@ __all__ = [
     "Role",
     "RolePermission",
     "Road",
+    "SyncChange",
+    "SyncOperation",
     "TopologyError",
     "User",
     "UserRole",

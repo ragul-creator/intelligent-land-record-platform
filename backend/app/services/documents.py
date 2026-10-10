@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ai.document_ai.extraction import DocumentExtractionResult, ExtractedFieldCandidate, FieldEvidence
 from ai.document_ai.models import BoundingBox, DocumentOcrResult
+from ai.document_ai.extraction.normalizers import normalize_field_value
 from ai.document_ai.validation import DocumentValidationResult, validate_document_extraction
 from app.audit.service import record_audit
 from app.models import (
@@ -120,7 +121,7 @@ def extraction_from_records(session: Session, *, document_id: uuid.UUID, ocr: Do
             correction = session.scalar(select(DocumentFieldCorrection).where(DocumentFieldCorrection.extracted_field_id == record.id).order_by(DocumentFieldCorrection.version.desc()))
             if correction:
                 value = correction.corrected_value
-                normalized = correction.corrected_value
+                normalized = normalize_field_value(record.field_name, correction.corrected_value)
         bbox = BoundingBox(**record.bounding_box_json) if record.bounding_box_json else None
         fields.setdefault(record.field_name, []).append(ExtractedFieldCandidate(
             field_name=record.field_name, original_value=value, normalized_value=normalized, confidence=record.confidence,
@@ -151,11 +152,21 @@ def persist_validation(session: Session, *, document: Document, ocr: DocumentOcr
 
 
 def create_correction(session: Session, *, document: Document, field: DocumentExtractedField, value: str, reason: str, actor_id: uuid.UUID) -> DocumentFieldCorrection:
+    session.get(DocumentExtractedField, field.id, with_for_update=True)
     version = (session.scalar(select(func.max(DocumentFieldCorrection.version)).where(DocumentFieldCorrection.extracted_field_id == field.id)) or 0) + 1
     correction = DocumentFieldCorrection(document_id=document.id, extracted_field_id=field.id, version=version, corrected_value=value, reason=reason, created_by_user_id=actor_id)
     session.add(correction)
     session.flush()
     record_audit(session, "document.field_corrected", "document_field_correction", correction.id, actor_id=actor_id, project_id=document.project_id, metadata={"document_id": str(document.id), "field_name": field.field_name, "extracted_field_id": str(field.id), "version": version})
+    from app.services.sync import record_sync_change
+    record_sync_change(
+        session,
+        project_id=document.project_id,
+        entity_type="DOCUMENT_FIELD",
+        entity_id=field.id,
+        change_type="UPDATED",
+        server_version=version,
+    )
     return correction
 
 
