@@ -7,7 +7,6 @@ import { loadCurrentUser } from "../api/gis";
 
 const demoIdentifier = "viewer.demo.tn@example.invalid";
 const demoPassword = "BhumiDemo2026Pass";
-const demoMode = true;
 
 export function HomePage() {
   const client = useQueryClient();
@@ -40,9 +39,8 @@ export function HomePage() {
     retry: false,
   });
   const signIn = useMutation({
-    mutationFn: () => login(demoMode ? demoIdentifier : identifier.trim(), demoMode ? demoPassword : password),
+    mutationFn: () => login(identifier.trim(), password),
     onSuccess: async () => {
-      if (!demoMode) setPassword("");
       setSessionVersion((value) => value + 1);
       await client.invalidateQueries();
     },
