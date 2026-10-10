@@ -25,7 +25,11 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_geoai_jobs_type",
         "geoai_jobs",
-        "job_type IN ('PARCEL_IMPORT', 'BUILDING_VECTORIZE', 'ROAD_VECTORIZE', 'ROAD_IMPORT', 'LAND_USE_IMPORT', 'TOPOLOGY_VALIDATE', 'GEOPACKAGE_IMPORT')",
+        # The sibling deployed branch may already contain parcel delineation
+        # and land-use jobs. Preserve them before the branches reach the merge.
+        "job_type IN ('PARCEL_IMPORT', 'PARCEL_DELINEATE', 'BUILDING_VECTORIZE', "
+        "'ROAD_VECTORIZE', 'LAND_USE_VECTORIZE', 'ROAD_IMPORT', 'LAND_USE_IMPORT', "
+        "'TOPOLOGY_VALIDATE', 'GEOPACKAGE_IMPORT')",
     )
 
 
