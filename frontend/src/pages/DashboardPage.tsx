@@ -92,12 +92,12 @@ export function DashboardPage() {
   return <main className="dashboard-shell">
     <header className="dashboard-header dashboard-hero">
       <div className="dashboard-title-block">
-        <p className="eyebrow">Land intelligence workspace</p>
+        <p className="eyebrow">Urban intelligence workspace</p>
         <div className="dashboard-title-line">
           <h1>{data.project.name}</h1>
           <div className="dashboard-badges" aria-label="Project status"><span>{data.project.state}</span><span>{data.project_role}</span></div>
         </div>
-        <p>{data.project.description || "Document intelligence and geospatial analysis in one auditable workspace."}</p>
+        <p>{data.project.description || "Planning documents and geospatial analysis in one auditable workspace."}</p>
         <div className="dashboard-hero-actions">
           {canDocuments && <Link to={`/projects/${projectId}/documents`}>Add document</Link>}
           {canGis && <Link to={`/projects/${projectId}/gis`}>Open map</Link>}
@@ -130,7 +130,7 @@ export function DashboardPage() {
         <Link to="/">Home</Link>
         {canDocuments && <Link to={`/projects/${projectId}/documents`}>Documents</Link>}
         {canGis && <Link to={`/projects/${projectId}/gis`}>Web-GIS</Link>}
-        {canReview && <Link to={`/projects/${projectId}/review`}>Review workspace</Link>}
+        {canReview && <Link to={`/projects/${projectId}/review`}>Planning review</Link>}
         {canProjectRead && <Link to={`/projects/${projectId}/search`}>Search</Link>}
         {canProjectRead && <Link to={`/projects/${projectId}/jobs`}>Jobs</Link>}
         {canExport && <Link to={`/projects/${projectId}/exports`}>Exports</Link>}
@@ -143,20 +143,20 @@ export function DashboardPage() {
       {canDocuments && <Link className="dashboard-launch-card" to={`/projects/${projectId}/documents`}>
         <span className="dashboard-launch-index">01</span>
         <span className="dashboard-workflow-icon"><WorkflowIcon kind="document" /></span>
-        <div><p className="eyebrow">Document intelligence</p><h2>OCR & land records</h2><p>Upload source records, inspect OCR evidence, structured fields, confidence, and provenance.</p></div>
-        <strong>Open Document AI <span aria-hidden="true">→</span></strong>
+        <div><p className="eyebrow">Document intelligence</p><h2>Planning documents & AI</h2><p>Upload planning documents and inspect extracted fields, confidence, and provenance.</p></div>
+        <strong>Open planning documents <span aria-hidden="true">→</span></strong>
       </Link>}
       {canGis && <Link className="dashboard-launch-card" to={`/projects/${projectId}/gis`}>
         <span className="dashboard-launch-index">02</span>
         <span className="dashboard-workflow-icon"><WorkflowIcon kind="map" /></span>
-        <div><p className="eyebrow">Spatial intelligence</p><h2>Web-GIS & GeoAI</h2><p>Inspect imagery, buildings, roads, preliminary parcel candidates, and visible-boundary evidence.</p></div>
-        <strong>Open Web-GIS <span aria-hidden="true">→</span></strong>
+        <div><p className="eyebrow">Spatial intelligence</p><h2>Urban GIS & GeoAI</h2><p>Inspect imagery, buildings, roads, preliminary parcel candidates, and visible-boundary evidence.</p></div>
+        <strong>Open Urban GIS <span aria-hidden="true">→</span></strong>
       </Link>}
       {canReview && <Link className="dashboard-launch-card dashboard-launch-card-secondary" to={`/projects/${projectId}/review`}>
         <span className="dashboard-launch-index">03</span>
         <span className="dashboard-workflow-icon"><WorkflowIcon kind="review" /></span>
-        <div><p className="eyebrow">Human oversight</p><h2>Review workspace</h2><p>Resolve low-confidence or conflicting evidence while preserving source provenance and audit history.</p></div>
-        <strong>Open Review <span aria-hidden="true">→</span></strong>
+        <div><p className="eyebrow">Planning oversight</p><h2>Planning review</h2><p>Resolve low-confidence or conflicting evidence while preserving source provenance and audit history.</p></div>
+        <strong>Open planning review <span aria-hidden="true">→</span></strong>
       </Link>}
     </section>
 
@@ -186,7 +186,7 @@ export function DashboardPage() {
     <section className="dashboard-operations" aria-label="Operational overview">
       <article className="dashboard-module dashboard-module-document">
         <div className="dashboard-module-head">
-          <div><p className="eyebrow">SIH18 · Document AI</p><h2>Record intelligence</h2></div>
+          <div><p className="eyebrow">DOCUMENT INTELLIGENCE</p><h2>Planning document intelligence</h2></div>
           {canDocuments && <Link to={`/projects/${projectId}/documents`} aria-label="Open documents">→</Link>}
         </div>
         <div className="dashboard-progress-block">
@@ -199,22 +199,22 @@ export function DashboardPage() {
 
       <article className="dashboard-module dashboard-module-spatial">
         <div className="dashboard-module-head">
-          <div><p className="eyebrow">SIH12 · GIS / GeoAI</p><h2>Spatial inventory</h2></div>
-          {canGis && <Link to={`/projects/${projectId}/gis`} aria-label="Open Web-GIS">→</Link>}
+          <div><p className="eyebrow">URBAN GIS / GEOAI</p><h2>Urban spatial inventory</h2></div>
+          {canGis && <Link to={`/projects/${projectId}/gis`} aria-label="Open Urban GIS">→</Link>}
         </div>
         <div className="dashboard-data-table">
           <DataRow label="Imagery" value={data.geo.imagery_assets} />
           <DataRow label="GeoAI jobs" value={data.geo.geoai_jobs} />
           <DataRow label="Buildings" value={data.geo.buildings} />
           <DataRow label="Roads" value={data.geo.roads} />
-          <DataRow label="Land-use features" value={data.geo.land_use_features} />
+          <DataRow label="Land-cover features" value={data.geo.land_use_features} />
         </div>
         <StatusList items={data.geo.parcel_statuses} />
       </article>
 
       <article className="dashboard-module dashboard-module-review">
         <div className="dashboard-module-head">
-          <div><p className="eyebrow">Human oversight</p><h2>Review load</h2></div>
+          <div><p className="eyebrow">Planning oversight</p><h2>Review load</h2></div>
           {canReview && <Link to={`/projects/${projectId}/review`} aria-label="Open review workspace">→</Link>}
         </div>
         <div className="dashboard-progress-block">
@@ -253,16 +253,16 @@ export function DashboardPage() {
       </div>
       <p>{visibilityNotice} Confirmed associations are workflow evidence only; external or statutory verification is not implied.</p>
       <div className="dashboard-policy-links">
-        {canAudit && <Link to={`/projects/${projectId}/audit`}>Audit trail</Link>}
-        {canExport && <Link to={`/projects/${projectId}/exports`}>Evidence exports</Link>}
+        {canAudit && <Link to={`/projects/${projectId}/audit`}>Activity history</Link>}
+        {canExport && <Link to={`/projects/${projectId}/exports`}>Planning exports</Link>}
       </div>
     </section>
 
     <section className="demo-flow" aria-label="Demo presentation guide">
-      <div><p className="eyebrow">Demo presentation</p><h2>Two focused capabilities</h2><p>Present document intelligence and spatial intelligence as separate, production-oriented workflows. Cross-validation is intentionally outside this demo scope.</p></div>
+      <div><p className="eyebrow">Demo presentation</p><h2>Connected planning workflows</h2><p>Explore document intelligence and spatial layers as connected planning workflows, with clear provenance and review status.</p></div>
       <ol>
-        {canDocuments && <li><Link to={`/projects/${projectId}/documents`}>1. Document AI / OCR</Link><span>Upload the demo land deed and show OCR evidence, structured extraction, confidence, and provenance.</span></li>}
-        {canGis && <li><Link to={`/projects/${projectId}/gis`}>2. Web-GIS / GeoAI</Link><span>Use the prepared imagery to show detected buildings, roads, preliminary parcels, and visible-boundary evidence.</span></li>}
+        {canDocuments && <li><Link to={`/projects/${projectId}/documents`}>1. Document AI / OCR</Link><span>Upload a prepared source document and inspect extraction evidence, confidence, and provenance.</span></li>}
+        {canGis && <li><Link to={`/projects/${projectId}/gis`}>2. Urban GIS / GeoAI</Link><span>Use prepared imagery to inspect buildings, roads, preliminary parcel candidates, and visible spatial evidence.</span></li>}
         {canReview && <li><Link to={`/projects/${projectId}/review`}>Optional: human review</Link><span>Use only if needed to demonstrate governance and auditable corrections.</span></li>}
       </ol>
     </section>

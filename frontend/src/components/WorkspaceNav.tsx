@@ -27,27 +27,27 @@ export function WorkspaceNav() {
   const base = projectId ? `/projects/${projectId}` : "";
   const primary: NavItem[] = projectId
     ? [
-        { label: "Dashboard", path: base, note: "Project overview" },
-        { label: "Documents", path: `${base}/documents`, note: "OCR & records" },
-        { label: "WebGIS", path: `${base}/gis`, note: "Maps & GeoAI" },
-        { label: "Review", path: `${base}/review`, note: "Human verification" },
+        { label: "City dashboard", path: base, note: "Urban intelligence overview" },
+        { label: "Planning documents", path: `${base}/documents`, note: "Document intelligence" },
+        { label: "Urban GIS", path: `${base}/gis`, note: "City maps & GeoAI" },
+        { label: "Planning review", path: `${base}/review`, note: "Data quality & verification" },
       ]
     : [];
 
   const tools: NavItem[] = projectId
     ? [
-        { label: "Search", path: `${base}/search`, note: "Find documents, parcels and evidence" },
-        { label: "Processing jobs", path: `${base}/jobs`, note: "Live work, failures and safe retries" },
-        { label: "Exports", path: `${base}/exports`, note: "Portable evidence with verification labels" },
-        { label: "Audit trail", path: `${base}/audit`, note: "Trace important workflow activity" },
-        { label: "Project admin", path: `${base}/admin`, note: "Metadata and authorized membership" },
+        { label: "Spatial search", path: `${base}/search`, note: "Find documents, places and evidence" },
+        { label: "Analysis centre", path: `${base}/jobs`, note: "Analysis history, failures and reruns" },
+        { label: "Planning reports", path: `${base}/exports`, note: "Exports and evidence summaries" },
+        { label: "Activity history", path: `${base}/audit`, note: "Trace important workspace activity" },
+        { label: "Workspace settings", path: `${base}/admin`, note: "Metadata and authorized membership" },
       ]
     : [];
 
   return (
     <>
-      <header className="workspace-nav" aria-label="Bhumi-AI navigation">
-        <Link className="workspace-wordmark" to="/" aria-label="Bhumi-AI home">
+      <header className={projectId ? "workspace-nav workspace-nav-sidebar" : "workspace-nav workspace-nav-public"} aria-label="UrbanPlan AI navigation">
+        <Link className="workspace-wordmark" to="/" aria-label="UrbanPlan AI home">
           <span className="workspace-earth" aria-hidden="true" />
           <span>Bhumi-AI</span>
         </Link>
@@ -55,7 +55,7 @@ export function WorkspaceNav() {
         <div className="workspace-dock">
           <nav className={toolsOpen ? "workspace-pill workspace-pill-open" : "workspace-pill"} aria-label="Primary navigation">
             <div className="workspace-links" aria-hidden={toolsOpen}>
-              {!projectId && <NavLink to="/" end>Projects</NavLink>}
+              {!projectId && <NavLink to="/" end>Study areas</NavLink>}
               {primary.map((item) => (
                 <NavLink key={item.path} to={item.path} end={item.label === "Dashboard"}>
                   {item.label}
@@ -81,10 +81,10 @@ export function WorkspaceNav() {
                 aria-hidden={!toolsOpen}
               >
                 <div className="workspace-panel-head">
-                  <span>Project tools</span>
+                  <span>Workspace tools</span>
                   <button type="button" onClick={() => setToolsOpen(false)} aria-label="Close project tools">×</button>
                 </div>
-                <p className="workspace-panel-kicker">Move between operational views without leaving this project.</p>
+                <p className="workspace-panel-kicker">Move between urban analysis tools without leaving this workspace.</p>
                 <div className="workspace-panel-rows">
                   {tools.map((item) => (
                     <NavLink key={item.path} to={item.path}>
@@ -97,8 +97,8 @@ export function WorkspaceNav() {
                   ))}
                 </div>
                 <div className="workspace-panel-chips" aria-label="Project shortcuts">
-                  <NavLink to={base} end>Dashboard</NavLink>
-                  <Link to="/">All projects</Link>
+                  <NavLink to={base} end>City dashboard</NavLink>
+                  <Link to="/">All workspaces</Link>
                 </div>
               </section>
             )}
@@ -106,7 +106,7 @@ export function WorkspaceNav() {
         </div>
 
         <div className="workspace-nav-end">
-          {projectId ? <Link to="/">Projects</Link> : <span className="workspace-mode">Land intelligence</span>}
+          {projectId ? <Link to="/">Workspaces</Link> : <span className="workspace-mode">Urban intelligence</span>}
         </div>
       </header>
       {toolsOpen && <button className="workspace-scrim" type="button" aria-label="Close navigation menu" onClick={() => setToolsOpen(false)} />}

@@ -67,18 +67,18 @@ export function HomePage() {
   return <main className="home-shell">
     <header className="home-hero">
       <div>
-        <h1>Bhumi-AI</h1>
-        <p>Professional land-record intelligence with two focused capabilities: document OCR and evidence extraction, plus Web-GIS and GeoAI analysis.</p>
+        <h1>UrbanPlan AI</h1>
+        <p>AI-powered urban development and spatial intelligence for municipal teams, researchers, and smart-city innovators.</p>
       </div>
 
     </header>
 
     {!loggedIn && <section className="login-card login-experience" aria-label="Sign in">
-      <aside className="login-visual" aria-label="Bhumi-AI capabilities">
+      <aside className="login-visual" aria-label="UrbanPlan AI capabilities">
         <div className="login-visual-copy">
-          <p className="eyebrow">Unified land intelligence</p>
-          <h2>Evidence first.<br />Decisions with context.</h2>
-          <p>One workspace for digitized land records, geospatial evidence, and human review.</p>
+          <p className="eyebrow">Urban intelligence workspace</p>
+          <h2>Plan with evidence.<br />Build with insight.</h2>
+          <p>One workspace for planning documents, spatial layers, urban analysis, and collaborative review.</p>
         </div>
 
         <div className="login-map-motif" aria-hidden="true">
@@ -92,15 +92,15 @@ export function HomePage() {
             <circle className="login-node" cx="122" cy="114" r="4" />
             <circle className="login-node" cx="298" cy="116" r="4" />
           </svg>
-          <span className="login-map-tag login-map-tag-a">Document evidence</span>
-          <span className="login-map-tag login-map-tag-b">GeoAI layers</span>
-          <span className="login-map-tag login-map-tag-c">Human review</span>
+          <span className="login-map-tag login-map-tag-a">Planning documents</span>
+          <span className="login-map-tag login-map-tag-b">City-scale AI layers</span>
+          <span className="login-map-tag login-map-tag-c">Planning review</span>
         </div>
 
         <div className="login-capabilities">
-          <span>OCR & extraction</span>
-          <span>WebGIS & GeoAI</span>
-          <span>Audit-ready review</span>
+          <span>Document intelligence</span>
+          <span>Urban GIS & GeoAI</span>
+          <span>Traceable decisions</span>
         </div>
       </aside>
 
@@ -108,7 +108,7 @@ export function HomePage() {
         <div className="login-form-heading">
           <p className="eyebrow">Secure project access</p>
           <h2>Sign in</h2>
-          <p>Continue to your authorized Bhumi-AI workspace.</p>
+          <p>Continue to your authorized UrbanPlan AI workspace.</p>
         </div>
         <form onSubmit={(event) => { event.preventDefault(); if (identifier.trim() && password) signIn.mutate(); }}>
           <label>Login ID or email<input aria-label="Login ID or email" autoComplete="username" value={identifier} onChange={(event) => setIdentifier(event.target.value)} /></label>
@@ -132,7 +132,7 @@ export function HomePage() {
       </section>
 
       {canCreateProject && <section className="project-create-card" aria-label="Create project">
-        <div><p className="eyebrow">H.2B.4 project setup</p><h2>Create a project</h2><p>Creates an isolated ACTIVE project and adds you as its owner/member using your current application role.</p></div>
+        <div><p className="eyebrow">Workspace setup</p><h2>Create a project</h2><p>Creates an isolated planning workspace with role-based access.</p></div>
         <form onSubmit={(event) => { event.preventDefault(); if (projectName.trim()) create.mutate(); }}>
           <label>Project name<input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} maxLength={255} /></label>
           <label>Description<textarea aria-label="Project description" value={projectDescription} onChange={(event) => setProjectDescription(event.target.value)} maxLength={10000} /></label>
@@ -151,17 +151,17 @@ export function HomePage() {
           return <article className="project-launch-card" key={project.id}>
             <div><span className="project-state">{project.state}</span><span>{membership?.role ?? "MEMBER"}</span></div>
             <h3>{project.name}</h3>
-            <p>{project.description || "Integrated land-record project"}</p>
-            <Link to={`/projects/${project.id}`}>Open operational dashboard</Link>
+            <p>{project.description || "Urban development and spatial intelligence workspace"}</p>
+            <Link to={`/projects/${project.id}`}>Open city dashboard</Link>
           </article>;
         })}</div>
       </section>
 
       <section className="home-demo-path">
-        <div><p className="eyebrow">Suggested judging path</p><h2>Two clear demo workflows</h2><p>Keep the live walkthrough focused and easy to follow.</p></div>
+        <div><p className="eyebrow">Suggested analysis workflows</p><h2>Connected planning workflows</h2><p>Keep the live walkthrough focused and easy to follow.</p></div>
         <ol>
-          <li><strong>Document AI / OCR</strong><span>Upload the prepared land deed and show OCR evidence, extracted fields, confidence, and provenance.</span></li>
-          <li><strong>Web-GIS / GeoAI</strong><span>Open the prepared imagery and show detected buildings, roads, parcel candidates, and visible-boundary evidence.</span></li>
+          <li><strong>Document AI / OCR</strong><span>Upload a prepared source document and inspect extracted fields, confidence, and provenance.</span></li>
+          <li><strong>Web-GIS / GeoAI</strong><span>Explore prepared imagery and inspect building footprints, road networks, preliminary parcel candidates, and land-cover evidence.</span></li>
         </ol>
       </section>
     </>}
