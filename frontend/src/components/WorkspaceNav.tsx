@@ -29,8 +29,8 @@ export function WorkspaceNav() {
     ? [
         { label: "City dashboard", path: base, note: "Urban intelligence overview" },
         { label: "Planning documents", path: `${base}/documents`, note: "Document intelligence" },
-        { label: "Urban GIS", path: `${base}/gis`, note: "City maps & GeoAI" },
-        { label: "Planning review", path: `${base}/review`, note: "Data quality & verification" },
+        { label: "Urban GIS Explorer", path: `${base}/gis`, note: "City maps & GeoAI" },
+        { label: "Review & verification", path: `${base}/review`, note: "Data quality & verification" },
       ]
     : [];
 
@@ -49,7 +49,7 @@ export function WorkspaceNav() {
       <header className={projectId ? "workspace-nav workspace-nav-sidebar" : "workspace-nav workspace-nav-public"} aria-label="UrbanPlan AI navigation">
         <Link className="workspace-wordmark" to="/" aria-label="UrbanPlan AI home">
           <span className="workspace-earth" aria-hidden="true" />
-          <span>Bhumi-AI</span>
+          <span>UrbanPlan AI</span>
         </Link>
 
         <div className="workspace-dock">
@@ -57,7 +57,7 @@ export function WorkspaceNav() {
             <div className="workspace-links" aria-hidden={toolsOpen}>
               {!projectId && <NavLink to="/" end>Study areas</NavLink>}
               {primary.map((item) => (
-                <NavLink key={item.path} to={item.path} end={item.label === "Dashboard"}>
+                <NavLink key={item.path} to={item.path} end={item.path === base}>
                   {item.label}
                 </NavLink>
               ))}
